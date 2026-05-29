@@ -322,9 +322,11 @@ Template rendering in `src/Shared/Notification/WpMailNotificationService.php`.
 - **`includes/Shortcode.php`** — `[clubcompetitie]` shortcode handler
 - **`composer.json`** — PHP dependencies (PHP 8.2+ required)
 
-## Git Commits
+## Git Workflow
 
-All commits must be authored as the human developer (pcmoreno), never as Claude or any AI identity. Before committing, verify `git config user.name` and `git config user.email` are set to the developer's identity. Claude must not appear as a contributor in the git log.
+- All commits must be authored as the human developer (pcmoreno), never as Claude or any AI identity. Before committing, verify `git config user.name` and `git config user.email` are set to the developer's identity. Claude must not appear as a contributor in the git log.
+- Always work on a branch — never commit directly to `master` unless explicitly instructed.
+- When updating a branch with changes from its base branch, use `git pull` (merge, not rebase).
 
 ## References
 

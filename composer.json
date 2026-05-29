@@ -17,7 +17,7 @@
     "symfony/serializer": "^6.4",
     "symfony/security-core": "^6.4",
     "symfony/console": "^6.4",
-    "symfony/csrf": "^6.4",
+    "symfony/security-csrf": "^6.4",
     "doctrine/dbal": "^3.7",
     "lcobucci/jwt": "^5.0",
     "dompdf/dompdf": "^2.0"
