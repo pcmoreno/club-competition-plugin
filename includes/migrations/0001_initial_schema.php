@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-return function ( wpdb $wpdb ): void {
+return function (wpdb $wpdb): void {
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
     $charset = $wpdb->get_charset_collate();
     $p       = $wpdb->prefix . 'scs_';
 
-    dbDelta( "CREATE TABLE {$p}players (
+    dbDelta("CREATE TABLE {$p}players (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       knsb_id VARCHAR(20) DEFAULT NULL,
@@ -19,9 +19,9 @@ return function ( wpdb $wpdb ): void {
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY  (id),
       UNIQUE KEY knsb_id (knsb_id)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}seasons (
+    dbDelta("CREATE TABLE {$p}seasons (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       location VARCHAR(255) DEFAULT NULL,
@@ -32,9 +32,9 @@ return function ( wpdb $wpdb ): void {
       categories JSON DEFAULT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY  (id)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}season_players (
+    dbDelta("CREATE TABLE {$p}season_players (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       season_id BIGINT UNSIGNED NOT NULL,
       player_id BIGINT UNSIGNED NOT NULL,
@@ -45,9 +45,9 @@ return function ( wpdb $wpdb ): void {
       UNIQUE KEY season_player (season_id, player_id),
       KEY season_id (season_id),
       KEY player_id (player_id)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}members (
+    dbDelta("CREATE TABLE {$p}members (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       player_id BIGINT UNSIGNED NOT NULL,
       email VARCHAR(255) NOT NULL,
@@ -63,9 +63,9 @@ return function ( wpdb $wpdb ): void {
       UNIQUE KEY player_id (player_id),
       KEY invite_token (invite_token),
       KEY reset_token (reset_token)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}admins (
+    dbDelta("CREATE TABLE {$p}admins (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       email VARCHAR(255) NOT NULL,
@@ -74,9 +74,9 @@ return function ( wpdb $wpdb ): void {
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY  (id),
       UNIQUE KEY email (email)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}rounds (
+    dbDelta("CREATE TABLE {$p}rounds (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       season_id BIGINT UNSIGNED NOT NULL,
       round_number TINYINT UNSIGNED NOT NULL,
@@ -86,9 +86,9 @@ return function ( wpdb $wpdb ): void {
       PRIMARY KEY  (id),
       UNIQUE KEY season_round (season_id, round_number),
       KEY season_id (season_id)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}attendance (
+    dbDelta("CREATE TABLE {$p}attendance (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       round_id BIGINT UNSIGNED NOT NULL,
       season_player_id BIGINT UNSIGNED NOT NULL,
@@ -98,17 +98,17 @@ return function ( wpdb $wpdb ): void {
       UNIQUE KEY round_player (round_id, season_player_id),
       KEY round_id (round_id),
       KEY season_player_id (season_player_id)
-    ) {$charset};" );
+    ) {$charset};");
 
-    dbDelta( "CREATE TABLE {$p}games (
+    dbDelta("CREATE TABLE {$p}games (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       round_id BIGINT UNSIGNED NOT NULL,
       white_season_player_id BIGINT UNSIGNED NOT NULL,
       black_season_player_id BIGINT UNSIGNED NOT NULL,
-      result VARCHAR(20) NOT NULL DEFAULT 'pending',
+      result VARCHAR(20) DEFAULT NULL,
       PRIMARY KEY  (id),
       KEY round_id (round_id),
       KEY white_season_player_id (white_season_player_id),
       KEY black_season_player_id (black_season_player_id)
-    ) {$charset};" );
+    ) {$charset};");
 };

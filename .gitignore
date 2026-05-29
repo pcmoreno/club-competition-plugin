@@ -28,6 +28,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# PHP CS Fixer
+.php-cs-fixer.cache
+
 # Logs
 *.log
 

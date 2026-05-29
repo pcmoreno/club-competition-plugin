@@ -6,6 +6,7 @@ $finder = PhpCsFixer\Finder::create()
         __DIR__ . '/includes',
         __DIR__ . '/tests',
     ])
+    ->append([__DIR__ . '/club-competition-plugin.php'])
     ->exclude('vendor');
 
 $config = new PhpCsFixer\Config();

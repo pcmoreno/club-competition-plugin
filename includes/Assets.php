@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace SCS\includes;
 
-class Assets {
-    public static function boot() {
+class Assets
+{
+    public static function boot()
+    {
         // Enqueue frontend scripts and styles
     }
 
-    public static function enqueue_frontend() {
-        $asset_file = dirname( __FILE__ ) . '/../build/viewer.asset.php';
+    public static function enqueue_frontend()
+    {
+        $asset_file = dirname(__FILE__) . '/../build/viewer.asset.php';
 
-        if ( ! file_exists( $asset_file ) ) {
+        if (! file_exists($asset_file)) {
             return;
         }
 
@@ -20,7 +23,7 @@ class Assets {
 
         wp_enqueue_script(
             'scs-viewer',
-            plugins_url( 'build/viewer.js', dirname( __FILE__ ) ),
+            plugins_url('build/viewer.js', dirname(__FILE__)),
             $asset['dependencies'],
             $asset['version'],
             true
@@ -28,7 +31,7 @@ class Assets {
 
         wp_enqueue_style(
             'scs-viewer',
-            plugins_url( 'build/viewer.css', dirname( __FILE__ ) ),
+            plugins_url('build/viewer.css', dirname(__FILE__)),
             [],
             $asset['version']
         );
