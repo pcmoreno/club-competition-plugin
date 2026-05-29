@@ -55,16 +55,28 @@ class RoundRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(int $season_id, int $round_number, ?string $date): Round
+    public function createNextForSeason(int $season_id, ?string $date): Round
     {
-        $this->connection->insert('wp_scs_rounds', [
-            'season_id'    => $season_id,
-            'round_number' => $round_number,
-            'date'         => $date,
-            'status'       => RoundStatus::Draft->value,
-        ]);
+        return $this->connection->transactional(function () use ($season_id, $date): Round {
+            $maxRow = $this->connection->createQueryBuilder()
+                ->select('COALESCE(MAX(round_number), 0) AS max_number')
+                ->from('wp_scs_rounds')
+                ->where('season_id = :season_id')
+                ->setParameter('season_id', $season_id)
+                ->forUpdate()
+                ->fetchAssociative();
 
-        return $this->findById((int)$this->connection->lastInsertId());
+            $nextNumber = ((int)($maxRow['max_number'] ?? 0)) + 1;
+
+            $this->connection->insert('wp_scs_rounds', [
+                'season_id'    => $season_id,
+                'round_number' => $nextNumber,
+                'date'         => $date,
+                'status'       => RoundStatus::Draft->value,
+            ]);
+
+            return $this->findById((int)$this->connection->lastInsertId());
+        });
     }
 
     public function updateStatus(int $id, RoundStatus $status): void

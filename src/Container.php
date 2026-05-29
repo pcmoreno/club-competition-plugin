@@ -67,10 +67,13 @@ class Container
         // ── Services ──────────────────────────────────────────────────────────
         $container->register('jwt_service', Service\JwtService::class);
 
+        $container->register('email_notification_service', Services\EmailNotificationService::class);
+
         $container->register('auth_service', Service\AuthService::class)
             ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('admin_repository'))
-            ->addArgument(new Reference('jwt_service'));
+            ->addArgument(new Reference('jwt_service'))
+            ->addArgument(new Reference('email_notification_service'));
 
         $container->register('serializer_service', Services\SerializerService::class);
 

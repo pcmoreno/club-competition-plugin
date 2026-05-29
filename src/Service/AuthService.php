@@ -10,6 +10,7 @@ use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
 use SCS\Repository\MemberRepository;
+use SCS\Services\EmailNotificationService;
 
 class AuthService
 {
@@ -17,6 +18,7 @@ class AuthService
         private readonly MemberRepository $memberRepository,
         private readonly AdminRepository $adminRepository,
         private readonly JwtService $jwtService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {
     }
 
@@ -90,8 +92,7 @@ class AuthService
             'reset_expires_at' => $expiresAt->format('Y-m-d H:i:s'),
         ]);
 
-        // Email sending handled by caller (controller passes to NotificationService)
-        // Stored token is returned implicitly via the updated member record
+        $this->emailNotificationService->sendPasswordReset($member->email, $resetToken);
     }
 
     public function resetPassword(string $token, string $password): void

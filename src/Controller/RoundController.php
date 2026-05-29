@@ -62,13 +62,9 @@ class RoundController
             return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
         }
 
-        $existingRounds = $this->roundRepository->findBySeason($season->id);
-        $roundNumber    = count($existingRounds) + 1;
-
-        $round = $this->roundRepository->create(
-            season_id:    $season->id,
-            round_number: $roundNumber,
-            date:         $request->get_param('date') !== null ? (string)$request->get_param('date') : null,
+        $round = $this->roundRepository->createNextForSeason(
+            season_id: $season->id,
+            date:      $request->get_param('date') !== null ? (string)$request->get_param('date') : null,
         );
 
         return new \WP_REST_Response($this->serializer->serialize($round), StatusCode::CREATED);

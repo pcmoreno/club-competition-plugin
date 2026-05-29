@@ -8,6 +8,7 @@ use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Http\StatusCode;
 use SCS\Service\AuthService;
+use SCS\Service\JwtService;
 
 class AuthController
 {
@@ -104,7 +105,7 @@ class AuthController
     private function setTokenCookie(string $token): void
     {
         setcookie('scs_token', $token, [
-            'expires'  => time() + 86400,
+            'expires'  => time() + JwtService::TOKEN_TTL_SECONDS,
             'path'     => '/',
             'secure'   => is_ssl(),
             'httponly' => true,

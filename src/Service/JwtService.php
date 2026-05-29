@@ -7,24 +7,39 @@ namespace SCS\Service;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Validation\Constraint\LooseValidAt;
+use Lcobucci\JWT\Validation\Constraint\SignedWith;
+use Psr\Clock\ClockInterface;
 
 class JwtService
 {
+    public const TOKEN_TTL_SECONDS = 86400;
+
     private Configuration $config;
+    private ClockInterface $clock;
 
     public function __construct()
     {
-        $secret = defined('SCS_JWT_SECRET') ? SCS_JWT_SECRET : 'dev-secret-change-in-production';
-        $this->config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText($secret));
+        if (!defined('SCS_JWT_SECRET') || SCS_JWT_SECRET === '' || SCS_JWT_SECRET === 'dev-secret-change-in-production') {
+            throw new \RuntimeException('SCS_JWT_SECRET must be defined in wp-config.php with a strong secret.');
+        }
+
+        $this->config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText(SCS_JWT_SECRET));
+        $this->clock  = new class () implements ClockInterface {
+            public function now(): \DateTimeImmutable
+            {
+                return new \DateTimeImmutable();
+            }
+        };
     }
 
     public function issue(int $subject, string $role): string
     {
-        $now = new \DateTimeImmutable();
+        $now = $this->clock->now();
 
         return $this->config->builder()
             ->issuedAt($now)
-            ->expiresAt($now->modify('+1 day'))
+            ->expiresAt($now->modify('+' . self::TOKEN_TTL_SECONDS . ' seconds'))
             ->withClaim('sub', $subject)
             ->withClaim('role', $role)
             ->getToken($this->config->signer(), $this->config->signingKey())
@@ -39,16 +54,9 @@ class JwtService
 
             $this->config->validator()->assert(
                 $token,
-                new \Lcobucci\JWT\Validation\Constraint\SignedWith(
-                    $this->config->signer(),
-                    $this->config->signingKey()
-                )
+                new SignedWith($this->config->signer(), $this->config->signingKey()),
+                new LooseValidAt($this->clock),
             );
-
-            $expiry = $token->claims()->get('exp');
-            if ($expiry instanceof \DateTimeImmutable && $expiry < new \DateTimeImmutable()) {
-                return null;
-            }
 
             return [
                 'sub'  => (int)$token->claims()->get('sub'),
