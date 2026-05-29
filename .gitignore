@@ -1,0 +1,39 @@
+# Composer
+/vendor/
+composer.lock
+
+# Node
+/node_modules/
+/build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+.phpstorm.meta.php
+_ide_helper.php
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# WordPress
+wp-config.php
+/wp-content/
+/wp-admin/
+/wp-includes/
+
+# Testing
+.phpunit.cache/
+coverage/

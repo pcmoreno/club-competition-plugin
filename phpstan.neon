@@ -1,0 +1,14 @@
+parameters:
+  level: 8
+  paths:
+    - src
+    - includes
+  excludePaths:
+    - vendor
+  ignoreErrors:
+    # WordPress globals
+    - '#Call to undefined function (get_option|add_option|delete_option)#'
+    - '#Call to undefined function (add_action|add_filter|do_action)#'
+    - '#Call to undefined function (wp_enqueue_script|wp_enqueue_style)#'
+    - '#Undefined variable: \$wpdb#'
+    - '#Undefined constant: (ABSPATH|DB_HOST|DB_NAME|DB_USER|DB_PASSWORD)#'
