@@ -8,14 +8,18 @@ use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
-use SCS\Http\StatusCode;
+use SCS\Exception\NotFoundException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonRepository;
+use SCS\Request\CreateRoundRequest;
+use SCS\Request\SaveAttendanceRequest;
+use SCS\Request\UpdateGameResultRequest;
+use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\SerializerService;
 
-class RoundController
+class RoundController extends RestController
 {
     public function __construct(
         private readonly RoundRepository $roundRepository,
@@ -28,114 +32,118 @@ class RoundController
 
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
 
-        $rounds = $this->roundRepository->findBySeason($season->id);
+            $rounds = $this->roundRepository->findBySeason($season->id);
 
-        return new \WP_REST_Response(array_map($this->serializer->serialize(...), $rounds), StatusCode::OK);
+            return $this->ok(array_map($this->serializer->serialize(...), $rounds));
+        });
     }
 
     public function show(\WP_REST_Request $request): \WP_REST_Response
     {
-        $round = $this->roundRepository->findById((int)$request->get_param('id'));
-        if ($round === null) {
-            return new \WP_REST_Response(['error' => 'Round not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
+            }
 
-        $games      = $this->gameRepository->findByRound($round->id);
-        $attendance = $this->attendanceRepository->findByRound($round->id);
+            $games      = $this->gameRepository->findByRound($round->id);
+            $attendance = $this->attendanceRepository->findByRound($round->id);
 
-        return new \WP_REST_Response([
-            'round'      => $this->serializer->serialize($round),
-            'games'      => array_map($this->serializer->serialize(...), $games),
-            'attendance' => array_map($this->serializer->serialize(...), $attendance),
-        ], StatusCode::OK);
+            return $this->ok([
+                'round'      => $this->serializer->serialize($round),
+                'games'      => array_map($this->serializer->serialize(...), $games),
+                'attendance' => array_map($this->serializer->serialize(...), $attendance),
+            ]);
+        });
     }
 
     public function store(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
 
-        $round = $this->roundRepository->createNextForSeason(
-            season_id: $season->id,
-            date:      $request->get_param('date') !== null ? (string)$request->get_param('date') : null,
-        );
+            $input = CreateRoundRequest::fromRequest($request);
+            $this->validate($input);
 
-        return new \WP_REST_Response($this->serializer->serialize($round), StatusCode::CREATED);
+            $round = $this->roundRepository->createNextForSeason(
+                season_id: $season->id,
+                date:      $input->date,
+            );
+
+            return $this->created($this->serializer->serialize($round));
+        });
     }
 
     public function updateStatus(\WP_REST_Request $request): \WP_REST_Response
     {
-        $round = $this->roundRepository->findById((int)$request->get_param('id'));
-        if ($round === null) {
-            return new \WP_REST_Response(['error' => 'Round not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
+            }
 
-        $status = RoundStatus::tryFrom((string)$request->get_param('status'));
-        if ($status === null) {
-            return new \WP_REST_Response(['error' => 'Invalid status.'], StatusCode::BAD_REQUEST);
-        }
+            $input = UpdateRoundStatusRequest::fromRequest($request);
+            $this->validate($input);
 
-        $this->roundRepository->updateStatus($round->id, $status);
+            $this->roundRepository->updateStatus($round->id, RoundStatus::from($input->status));
 
-        return new \WP_REST_Response($this->serializer->serialize($this->roundRepository->findById($round->id)), StatusCode::OK);
+            return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id)));
+        });
     }
 
     public function saveAttendance(\WP_REST_Request $request): \WP_REST_Response
     {
-        $round = $this->roundRepository->findById((int)$request->get_param('id'));
-        if ($round === null) {
-            return new \WP_REST_Response(['error' => 'Round not found.'], StatusCode::NOT_FOUND);
-        }
-
-        $entries = $request->get_param('attendance');
-        if (!is_array($entries)) {
-            return new \WP_REST_Response(['error' => 'attendance must be an array.'], StatusCode::BAD_REQUEST);
-        }
-
-        foreach ($entries as $entry) {
-            $status  = AttendanceStatus::tryFrom((string)($entry['status'] ?? ''));
-            $byeType = isset($entry['bye_type']) ? ByeType::tryFrom((string)$entry['bye_type']) : null;
-
-            if ($status === null) {
-                return new \WP_REST_Response(['error' => 'Invalid attendance status.'], StatusCode::BAD_REQUEST);
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
             }
 
-            $this->attendanceRepository->save(
-                round_id:         $round->id,
-                season_player_id: (int)$entry['season_player_id'],
-                status:           $status,
-                bye_type:         $byeType,
-            );
-        }
+            $input = SaveAttendanceRequest::fromRequest($request);
+            $this->validate($input);
 
-        $attendance = $this->attendanceRepository->findByRound($round->id);
+            $parsed = [];
+            foreach ($input->attendance as $entry) {
+                $parsed[] = [
+                    'season_player_id' => (int)$entry['season_player_id'],
+                    'status'           => AttendanceStatus::from($entry['status']),
+                    'bye_type'         => isset($entry['bye_type']) ? ByeType::from($entry['bye_type']) : null,
+                ];
+            }
 
-        return new \WP_REST_Response(array_map($this->serializer->serialize(...), $attendance), StatusCode::OK);
+            $this->attendanceRepository->saveMany($round->id, $parsed);
+
+            $attendance = $this->attendanceRepository->findByRound($round->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $attendance));
+        });
     }
 
     public function updateGameResult(\WP_REST_Request $request): \WP_REST_Response
     {
-        $game = $this->gameRepository->findById((int)$request->get_param('id'));
-        if ($game === null) {
-            return new \WP_REST_Response(['error' => 'Game not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $game = $this->gameRepository->findById((int)$request->get_param('id'));
+            if ($game === null) {
+                throw new NotFoundException('Game not found.');
+            }
 
-        $resultParam = $request->get_param('result');
-        $result      = $resultParam !== null ? GameResult::tryFrom((string)$resultParam) : null;
+            $input = UpdateGameResultRequest::fromRequest($request);
+            $this->validate($input);
 
-        if ($resultParam !== null && $result === null) {
-            return new \WP_REST_Response(['error' => 'Invalid result value.'], StatusCode::BAD_REQUEST);
-        }
+            $result = $input->result !== null ? GameResult::from($input->result) : null;
 
-        $this->gameRepository->updateResult($game->id, $result);
+            $this->gameRepository->updateResult($game->id, $result);
 
-        return new \WP_REST_Response($this->serializer->serialize($this->gameRepository->findById($game->id)), StatusCode::OK);
+            return $this->ok($this->serializer->serialize($this->gameRepository->findById($game->id)));
+        });
     }
 }

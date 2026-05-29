@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Entity\Enum\PairingSystem;
-use SCS\Entity\Enum\SeasonStatus;
-use SCS\Http\StatusCode;
+use SCS\Exception\ConflictException;
+use SCS\Exception\NotFoundException;
+use SCS\Exception\ValidationException;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
+use SCS\Request\CreateSeasonRequest;
+use SCS\Request\EnrollPlayerRequest;
+use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\SerializerService;
 
-class SeasonController
+class SeasonController extends RestController
 {
     public function __construct(
         private readonly SeasonRepository $seasonRepository,
@@ -24,139 +28,126 @@ class SeasonController
 
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
-        $seasons = $this->seasonRepository->findAll();
+        return $this->handle(function () {
+            $seasons = $this->seasonRepository->findAll();
 
-        return new \WP_REST_Response(array_map($this->serializer->serialize(...), $seasons), StatusCode::OK);
+            return $this->ok(array_map($this->serializer->serialize(...), $seasons));
+        });
     }
 
     public function show(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
 
-        $seasonPlayers = $this->seasonPlayerRepository->findBySeason($season->id);
+            $seasonPlayers = $this->seasonPlayerRepository->findBySeason($season->id);
 
-        return new \WP_REST_Response([
-            'season'  => $this->serializer->serialize($season),
-            'players' => array_map($this->serializer->serialize(...), $seasonPlayers),
-        ], StatusCode::OK);
+            return $this->ok([
+                'season'  => $this->serializer->serialize($season),
+                'players' => array_map($this->serializer->serialize(...), $seasonPlayers),
+            ]);
+        });
     }
 
     public function store(\WP_REST_Request $request): \WP_REST_Response
     {
-        $name = trim((string)$request->get_param('name'));
-        if ($name === '') {
-            return new \WP_REST_Response(['error' => 'Name is required.'], StatusCode::BAD_REQUEST);
-        }
+        return $this->handle(function () use ($request) {
+            $input = CreateSeasonRequest::fromRequest($request);
+            $this->validate($input);
 
-        $pairingSystemValue = $request->get_param('pairing_system') ?? PairingSystem::Keizer->value;
-        $pairingSystem      = PairingSystem::tryFrom((string)$pairingSystemValue);
-        if ($pairingSystem === null) {
-            return new \WP_REST_Response(['error' => 'Invalid pairing system.'], StatusCode::BAD_REQUEST);
-        }
+            $season = $this->seasonRepository->create(
+                name:           $input->name,
+                location:       $input->location,
+                start_date:     $input->start_date,
+                end_date:       $input->end_date,
+                pairing_system: PairingSystem::from($input->pairing_system),
+                categories:     $input->categories,
+            );
 
-        $season = $this->seasonRepository->create(
-            name:           $name,
-            location:       $request->get_param('location') !== null ? (string)$request->get_param('location') : null,
-            start_date:     $request->get_param('start_date') !== null ? (string)$request->get_param('start_date') : null,
-            end_date:       $request->get_param('end_date') !== null ? (string)$request->get_param('end_date') : null,
-            pairing_system: $pairingSystem,
-            categories:     (array)($request->get_param('categories') ?? []),
-        );
-
-        return new \WP_REST_Response($this->serializer->serialize($season), StatusCode::CREATED);
+            return $this->created($this->serializer->serialize($season));
+        });
     }
 
     public function update(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
-
-        $data = array_filter([
-            'name'       => $request->get_param('name') !== null ? trim((string)$request->get_param('name')) : null,
-            'location'   => $request->get_param('location'),
-            'start_date' => $request->get_param('start_date'),
-            'end_date'   => $request->get_param('end_date'),
-            'categories' => $request->get_param('categories') !== null ? json_encode($request->get_param('categories')) : null,
-        ], fn ($v) => $v !== null);
-
-        if ($request->get_param('pairing_system') !== null) {
-            $ps = PairingSystem::tryFrom((string)$request->get_param('pairing_system'));
-            if ($ps === null) {
-                return new \WP_REST_Response(['error' => 'Invalid pairing system.'], StatusCode::BAD_REQUEST);
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
             }
-            $data['pairing_system'] = $ps->value;
-        }
 
-        if ($request->get_param('status') !== null) {
-            $status = SeasonStatus::tryFrom((string)$request->get_param('status'));
-            if ($status === null) {
-                return new \WP_REST_Response(['error' => 'Invalid status.'], StatusCode::BAD_REQUEST);
+            $input = UpdateSeasonRequest::fromRequest($request);
+            $this->validate($input);
+
+            $data = $input->toUpdateData();
+            if (empty($data)) {
+                throw new ValidationException(['fields' => 'No fields to update.']);
             }
-            $data['status'] = $status->value;
-        }
 
-        if (empty($data)) {
-            return new \WP_REST_Response(['error' => 'No fields to update.'], StatusCode::BAD_REQUEST);
-        }
+            $this->seasonRepository->update($season->id, $data);
 
-        $this->seasonRepository->update($season->id, $data);
-
-        return new \WP_REST_Response($this->serializer->serialize($this->seasonRepository->findById($season->id)), StatusCode::OK);
+            return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id)));
+        });
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
 
-        $playerId = (int)$request->get_param('player_id');
-        $player   = $this->playerRepository->findById($playerId);
-        if ($player === null) {
-            return new \WP_REST_Response(['error' => 'Player not found.'], StatusCode::NOT_FOUND);
-        }
+            $input = EnrollPlayerRequest::fromRequest($request);
+            $this->validate($input);
 
-        $existing = $this->seasonPlayerRepository->findBySeasonAndPlayer($season->id, $playerId);
-        if ($existing !== null) {
-            return new \WP_REST_Response(['error' => 'Player is already enrolled in this season.'], StatusCode::CONFLICT);
-        }
+            if (!in_array($input->category, $season->categories, true)) {
+                throw new ValidationException([
+                    'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
+                ]);
+            }
 
-        $category  = trim((string)($request->get_param('category') ?? ''));
-        $eloRating = (int)($request->get_param('elo_rating') ?? $player->knsb_elo ?? 0);
+            $player = $this->playerRepository->findById($input->player_id);
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
 
-        if ($category === '') {
-            return new \WP_REST_Response(['error' => 'Category is required.'], StatusCode::BAD_REQUEST);
-        }
+            $existing = $this->seasonPlayerRepository->findBySeasonAndPlayer($season->id, $input->player_id);
+            if ($existing !== null) {
+                throw new ConflictException('Player is already enrolled in this season.');
+            }
 
-        $seasonPlayer = $this->seasonPlayerRepository->create($season->id, $playerId, $category, $eloRating);
+            $eloRating = $input->elo_rating ?? $player->knsb_elo ?? 0;
 
-        return new \WP_REST_Response($this->serializer->serialize($seasonPlayer), StatusCode::CREATED);
+            $seasonPlayer = $this->seasonPlayerRepository->create($season->id, $input->player_id, $input->category, $eloRating);
+
+            return $this->created($this->serializer->serialize($seasonPlayer));
+        });
     }
 
     public function removePlayer(\WP_REST_Request $request): \WP_REST_Response
     {
-        $season = $this->seasonRepository->findById((int)$request->get_param('id'));
-        if ($season === null) {
-            return new \WP_REST_Response(['error' => 'Season not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
 
-        $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
-            $season->id,
-            (int)$request->get_param('player_id')
-        );
+            $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
+                $season->id,
+                (int)$request->get_param('player_id')
+            );
 
-        if ($seasonPlayer === null) {
-            return new \WP_REST_Response(['error' => 'Player is not enrolled in this season.'], StatusCode::NOT_FOUND);
-        }
+            if ($seasonPlayer === null) {
+                throw new NotFoundException('Player is not enrolled in this season.');
+            }
 
-        $this->seasonPlayerRepository->delete($seasonPlayer->id);
+            $this->seasonPlayerRepository->delete($seasonPlayer->id);
 
-        return new \WP_REST_Response(null, StatusCode::NO_CONTENT);
+            return $this->noContent();
+        });
     }
 }

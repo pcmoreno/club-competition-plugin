@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
-use SCS\Exception\NotFoundException;
-use SCS\Exception\UnauthorizedException;
-use SCS\Http\StatusCode;
-use SCS\Service\AuthService;
-use SCS\Service\JwtService;
+use SCS\Request\AcceptInviteRequest;
+use SCS\Request\ForgotPasswordRequest;
+use SCS\Request\LoginRequest;
+use SCS\Request\ResetPasswordRequest;
+use SCS\Services\AuthService;
+use SCS\Services\JwtService;
 
-class AuthController
+class AuthController extends RestController
 {
     public function __construct(private readonly AuthService $authService)
     {
@@ -18,88 +19,59 @@ class AuthController
 
     public function login(\WP_REST_Request $request): \WP_REST_Response
     {
-        $email    = trim((string)$request->get_param('email'));
-        $password = (string)$request->get_param('password');
+        return $this->handle(function () use ($request) {
+            $input = LoginRequest::fromRequest($request);
+            $this->validate($input);
 
-        if ($email === '' || $password === '') {
-            return new \WP_REST_Response(['error' => 'Email and password are required.'], StatusCode::BAD_REQUEST);
-        }
-
-        try {
-            $result = $this->authService->login($email, $password);
+            $result = $this->authService->login($input->email, $input->password);
             $this->setTokenCookie($result['token']);
 
-            return new \WP_REST_Response(['role' => $result['role']], StatusCode::OK);
-        } catch (UnauthorizedException $e) {
-            return new \WP_REST_Response(['error' => $e->getMessage()], StatusCode::UNAUTHORIZED);
-        }
+            return $this->ok(['role' => $result['role']]);
+        });
     }
 
     public function logout(\WP_REST_Request $request): \WP_REST_Response
     {
         $this->clearTokenCookie();
 
-        return new \WP_REST_Response(null, StatusCode::NO_CONTENT);
+        return $this->noContent();
     }
 
     public function acceptInvite(\WP_REST_Request $request): \WP_REST_Response
     {
-        $token    = trim((string)$request->get_param('token'));
-        $password = (string)$request->get_param('password');
+        return $this->handle(function () use ($request) {
+            $input = AcceptInviteRequest::fromRequest($request);
+            $this->validate($input);
 
-        if ($token === '' || $password === '') {
-            return new \WP_REST_Response(['error' => 'Token and password are required.'], StatusCode::BAD_REQUEST);
-        }
-        if (strlen($password) < 8) {
-            return new \WP_REST_Response(['error' => 'Password must be at least 8 characters.'], StatusCode::BAD_REQUEST);
-        }
+            $this->authService->acceptInvite($input->token, $input->password);
 
-        try {
-            $this->authService->acceptInvite($token, $password);
-
-            return new \WP_REST_Response(['message' => 'Account activated. You can now log in.'], StatusCode::OK);
-        } catch (NotFoundException $e) {
-            return new \WP_REST_Response(['error' => $e->getMessage()], StatusCode::NOT_FOUND);
-        } catch (UnauthorizedException $e) {
-            return new \WP_REST_Response(['error' => $e->getMessage()], StatusCode::UNAUTHORIZED);
-        }
+            return $this->ok(['message' => 'Account activated. You can now log in.']);
+        });
     }
 
     public function forgotPassword(\WP_REST_Request $request): \WP_REST_Response
     {
-        $email = trim((string)$request->get_param('email'));
+        return $this->handle(function () use ($request) {
+            $input = ForgotPasswordRequest::fromRequest($request);
+            $this->validate($input);
 
-        if ($email === '') {
-            return new \WP_REST_Response(['error' => 'Email is required.'], StatusCode::BAD_REQUEST);
-        }
+            $this->authService->initiatePasswordReset($input->email);
 
-        $this->authService->initiatePasswordReset($email);
-
-        // Always return success to avoid email enumeration
-        return new \WP_REST_Response(['message' => 'If that email is registered, a reset link has been sent.'], StatusCode::OK);
+            // Always return success to avoid email enumeration
+            return $this->ok(['message' => 'If that email is registered, a reset link has been sent.']);
+        });
     }
 
     public function resetPassword(\WP_REST_Request $request): \WP_REST_Response
     {
-        $token    = trim((string)$request->get_param('token'));
-        $password = (string)$request->get_param('password');
+        return $this->handle(function () use ($request) {
+            $input = ResetPasswordRequest::fromRequest($request);
+            $this->validate($input);
 
-        if ($token === '' || $password === '') {
-            return new \WP_REST_Response(['error' => 'Token and password are required.'], StatusCode::BAD_REQUEST);
-        }
-        if (strlen($password) < 8) {
-            return new \WP_REST_Response(['error' => 'Password must be at least 8 characters.'], StatusCode::BAD_REQUEST);
-        }
+            $this->authService->resetPassword($input->token, $input->password);
 
-        try {
-            $this->authService->resetPassword($token, $password);
-
-            return new \WP_REST_Response(['message' => 'Password updated. You can now log in.'], StatusCode::OK);
-        } catch (NotFoundException $e) {
-            return new \WP_REST_Response(['error' => $e->getMessage()], StatusCode::NOT_FOUND);
-        } catch (UnauthorizedException $e) {
-            return new \WP_REST_Response(['error' => $e->getMessage()], StatusCode::UNAUTHORIZED);
-        }
+            return $this->ok(['message' => 'Password updated. You can now log in.']);
+        });
     }
 
     private function setTokenCookie(string $token): void

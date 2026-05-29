@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SCS\Service;
+namespace SCS\Services;
 
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Entity\Enum\MemberStatus;
@@ -10,7 +10,6 @@ use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
 use SCS\Repository\MemberRepository;
-use SCS\Services\EmailNotificationService;
 
 class AuthService
 {

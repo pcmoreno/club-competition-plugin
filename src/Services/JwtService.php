@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SCS\Service;
+namespace SCS\Services;
 
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Hmac\Sha256;

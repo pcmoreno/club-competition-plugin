@@ -15,7 +15,10 @@ use SCS\Entity\SeasonPlayer;
 
 class SerializerService
 {
-    public function serialize(object $entity): array
+    public const GROUP_PUBLIC = 'public';
+    public const GROUP_ADMIN  = 'admin';
+
+    public function serialize(object $entity, string $group = self::GROUP_PUBLIC): array
     {
         return match(true) {
             $entity instanceof Player       => $this->player($entity),
@@ -24,10 +27,23 @@ class SerializerService
             $entity instanceof Round        => $this->round($entity),
             $entity instanceof Game         => $this->game($entity),
             $entity instanceof Attendance   => $this->attendance($entity),
-            $entity instanceof Member       => $this->member($entity),
-            $entity instanceof Admin        => $this->admin($entity),
+            $entity instanceof Member       => $this->member($entity, $group),
+            $entity instanceof Admin        => $this->admin($entity, $group),
             default => throw new \InvalidArgumentException('Cannot serialize ' . get_class($entity)),
         };
+    }
+
+    /**
+     * @param iterable<object> $entities
+     */
+    public function serializeMany(iterable $entities, string $group = self::GROUP_PUBLIC): array
+    {
+        $out = [];
+        foreach ($entities as $entity) {
+            $out[] = $this->serialize($entity, $group);
+        }
+
+        return $out;
     }
 
     private function player(Player $p): array
@@ -102,23 +118,33 @@ class SerializerService
         ];
     }
 
-    private function member(Member $m): array
+    private function member(Member $m, string $group): array
     {
-        return [
+        $data = [
             'id'        => $m->id,
             'player_id' => $m->player_id,
-            'email'     => $m->email,
             'status'    => $m->status->value,
         ];
+
+        if ($group === self::GROUP_ADMIN) {
+            $data['email'] = $m->email;
+        }
+
+        return $data;
     }
 
-    private function admin(Admin $a): array
+    private function admin(Admin $a, string $group): array
     {
-        return [
+        $data = [
             'id'     => $a->id,
             'name'   => $a->name,
-            'email'  => $a->email,
             'status' => $a->status->value,
         ];
+
+        if ($group === self::GROUP_ADMIN) {
+            $data['email'] = $a->email;
+        }
+
+        return $data;
     }
 }

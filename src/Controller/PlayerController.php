@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
-use SCS\Http\StatusCode;
+use SCS\Exception\NotFoundException;
+use SCS\Exception\ValidationException;
 use SCS\Repository\PlayerRepository;
+use SCS\Request\CreatePlayerRequest;
+use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\SerializerService;
 
-class PlayerController
+class PlayerController extends RestController
 {
     public function __construct(
         private readonly PlayerRepository $playerRepository,
@@ -18,61 +21,62 @@ class PlayerController
 
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
-        $players = $this->playerRepository->findActive();
+        return $this->handle(function () {
+            $players = $this->playerRepository->findActive();
 
-        return new \WP_REST_Response(array_map($this->serializer->serialize(...), $players), StatusCode::OK);
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
     }
 
     public function show(\WP_REST_Request $request): \WP_REST_Response
     {
-        $player = $this->playerRepository->findById((int)$request->get_param('id'));
-        if ($player === null) {
-            return new \WP_REST_Response(['error' => 'Player not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
 
-        return new \WP_REST_Response($this->serializer->serialize($player), StatusCode::OK);
+            return $this->ok($this->serializer->serialize($player));
+        });
     }
 
     public function store(\WP_REST_Request $request): \WP_REST_Response
     {
-        $name = trim((string)$request->get_param('name'));
-        if ($name === '') {
-            return new \WP_REST_Response(['error' => 'Name is required.'], StatusCode::BAD_REQUEST);
-        }
+        return $this->handle(function () use ($request) {
+            $input = CreatePlayerRequest::fromRequest($request);
+            $this->validate($input);
 
-        $player = $this->playerRepository->create(
-            name:          $name,
-            knsb_id:       $request->get_param('knsb_id') !== null ? (string)$request->get_param('knsb_id') : null,
-            knsb_elo:      $request->get_param('knsb_elo') !== null ? (int)$request->get_param('knsb_elo') : null,
-            gender:        $request->get_param('gender') !== null ? (string)$request->get_param('gender') : null,
-            date_of_birth: $request->get_param('date_of_birth') !== null ? (string)$request->get_param('date_of_birth') : null,
-        );
+            $player = $this->playerRepository->create(
+                name:          $input->name,
+                knsb_id:       $input->knsb_id,
+                knsb_elo:      $input->knsb_elo,
+                gender:        $input->gender,
+                date_of_birth: $input->date_of_birth,
+            );
 
-        return new \WP_REST_Response($this->serializer->serialize($player), StatusCode::CREATED);
+            return $this->created($this->serializer->serialize($player));
+        });
     }
 
     public function update(\WP_REST_Request $request): \WP_REST_Response
     {
-        $player = $this->playerRepository->findById((int)$request->get_param('id'));
-        if ($player === null) {
-            return new \WP_REST_Response(['error' => 'Player not found.'], StatusCode::NOT_FOUND);
-        }
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
 
-        $data = array_filter([
-            'name'          => $request->get_param('name') !== null ? trim((string)$request->get_param('name')) : null,
-            'knsb_id'       => $request->get_param('knsb_id'),
-            'knsb_elo'      => $request->get_param('knsb_elo') !== null ? (int)$request->get_param('knsb_elo') : null,
-            'gender'        => $request->get_param('gender'),
-            'date_of_birth' => $request->get_param('date_of_birth'),
-            'active'        => $request->get_param('active') !== null ? (int)(bool)$request->get_param('active') : null,
-        ], fn ($v) => $v !== null);
+            $input = UpdatePlayerRequest::fromRequest($request);
+            $this->validate($input);
 
-        if (empty($data)) {
-            return new \WP_REST_Response(['error' => 'No fields to update.'], StatusCode::BAD_REQUEST);
-        }
+            $data = $input->toUpdateData();
+            if (empty($data)) {
+                throw new ValidationException(['fields' => 'No fields to update.']);
+            }
 
-        $this->playerRepository->update($player->id, $data);
+            $this->playerRepository->update($player->id, $data);
 
-        return new \WP_REST_Response($this->serializer->serialize($this->playerRepository->findById($player->id)), StatusCode::OK);
+            return $this->ok($this->serializer->serialize($this->playerRepository->findById($player->id)));
+        });
     }
 }

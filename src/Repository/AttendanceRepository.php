@@ -63,6 +63,18 @@ class AttendanceRepository
         }
     }
 
+    /**
+     * @param list<array{season_player_id: int, status: AttendanceStatus, bye_type: ?ByeType}> $entries
+     */
+    public function saveMany(int $round_id, array $entries): void
+    {
+        $this->connection->transactional(function () use ($round_id, $entries): void {
+            foreach ($entries as $entry) {
+                $this->save($round_id, $entry['season_player_id'], $entry['status'], $entry['bye_type']);
+            }
+        });
+    }
+
     private function hydrate(array $row): Attendance
     {
         return new Attendance(

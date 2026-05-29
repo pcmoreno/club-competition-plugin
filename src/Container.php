@@ -8,6 +8,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Validator\Validation;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class Container
 {
@@ -19,6 +21,7 @@ class Container
             self::$instance = self::build();
 
             $container = self::$instance;
+            Controller\RestController::setValidator(self::createValidator());
             includes\RestApi::register($container);
             add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
             add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
@@ -65,11 +68,12 @@ class Container
             ->addArgument(new Reference('db_connection'));
 
         // ── Services ──────────────────────────────────────────────────────────
-        $container->register('jwt_service', Service\JwtService::class);
+        $container->register('jwt_service', Services\JwtService::class)
+            ->setPublic(true);
 
         $container->register('email_notification_service', Services\EmailNotificationService::class);
 
-        $container->register('auth_service', Service\AuthService::class)
+        $container->register('auth_service', Services\AuthService::class)
             ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('jwt_service'))
@@ -77,21 +81,25 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
-        // ── Controllers ───────────────────────────────────────────────────────
+        // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
+            ->setPublic(true)
             ->addArgument(new Reference('auth_service'));
 
         $container->register('player_controller', Controller\PlayerController::class)
+            ->setPublic(true)
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
+            ->setPublic(true)
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('round_controller', Controller\RoundController::class)
+            ->setPublic(true)
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
@@ -113,5 +121,12 @@ class Container
             'password' => DB_PASSWORD,
             'charset'  => 'utf8mb4',
         ]);
+    }
+
+    public static function createValidator(): ValidatorInterface
+    {
+        return Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
     }
 }
