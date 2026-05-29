@@ -20,8 +20,8 @@ class Container
 
             $container = self::$instance;
             includes\RestApi::register($container);
-            add_action('wp_enqueue_scripts', [ includes\Assets::class, 'enqueue_frontend' ]);
-            add_shortcode('clubcompetitie', [ includes\Shortcode::class, 'render' ]);
+            add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
+            add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
 
             if (defined('WP_CLI') && WP_CLI) {
                 \WP_CLI::add_command('scs migrate', new Command\MigrateCommand());
@@ -37,7 +37,7 @@ class Container
 
         // ── Database ──────────────────────────────────────────────────────────
         $container->register('db_connection', Connection::class)
-            ->setFactory([ self::class, 'createDbConnection' ]);
+            ->setFactory([self::class, 'createDbConnection']);
 
         // ── Repositories ──────────────────────────────────────────────────────
         $container->register('player_repository', Repository\PlayerRepository::class)
@@ -63,6 +63,37 @@ class Container
 
         $container->register('admin_repository', Repository\AdminRepository::class)
             ->addArgument(new Reference('db_connection'));
+
+        // ── Services ──────────────────────────────────────────────────────────
+        $container->register('jwt_service', Service\JwtService::class);
+
+        $container->register('auth_service', Service\AuthService::class)
+            ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('jwt_service'));
+
+        $container->register('serializer_service', Services\SerializerService::class);
+
+        // ── Controllers ───────────────────────────────────────────────────────
+        $container->register('auth_controller', Controller\AuthController::class)
+            ->addArgument(new Reference('auth_service'));
+
+        $container->register('player_controller', Controller\PlayerController::class)
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
+
+        $container->register('season_controller', Controller\SeasonController::class)
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
+
+        $container->register('round_controller', Controller\RoundController::class)
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
         $container->compile();
 
