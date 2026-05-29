@@ -36,7 +36,8 @@
   },
   "autoload": {
     "psr-4": {
-      "SCS\\": "src/"
+      "SCS\\": "src/",
+      "SCS\\includes\\": "includes/"
     }
   },
   "autoload-dev": {
