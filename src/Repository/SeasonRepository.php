@@ -38,16 +38,23 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function findActive(): ?Season
+    /**
+     * Multiple seasons can be active at once (e.g. a league season running
+     * alongside a mid-season tournament), so this returns all of them.
+     *
+     * @return Season[]
+     */
+    public function findActive(): array
     {
-        $row = $this->connection->createQueryBuilder()
+        $rows = $this->connection->createQueryBuilder()
             ->select('*')
             ->from('wp_scs_seasons')
             ->where('status = :status')
             ->setParameter('status', SeasonStatus::Active->value)
-            ->fetchAssociative();
+            ->orderBy('created_at', 'DESC')
+            ->fetchAllAssociative();
 
-        return $row ? $this->hydrate($row) : null;
+        return array_map($this->hydrate(...), $rows);
     }
 
     public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories): Season
