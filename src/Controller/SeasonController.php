@@ -104,7 +104,17 @@ class SeasonController extends RestController
             $input = EnrollPlayerRequest::fromRequest($request);
             $this->validate($input);
 
-            if (!in_array($input->category, $season->categories, true)) {
+            if ($season->categories === []) {
+                if ($input->category !== null) {
+                    throw new ValidationException([
+                        'category' => 'This season has no categories; leave the category empty.',
+                    ]);
+                }
+            } elseif ($input->category === null) {
+                throw new ValidationException([
+                    'category' => sprintf('Category is required. Choose one of: %s.', implode(', ', $season->categories)),
+                ]);
+            } elseif (!in_array($input->category, $season->categories, true)) {
                 throw new ValidationException([
                     'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
                 ]);

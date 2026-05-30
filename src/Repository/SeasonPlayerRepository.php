@@ -52,7 +52,7 @@ class SeasonPlayerRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(int $season_id, int $player_id, string $category, int $elo_rating): SeasonPlayer
+    public function create(int $season_id, int $player_id, ?string $category, int $elo_rating): SeasonPlayer
     {
         $this->connection->insert('wp_scs_season_players', [
             'season_id'  => $season_id,
@@ -80,7 +80,7 @@ class SeasonPlayerRepository
             id:          (int)$row['id'],
             season_id:   (int)$row['season_id'],
             player_id:   (int)$row['player_id'],
-            category:    $row['category'],
+            category:    $row['category'] !== null ? (string)$row['category'] : null,
             elo_rating:  (int)$row['elo_rating'],
             enrolled_at: new \DateTimeImmutable($row['enrolled_at']),
         );

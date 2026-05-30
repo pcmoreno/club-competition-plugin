@@ -11,8 +11,7 @@ class EnrollPlayerRequest
     #[Assert\Positive(message: 'Player id is required.')]
     public int $player_id = 0;
 
-    #[Assert\NotBlank(message: 'Category is required.')]
-    public string $category = '';
+    public ?string $category = null;
 
     #[Assert\PositiveOrZero(message: 'Elo rating must be zero or positive.')]
     public ?int $elo_rating = null;
@@ -21,7 +20,9 @@ class EnrollPlayerRequest
     {
         $dto             = new self();
         $dto->player_id  = (int)$request->get_param('player_id');
-        $dto->category   = trim((string)($request->get_param('category') ?? ''));
+
+        $category        = trim((string)($request->get_param('category') ?? ''));
+        $dto->category   = $category === '' ? null : $category;
 
         if ($request->get_param('elo_rating') !== null) {
             $dto->elo_rating = (int)$request->get_param('elo_rating');

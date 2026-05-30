@@ -38,7 +38,7 @@ return function (wpdb $wpdb): void {
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       season_id BIGINT UNSIGNED NOT NULL,
       player_id BIGINT UNSIGNED NOT NULL,
-      category VARCHAR(100) NOT NULL,
+      category VARCHAR(100) DEFAULT NULL,
       elo_rating SMALLINT UNSIGNED NOT NULL DEFAULT 0,
       enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY  (id),
