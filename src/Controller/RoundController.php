@@ -18,16 +18,19 @@ use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\SerializerService;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class RoundController extends RestController
 {
     public function __construct(
+        ValidatorInterface $validator,
         private readonly RoundRepository $roundRepository,
         private readonly GameRepository $gameRepository,
         private readonly AttendanceRepository $attendanceRepository,
         private readonly SeasonRepository $seasonRepository,
         private readonly SerializerService $serializer,
     ) {
+        parent::__construct($validator);
     }
 
     public function index(\WP_REST_Request $request): \WP_REST_Response

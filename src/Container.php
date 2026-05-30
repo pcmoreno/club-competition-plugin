@@ -23,7 +23,6 @@ class Container
             self::$instance = self::build();
 
             $container = self::$instance;
-            Controller\RestController::setValidator(self::createValidator());
             includes\RestApi::register($container);
             add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
             add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
@@ -83,6 +82,9 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
+        $container->register('validator', ValidatorInterface::class)
+            ->setFactory([self::class, 'createValidator']);
+
         $container->register('csrf_token_manager', CsrfTokenManager::class)
             ->setPublic(true)
             ->setFactory([self::class, 'createCsrfTokenManager']);
@@ -90,16 +92,19 @@ class Container
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
             ->setPublic(true)
+            ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('csrf_token_manager'));
 
         $container->register('player_controller', Controller\PlayerController::class)
             ->setPublic(true)
+            ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
             ->setPublic(true)
+            ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'))
@@ -107,6 +112,7 @@ class Container
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)
+            ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))

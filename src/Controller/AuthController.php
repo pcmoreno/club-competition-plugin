@@ -11,15 +11,18 @@ use SCS\Request\ResetPasswordRequest;
 use SCS\Services\AuthService;
 use SCS\Services\JwtService;
 use Symfony\Component\Security\Csrf\CsrfTokenManager;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class AuthController extends RestController
 {
     public const CSRF_TOKEN_ID = 'scs_admin_write';
 
     public function __construct(
+        ValidatorInterface $validator,
         private readonly AuthService $authService,
         private readonly CsrfTokenManager $csrfTokenManager,
     ) {
+        parent::__construct($validator);
     }
 
     public function login(\WP_REST_Request $request): \WP_REST_Response

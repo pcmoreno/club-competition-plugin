@@ -15,15 +15,18 @@ use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\SerializerService;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class SeasonController extends RestController
 {
     public function __construct(
+        ValidatorInterface $validator,
         private readonly SeasonRepository $seasonRepository,
         private readonly SeasonPlayerRepository $seasonPlayerRepository,
         private readonly PlayerRepository $playerRepository,
         private readonly SerializerService $serializer,
     ) {
+        parent::__construct($validator);
     }
 
     public function index(\WP_REST_Request $request): \WP_REST_Response

@@ -12,20 +12,13 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 abstract class RestController
 {
-    private static ?ValidatorInterface $validator = null;
-
-    public static function setValidator(ValidatorInterface $validator): void
+    public function __construct(protected readonly ValidatorInterface $validator)
     {
-        self::$validator = $validator;
     }
 
     protected function validate(object $dto): void
     {
-        if (self::$validator === null) {
-            throw new \RuntimeException('Validator has not been wired into RestController.');
-        }
-
-        $violations = self::$validator->validate($dto);
+        $violations = $this->validator->validate($dto);
         if ($violations->count() === 0) {
             return;
         }

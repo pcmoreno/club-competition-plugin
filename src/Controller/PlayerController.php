@@ -10,13 +10,16 @@ use SCS\Repository\PlayerRepository;
 use SCS\Request\CreatePlayerRequest;
 use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\SerializerService;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class PlayerController extends RestController
 {
     public function __construct(
+        ValidatorInterface $validator,
         private readonly PlayerRepository $playerRepository,
         private readonly SerializerService $serializer,
     ) {
+        parent::__construct($validator);
     }
 
     public function index(\WP_REST_Request $request): \WP_REST_Response
