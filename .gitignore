@@ -1,6 +1,5 @@
 # Composer
 /vendor/
-composer.lock
 
 # Local development
 dev/
@@ -28,6 +27,9 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# PHP CS Fixer
+.php-cs-fixer.cache
 
 # Logs
 *.log

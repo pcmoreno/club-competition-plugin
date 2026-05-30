@@ -14,7 +14,6 @@
     "php": ">=8.2",
     "symfony/dependency-injection": "^6.4",
     "symfony/validator": "^6.4",
-    "symfony/serializer": "^6.4",
     "symfony/security-core": "^6.4",
     "symfony/console": "^6.4",
     "symfony/security-csrf": "^6.4",

@@ -4,176 +4,151 @@ declare(strict_types=1);
 
 namespace SCS;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Security\Csrf\CsrfTokenManager;
+use Symfony\Component\Security\Csrf\TokenGenerator\UriSafeTokenGenerator;
 use Symfony\Component\Validator\Validation;
-use Symfony\Component\Serializer\Serializer;
-use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-class Container {
-	private static $instance = null;
+class Container
+{
+    private static ?ContainerBuilder $instance = null;
 
-	/**
-	 * Boot and return the DI container.
-	 */
-	public static function boot() {
-		if ( self::$instance === null ) {
-			self::$instance = self::build();
-		}
-		return self::$instance;
-	}
+    public static function boot(): ContainerBuilder
+    {
+        if (self::$instance === null) {
+            self::$instance = self::build();
 
-	/**
-	 * Build the container with all service definitions.
-	 */
-	private static function build() {
-		$container = new ContainerBuilder();
+            $container = self::$instance;
+            includes\RestApi::register($container);
+            add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
+            add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
 
-		// =========== Database ===========
-		$container->register( 'db_connection' )
-			->setFactory( [ self::class, 'createDbConnection' ] );
+            if (defined('WP_CLI') && WP_CLI) {
+                \WP_CLI::add_command('scs migrate', new Command\MigrateCommand());
+            }
+        }
 
-		// =========== Validators ===========
-		$container->register( 'validator' )
-			->setFactory( [ Validation::class, 'createValidator' ] );
+        return self::$instance;
+    }
 
-		// =========== Serializer ===========
-		$container->register( 'serializer' )
-			->setFactory( [ self::class, 'createSerializer' ] );
+    private static function build(): ContainerBuilder
+    {
+        $container = new ContainerBuilder();
 
-		// =========== Repositories ===========
-		$container->register( 'player_repository', Repository\PlayerRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        // ── Database ──────────────────────────────────────────────────────────
+        $container->register('db_connection', Connection::class)
+            ->setFactory([self::class, 'createDbConnection']);
 
-		$container->register( 'season_repository', Repository\SeasonRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        // ── Repositories ──────────────────────────────────────────────────────
+        $container->register('player_repository', Repository\PlayerRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'season_player_repository', Repository\SeasonPlayerRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('season_repository', Repository\SeasonRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'round_repository', Repository\RoundRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('season_player_repository', Repository\SeasonPlayerRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'game_repository', Repository\GameRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('round_repository', Repository\RoundRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'attendance_repository', Repository\AttendanceRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('attendance_repository', Repository\AttendanceRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'ranking_repository', Repository\RankingRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('game_repository', Repository\GameRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'member_repository', Repository\MemberRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('member_repository', Repository\MemberRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		$container->register( 'admin_repository', Repository\AdminRepository::class )
-			->addArgument( new Reference( 'db_connection' ) );
+        $container->register('admin_repository', Repository\AdminRepository::class)
+            ->addArgument(new Reference('db_connection'));
 
-		// =========== Services ===========
-		$container->register( 'auth_service', Security\Auth\AuthService::class )
-			->addArgument( new Reference( 'member_repository' ) )
-			->addArgument( new Reference( 'admin_repository' ) );
+        // ── Services ──────────────────────────────────────────────────────────
+        $container->register('jwt_service', Services\JwtService::class)
+            ->setPublic(true);
 
-		$container->register( 'notification_service', Shared\Notification\WpMailNotificationService::class );
+        $container->register('email_notification_service', Services\EmailNotificationService::class);
 
-		$container->register( 'knsb_service', Services\KnsbSyncService::class )
-			->addArgument( new Reference( 'player_repository' ) );
+        $container->register('auth_service', Services\AuthService::class)
+            ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('jwt_service'))
+            ->addArgument(new Reference('email_notification_service'));
 
-		// =========== Security / Auth ===========
-		$container->register( 'jwt_secret' )
-			->setFactory( [ self::class, 'getJwtSecret' ] );
+        $container->register('serializer_service', Services\SerializerService::class);
 
-		$container->register( 'member_provider', Security\Auth\MemberProvider::class )
-			->addArgument( new Reference( 'member_repository' ) );
+        $container->register('validator', ValidatorInterface::class)
+            ->setFactory([self::class, 'createValidator']);
 
-		$container->register( 'admin_provider', Security\Auth\AdminProvider::class )
-			->addArgument( new Reference( 'admin_repository' ) );
+        $container->register('csrf_token_manager', CsrfTokenManager::class)
+            ->setPublic(true)
+            ->setFactory([self::class, 'createCsrfTokenManager']);
 
-		$container->register( 'jwt_authenticator', Security\Auth\JwtAuthenticator::class )
-			->addArgument( new Reference( 'jwt_secret' ) )
-			->addArgument( new Reference( 'member_provider' ) )
-			->addArgument( new Reference( 'admin_provider' ) );
+        // ── Controllers (public — fetched by RestApi) ─────────────────────────
+        $container->register('auth_controller', Controller\AuthController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('auth_service'))
+            ->addArgument(new Reference('csrf_token_manager'));
 
-		// =========== Controllers ===========
-		$container->register( 'player_controller', Controller\PlayerController::class )
-			->addArgument( new Reference( 'player_repository' ) )
-			->addArgument( new Reference( 'validator' ) )
-			->addArgument( new Reference( 'serializer' ) );
+        $container->register('player_controller', Controller\PlayerController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
-		// =========== REST API & Frontend ===========
-		$container->register( 'rest_api' )
-			->setFactory( [ includes\RestApi::class, 'register' ] )
-			->addArgument( $container );
+        $container->register('season_controller', Controller\SeasonController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
-		$container->register( 'assets' )
-			->setFactory( [ includes\Assets::class, 'boot' ] );
+        $container->register('round_controller', Controller\RoundController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
-		$container->register( 'shortcode' )
-			->setFactory( [ includes\Shortcode::class, 'boot' ] );
+        $container->compile();
 
-		// =========== Installer / Activation ===========
-		$container->register( 'installer' )
-			->setFactory( [ includes\Database::class, 'boot' ] );
+        return $container;
+    }
 
-		// =========== Plugin Init ===========
-		$container->register( 'plugin' )
-			->setFactory( [ self::class, 'createPluginInitializer' ] )
-			->addArgument( $container );
+    public static function createDbConnection(): Connection
+    {
+        return DriverManager::getConnection([
+            'driver'   => 'pdo_mysql',
+            'host'     => DB_HOST,
+            'dbname'   => DB_NAME,
+            'user'     => DB_USER,
+            'password' => DB_PASSWORD,
+            'charset'  => 'utf8mb4',
+        ]);
+    }
 
-		// =========== WP-CLI Commands ===========
-		$container->register( 'command_create_admin', Command\CreateAdminCommand::class )
-			->addArgument( new Reference( 'admin_repository' ) );
+    public static function createValidator(): ValidatorInterface
+    {
+        return Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+    }
 
-		$container->register( 'command_import', Command\ImportCommand::class )
-			->addArgument( new Reference( 'player_repository' ) )
-			->addArgument( new Reference( 'season_repository' ) );
-
-		$container->register( 'command_sync_knsb', Command\SyncKnsbCommand::class )
-			->addArgument( new Reference( 'knsb_service' ) );
-
-		$container->compile();
-		return $container;
-	}
-
-	/**
-	 * Create database connection via WordPress.
-	 */
-	public static function createDbConnection() {
-		global $wpdb;
-		return new \Doctrine\DBAL\Connection(
-			[
-				'pdo' => new \PDO(
-					'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME,
-					DB_USER,
-					DB_PASSWORD
-				),
-			],
-			new \Doctrine\DBAL\Driver\PDO\MySQL\Driver()
-		);
-	}
-
-	/**
-	 * Create Symfony serializer with JSON encoder and object normalizer.
-	 */
-	public static function createSerializer() {
-		return new Serializer(
-			[ new ObjectNormalizer() ],
-			[ new JsonEncoder() ]
-		);
-	}
-
-	/**
-	 * Get JWT secret from WordPress option or environment.
-	 */
-	public static function getJwtSecret() {
-		return get_option( 'scs_jwt_secret' ) ?: getenv( 'SCS_JWT_SECRET' );
-	}
-
-	/**
-	 * Create the plugin initializer that handles hooks.
-	 */
-	public static function createPluginInitializer( ContainerBuilder $container ) {
-		return new PluginInitializer( $container );
-	}
+    public static function createCsrfTokenManager(): CsrfTokenManager
+    {
+        return new CsrfTokenManager(
+            new UriSafeTokenGenerator(),
+            new Security\CookieCsrfTokenStorage(),
+            '',
+        );
+    }
 }
