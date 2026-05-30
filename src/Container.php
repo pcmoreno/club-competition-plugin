@@ -8,6 +8,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Security\Csrf\CsrfTokenManager;
+use Symfony\Component\Security\Csrf\TokenGenerator\UriSafeTokenGenerator;
 use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -81,10 +83,15 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
+        $container->register('csrf_token_manager', CsrfTokenManager::class)
+            ->setPublic(true)
+            ->setFactory([self::class, 'createCsrfTokenManager']);
+
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
             ->setPublic(true)
-            ->addArgument(new Reference('auth_service'));
+            ->addArgument(new Reference('auth_service'))
+            ->addArgument(new Reference('csrf_token_manager'));
 
         $container->register('player_controller', Controller\PlayerController::class)
             ->setPublic(true)
@@ -128,5 +135,14 @@ class Container
         return Validation::createValidatorBuilder()
             ->enableAttributeMapping()
             ->getValidator();
+    }
+
+    public static function createCsrfTokenManager(): CsrfTokenManager
+    {
+        return new CsrfTokenManager(
+            new UriSafeTokenGenerator(),
+            new Security\CookieCsrfTokenStorage(),
+            '',
+        );
     }
 }

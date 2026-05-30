@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace SCS\includes;
 
+use SCS\Controller\AuthController;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\Security\Csrf\CsrfToken;
 
 class RestApi
 {
@@ -12,16 +14,22 @@ class RestApi
     {
         add_action('rest_api_init', function () use ($container) {
             $jwtService      = $container->get('jwt_service');
+            $csrfManager     = $container->get('csrf_token_manager');
             $auth            = $container->get('auth_controller');
             $players         = $container->get('player_controller');
             $seasons         = $container->get('season_controller');
             $rounds          = $container->get('round_controller');
 
-            $isAdmin = function () use ($jwtService) {
+            $isAdmin = function (\WP_REST_Request $request) use ($jwtService, $csrfManager) {
                 $token  = $_COOKIE['scs_token'] ?? null;
                 $claims = $token ? $jwtService->parse($token) : null;
                 if (!$claims || $claims['role'] !== 'ROLE_ADMIN') {
                     return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
+                }
+
+                $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
+                if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
+                    return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
                 }
 
                 return true;
@@ -55,6 +63,12 @@ class RestApi
             register_rest_route('scs/v1', '/auth/reset-password', [
                 'methods'             => 'POST',
                 'callback'            => [$auth, 'resetPassword'],
+                'permission_callback' => '__return_true',
+            ]);
+
+            register_rest_route('scs/v1', '/auth/csrf-token', [
+                'methods'             => 'GET',
+                'callback'            => [$auth, 'csrfToken'],
                 'permission_callback' => '__return_true',
             ]);
 

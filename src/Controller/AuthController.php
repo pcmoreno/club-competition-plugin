@@ -10,11 +10,16 @@ use SCS\Request\LoginRequest;
 use SCS\Request\ResetPasswordRequest;
 use SCS\Services\AuthService;
 use SCS\Services\JwtService;
+use Symfony\Component\Security\Csrf\CsrfTokenManager;
 
 class AuthController extends RestController
 {
-    public function __construct(private readonly AuthService $authService)
-    {
+    public const CSRF_TOKEN_ID = 'scs_admin_write';
+
+    public function __construct(
+        private readonly AuthService $authService,
+        private readonly CsrfTokenManager $csrfTokenManager,
+    ) {
     }
 
     public function login(\WP_REST_Request $request): \WP_REST_Response
@@ -23,18 +28,30 @@ class AuthController extends RestController
             $input = LoginRequest::fromRequest($request);
             $this->validate($input);
 
-            $result = $this->authService->login($input->email, $input->password);
+            $result    = $this->authService->login($input->email, $input->password);
+            $csrfToken = $this->csrfTokenManager->refreshToken(self::CSRF_TOKEN_ID)->getValue();
+
             $this->setTokenCookie($result['token']);
 
-            return $this->ok(['role' => $result['role']]);
+            return $this->ok(['role' => $result['role'], 'csrf_token' => $csrfToken]);
         });
     }
 
     public function logout(\WP_REST_Request $request): \WP_REST_Response
     {
         $this->clearTokenCookie();
+        $this->csrfTokenManager->removeToken(self::CSRF_TOKEN_ID);
 
         return $this->noContent();
+    }
+
+    public function csrfToken(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () {
+            $csrfToken = $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue();
+
+            return $this->ok(['csrf_token' => $csrfToken]);
+        });
     }
 
     public function acceptInvite(\WP_REST_Request $request): \WP_REST_Response
