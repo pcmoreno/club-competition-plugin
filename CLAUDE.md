@@ -44,7 +44,7 @@ Database
 | REST API | WordPress REST API | Custom endpoints at `/wp-json/scs/v1/` |
 | Authentication | Symfony Security + lcobucci/jwt | JWT in httpOnly cookies, not localStorage |
 | Validation | Symfony Validator | Input validation on all DTOs |
-| Serialization | Symfony Serializer | JSON response formatting |
+| Serialization | Hand-rolled `SerializerService` | Entity → array; visibility via groups |
 | Frontend | React | Embedded via shortcode `[clubcompetitie]` |
 | PDF Generation | dompdf | Server-side pairing sheet rendering |
 | Email | WordPress wp_mail | Invite notifications, round publishing |
@@ -192,20 +192,25 @@ This enforces strict type checking for function arguments and return types, catc
 
 ### REST API Response Format
 
-All endpoints use Symfony Serializer with context:
+Controllers return `WP_REST_Response` with plain arrays — WordPress encodes
+the JSON. Entities are turned into arrays by `SerializerService` (a
+hand-rolled normalizer in `src/Services/`), never by Symfony Serializer.
 
 ```php
-// In Controller
-$data = [
-    'season' => $season,
-    'standings' => $standings,
-];
-return new JsonResponse(
-    $this->serializer->normalize($data, 'json', ['groups' => ['public']])
-);
+// In Controller (extends RestController)
+return $this->ok([
+    'season'  => $this->serializer->serialize($season, SerializerService::GROUP_ADMIN),
+    'players' => $this->serializer->serializeMany($players),
+]);
 ```
 
-Entities use `#[Groups(['public', 'admin'])]` to control field visibility.
+Field visibility is controlled by the `$group` argument
+(`GROUP_PUBLIC` / `GROUP_ADMIN`), not attributes. The serializer is a
+**whitelist**: each entity has a method that emits only the fields it
+should expose, so secret-bearing properties (`password_hash`,
+`invite_token`, `reset_token`) are never serialized. Public GET routes
+serialize with `GROUP_PUBLIC`; admin-only writes use `GROUP_ADMIN`
+(which adds `email`, `created_at`, etc.).
 
 ### Database Access
 
