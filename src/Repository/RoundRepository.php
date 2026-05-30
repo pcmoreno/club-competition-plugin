@@ -58,6 +58,10 @@ class RoundRepository
     public function createNextForSeason(int $season_id, ?string $date): Round
     {
         return $this->connection->transactional(function () use ($season_id, $date): Round {
+            // forUpdate() emits SELECT ... FOR UPDATE to lock the gap and serialize
+            // concurrent inserts, so two requests can't claim the same round_number.
+            // This relies on MySQL/InnoDB row-locking (our only target); a different
+            // DBAL platform may ignore the lock and reopen the race.
             $maxRow = $this->connection->createQueryBuilder()
                 ->select('COALESCE(MAX(round_number), 0) AS max_number')
                 ->from('wp_scs_rounds')
