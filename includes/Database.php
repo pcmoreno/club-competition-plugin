@@ -31,8 +31,30 @@ class Database
             }
 
             $migration = require $path;
-            $migration($wpdb);
 
+            // dbDelta() swallows SQL errors into $wpdb->last_error instead of
+            // throwing, so clear it first and inspect it after the migration to
+            // catch silent failures alongside any thrown exception.
+            $wpdb->last_error = '';
+
+            try {
+                $migration($wpdb);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException(
+                    sprintf('Migration "%s" failed: %s', basename($path), $e->getMessage()),
+                    0,
+                    $e
+                );
+            }
+
+            if ($wpdb->last_error !== '') {
+                throw new \RuntimeException(
+                    sprintf('Migration "%s" failed: %s', basename($path), $wpdb->last_error)
+                );
+            }
+
+            // Mark applied only after the migration completed without error.
+            // dbDelta is idempotent, so a failed migration safely retries next run.
             $applied[] = $number;
             update_option(self::APPLIED_OPTION, $applied);
         }
