@@ -109,6 +109,13 @@ All custom tables prefixed `wp_scs_`:
 - `wp_scs_members` — non-WordPress member accounts
 - `wp_scs_admins` — plugin admins
 
+**Multiple seasons can be `active` at once** — a season also models a mid-season
+tournament, so a league season and side tournaments run concurrently. There is
+no "single active season" invariant: don't add a unique constraint, and note
+`SeasonRepository::findActive()` returns a list. Categories are a per-season
+property (`categories` column), optional — a season may run as one undivided
+pool, so `season_players.category` is nullable.
+
 Migrations tracked via `scs_db_version` WordPress option.
 
 ## Development Workflow
@@ -211,6 +218,19 @@ should expose, so secret-bearing properties (`password_hash`,
 `invite_token`, `reset_token`) are never serialized. Public GET routes
 serialize with `GROUP_PUBLIC`; admin-only writes use `GROUP_ADMIN`
 (which adds `email`, `created_at`, etc.).
+
+### CSRF Protection
+
+Admin write endpoints are CSRF-protected on top of the JWT check. On login the
+server issues a CSRF token (base value stored in an httpOnly `scs_csrf` cookie
+via `CookieCsrfTokenStorage`; the randomized value is returned in the login
+response and from `GET /auth/csrf-token`). Clients must echo that value in the
+`X-SCS-CSRF-Token` header on every write; the `$isAdmin` permission callback in
+`includes/RestApi.php` validates it via `CsrfTokenManager`.
+
+**Any new admin write route must go through `$isAdmin`** (which enforces both
+`ROLE_ADMIN` and the CSRF header) — don't add a write endpoint that only checks
+the JWT.
 
 ### Database Access
 

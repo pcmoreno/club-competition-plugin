@@ -63,9 +63,9 @@ See `/docs/local-development.md` for detailed setup instructions.
 | Plugin Runtime | PHP (WordPress plugin API) |
 | Database | MySQL via Doctrine DBAL |
 | REST API | WordPress REST API |
-| Auth | Symfony Security + lcobucci/jwt |
+| Auth | Symfony Security + lcobucci/jwt (JWT cookie + CSRF) |
 | Validation | Symfony Validator |
-| Serialization | Symfony Serializer |
+| Serialization | Hand-rolled `SerializerService` |
 | DI Container | Symfony DependencyInjection |
 | Frontend | React |
 | PDF | dompdf |
