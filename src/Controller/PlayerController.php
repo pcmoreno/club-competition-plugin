@@ -54,7 +54,7 @@ class PlayerController extends RestController
                 date_of_birth: $input->date_of_birth,
             );
 
-            return $this->created($this->serializer->serialize($player));
+            return $this->created($this->serializer->serialize($player, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -76,7 +76,7 @@ class PlayerController extends RestController
 
             $this->playerRepository->update($player->id, $data);
 
-            return $this->ok($this->serializer->serialize($this->playerRepository->findById($player->id)));
+            return $this->ok($this->serializer->serialize($this->playerRepository->findById($player->id), SerializerService::GROUP_ADMIN));
         });
     }
 }

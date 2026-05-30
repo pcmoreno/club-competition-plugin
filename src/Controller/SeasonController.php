@@ -67,7 +67,7 @@ class SeasonController extends RestController
                 categories:     $input->categories,
             );
 
-            return $this->created($this->serializer->serialize($season));
+            return $this->created($this->serializer->serialize($season, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -89,7 +89,7 @@ class SeasonController extends RestController
 
             $this->seasonRepository->update($season->id, $data);
 
-            return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id)));
+            return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
     }
 

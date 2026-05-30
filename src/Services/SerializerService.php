@@ -21,10 +21,10 @@ class SerializerService
     public function serialize(object $entity, string $group = self::GROUP_PUBLIC): array
     {
         return match(true) {
-            $entity instanceof Player       => $this->player($entity),
-            $entity instanceof Season       => $this->season($entity),
+            $entity instanceof Player       => $this->player($entity, $group),
+            $entity instanceof Season       => $this->season($entity, $group),
             $entity instanceof SeasonPlayer => $this->seasonPlayer($entity),
-            $entity instanceof Round        => $this->round($entity),
+            $entity instanceof Round        => $this->round($entity, $group),
             $entity instanceof Game         => $this->game($entity),
             $entity instanceof Attendance   => $this->attendance($entity),
             $entity instanceof Member       => $this->member($entity, $group),
@@ -46,9 +46,9 @@ class SerializerService
         return $out;
     }
 
-    private function player(Player $p): array
+    private function player(Player $p, string $group): array
     {
-        return [
+        $data = [
             'id'            => $p->id,
             'name'          => $p->name,
             'knsb_id'       => $p->knsb_id,
@@ -57,11 +57,17 @@ class SerializerService
             'date_of_birth' => $p->date_of_birth?->format('Y-m-d'),
             'active'        => $p->active,
         ];
+
+        if ($group === self::GROUP_ADMIN) {
+            $data['created_at'] = $p->created_at->format('Y-m-d H:i:s');
+        }
+
+        return $data;
     }
 
-    private function season(Season $s): array
+    private function season(Season $s, string $group): array
     {
-        return [
+        $data = [
             'id'             => $s->id,
             'name'           => $s->name,
             'location'       => $s->location,
@@ -71,6 +77,12 @@ class SerializerService
             'status'         => $s->status->value,
             'categories'     => $s->categories,
         ];
+
+        if ($group === self::GROUP_ADMIN) {
+            $data['created_at'] = $s->created_at->format('Y-m-d H:i:s');
+        }
+
+        return $data;
     }
 
     private function seasonPlayer(SeasonPlayer $sp): array
@@ -85,15 +97,21 @@ class SerializerService
         ];
     }
 
-    private function round(Round $r): array
+    private function round(Round $r, string $group): array
     {
-        return [
+        $data = [
             'id'           => $r->id,
             'season_id'    => $r->season_id,
             'round_number' => $r->round_number,
             'date'         => $r->date?->format('Y-m-d'),
             'status'       => $r->status->value,
         ];
+
+        if ($group === self::GROUP_ADMIN) {
+            $data['created_at'] = $r->created_at->format('Y-m-d H:i:s');
+        }
+
+        return $data;
     }
 
     private function game(Game $g): array
@@ -127,7 +145,8 @@ class SerializerService
         ];
 
         if ($group === self::GROUP_ADMIN) {
-            $data['email'] = $m->email;
+            $data['email']      = $m->email;
+            $data['created_at'] = $m->created_at->format('Y-m-d H:i:s');
         }
 
         return $data;
@@ -142,7 +161,8 @@ class SerializerService
         ];
 
         if ($group === self::GROUP_ADMIN) {
-            $data['email'] = $a->email;
+            $data['email']      = $a->email;
+            $data['created_at'] = $a->created_at->format('Y-m-d H:i:s');
         }
 
         return $data;

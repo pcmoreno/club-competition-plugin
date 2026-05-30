@@ -79,7 +79,7 @@ class RoundController extends RestController
                 date:      $input->date,
             );
 
-            return $this->created($this->serializer->serialize($round));
+            return $this->created($this->serializer->serialize($round, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -96,7 +96,7 @@ class RoundController extends RestController
 
             $this->roundRepository->updateStatus($round->id, RoundStatus::from($input->status));
 
-            return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id)));
+            return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id), SerializerService::GROUP_ADMIN));
         });
     }
 
