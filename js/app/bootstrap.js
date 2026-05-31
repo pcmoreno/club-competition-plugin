@@ -15,6 +15,9 @@ export const bootstrap = {
 	// 'ROLE_ADMIN' | 'ROLE_MEMBER' | null — resolved server-side from the
 	// httpOnly scs_token JWT cookie at render time.
 	role: raw?.role ?? null,
+	// The logged-in member's player id (null for anonymous/admins), used to
+	// identify "you" in lists.
+	playerId: raw?.playerId ?? null,
 	// URL of the plugin's build/ dir, for any runtime asset references.
 	buildUrl: raw?.buildUrl ?? '',
 };

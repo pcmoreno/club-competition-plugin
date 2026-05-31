@@ -113,6 +113,7 @@ class RoundController extends RestController
         foreach ($this->seasonPlayerRepository->findBySeason($season_id) as $sp) {
             $map[$sp->id] = [
                 'season_player_id' => $sp->id,
+                'player_id'        => $sp->player_id,
                 'name'             => $names[$sp->player_id] ?? null,
                 'category'         => $sp->category,
                 'elo'              => $sp->elo_rating,

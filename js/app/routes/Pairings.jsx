@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
+import { Notice } from '../components/ui';
+import { Square, resultToken, categoryLabel } from '../components/game';
 
 // PUBLIC. Shows the most-recent non-draft round of the selected tournament:
 // pairings appear at `published`, results at `complete`. Backed by
@@ -25,43 +27,6 @@ function pickCurrentRound( rounds ) {
 	);
 }
 
-function categoryLabel( white, black ) {
-	const wc = white?.category;
-	const bc = black?.category;
-	if ( ! wc && ! bc ) {
-		return '';
-	}
-	if ( wc && bc && wc !== bc ) {
-		return `${ wc } ↔ ${ bc }`;
-	}
-	return `Cat ${ wc || bc }`;
-}
-
-function resultToken( result ) {
-	switch ( result ) {
-		case 'white':
-			return '1–0';
-		case 'black':
-			return '0–1';
-		case 'draw':
-			return '½–½';
-		default:
-			return '·';
-	}
-}
-
-// Small chess-square swatch matching the hi-fi design system.
-function Square( { color } ) {
-	return (
-		<span
-			className={ [
-				'inline-block h-3 w-3 rounded-[2px] border border-rule align-middle',
-				color === 'white' ? 'bg-white-sq' : 'bg-black-sq',
-			].join( ' ' ) }
-		/>
-	);
-}
-
 function PlayerCell( { player, color } ) {
 	return (
 		<span className="inline-flex items-center gap-2">
@@ -75,14 +40,6 @@ function PlayerCell( { player, color } ) {
 				) : null }
 			</span>
 		</span>
-	);
-}
-
-function Notice( { children } ) {
-	return (
-		<div className="rounded border border-dashed border-rule bg-surface p-6 text-ink-3">
-			{ children }
-		</div>
 	);
 }
 
@@ -150,7 +107,7 @@ function RoundTable( { round, data } ) {
 		: null;
 
 	return (
-		<div className="rounded border border-rule bg-surface shadow-sm">
+		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<div className="flex items-center justify-between gap-3 border-b border-rule px-5 py-3.5">
 				<h2 className="font-serif text-xl">
 					Round { round.round_number }

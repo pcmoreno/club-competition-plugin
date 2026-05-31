@@ -36,7 +36,11 @@ class AuthController extends RestController
 
             $this->setTokenCookie($result['token']);
 
-            return $this->ok(['role' => $result['role'], 'csrf_token' => $csrfToken]);
+            return $this->ok([
+                'role'       => $result['role'],
+                'player_id'  => $result['player_id'] ?? null,
+                'csrf_token' => $csrfToken,
+            ]);
         });
     }
 

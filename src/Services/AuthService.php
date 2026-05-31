@@ -35,8 +35,9 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($member->id, Role::Member),
-                'role'  => Role::Member->value,
+                'token'     => $this->jwtService->issue($member->id, Role::Member, $member->player_id),
+                'role'      => Role::Member->value,
+                'player_id' => $member->player_id,
             ];
         }
 
@@ -50,8 +51,9 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($admin->id, Role::Admin),
-                'role'  => Role::Admin->value,
+                'token'     => $this->jwtService->issue($admin->id, Role::Admin),
+                'role'      => Role::Admin->value,
+                'player_id' => null,
             ];
         }
 

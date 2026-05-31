@@ -2,21 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
 import { Link } from '../router/router';
+import { useAuth } from '../auth/AuthContext';
+import { Notice, YouTag, youRowClass } from '../components/ui';
 
 // MEMBER. Plain roster (NOT standings) scoped to the selected tournament:
 // Name · Cat · Elo, sorted by Elo desc; rows link to player detail. Backed by
 // the enriched GET /seasons/{id} players list. Tournament selection is the
 // global switcher, so there's no per-view search/filter.
 
-function Notice( { children } ) {
-	return (
-		<div className="rounded border border-dashed border-rule bg-surface p-6 text-ink-3">
-			{ children }
-		</div>
-	);
-}
-
 export function Players( { seasonId } ) {
+	const { playerId } = useAuth();
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'season', seasonId ],
 		queryFn: () => api.get( `seasons/${ seasonId }` ),
@@ -35,7 +30,7 @@ export function Players( { seasonId } ) {
 		const players = [ ...data.players ].sort(
 			( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 )
 		);
-		content = <RosterTable players={ players } />;
+		content = <RosterTable players={ players } meId={ playerId } />;
 	}
 
 	return (
@@ -48,7 +43,7 @@ export function Players( { seasonId } ) {
 	);
 }
 
-function RosterTable( { players } ) {
+function RosterTable( { players, meId } ) {
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<table className="w-full text-sm">
@@ -62,27 +57,34 @@ function RosterTable( { players } ) {
 					</tr>
 				</thead>
 				<tbody>
-					{ players.map( ( p ) => (
-						<tr
-							key={ p.season_player_id }
-							className="border-b border-rule-soft"
-						>
-							<td className="px-4 py-2.5">
-								<Link
-									to={ `/players/${ p.player_id }` }
-									className="text-ink no-underline hover:text-accent"
-								>
-									{ p.name ?? '—' }
-								</Link>
-							</td>
-							<td className="px-4 py-2.5 text-ink-3">
-								{ p.category ?? '—' }
-							</td>
-							<td className="num px-4 py-2.5 text-right font-mono">
-								{ p.elo ? p.elo : '—' }
-							</td>
-						</tr>
-					) ) }
+					{ players.map( ( p ) => {
+						const isMe = meId !== null && p.player_id === meId;
+						return (
+							<tr
+								key={ p.season_player_id }
+								className={ [
+									'border-b border-rule-soft',
+									isMe ? youRowClass : '',
+								].join( ' ' ) }
+							>
+								<td className="px-4 py-2.5">
+									<Link
+										to={ `/players/${ p.player_id }` }
+										className="text-ink no-underline hover:text-accent"
+									>
+										{ p.name ?? '—' }
+									</Link>
+									{ isMe && <YouTag /> }
+								</td>
+								<td className="px-4 py-2.5 text-ink-3">
+									{ p.category ?? '—' }
+								</td>
+								<td className="num px-4 py-2.5 text-right font-mono">
+									{ p.elo ? p.elo : '—' }
+								</td>
+							</tr>
+						);
+					} ) }
 				</tbody>
 			</table>
 		</div>

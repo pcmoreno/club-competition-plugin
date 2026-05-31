@@ -18,6 +18,9 @@ const AuthContext = createContext( null );
 // on a GET), so it's fetched lazily once we know the session is authenticated.
 export function AuthProvider( { children } ) {
 	const [ role, setRole ] = useState( bootstrap.role );
+	// The logged-in member's player id (null for anonymous/admins), used to
+	// identify "you" in lists.
+	const [ playerId, setPlayerId ] = useState( bootstrap.playerId );
 
 	const isMember = role === 'ROLE_MEMBER' || role === 'ROLE_ADMIN';
 	const isAdmin = role === 'ROLE_ADMIN';
@@ -41,12 +44,14 @@ export function AuthProvider( { children } ) {
 	}, [ isMember, refreshCsrf ] );
 
 	const login = useCallback( async ( email, password ) => {
-		const { role: nextRole, csrf_token: csrfToken } = await api.post(
-			'auth/login',
-			{ email, password }
-		);
+		const {
+			role: nextRole,
+			player_id: nextPlayerId,
+			csrf_token: csrfToken,
+		} = await api.post( 'auth/login', { email, password } );
 		setCsrfToken( csrfToken );
 		setRole( nextRole );
+		setPlayerId( nextPlayerId ?? null );
 		return nextRole;
 	}, [] );
 
@@ -56,10 +61,19 @@ export function AuthProvider( { children } ) {
 		} finally {
 			setCsrfToken( null );
 			setRole( null );
+			setPlayerId( null );
 		}
 	}, [] );
 
-	const value = { role, isMember, isAdmin, login, logout, refreshCsrf };
+	const value = {
+		role,
+		playerId,
+		isMember,
+		isAdmin,
+		login,
+		logout,
+		refreshCsrf,
+	};
 	return (
 		<AuthContext.Provider value={ value }>
 			{ children }
