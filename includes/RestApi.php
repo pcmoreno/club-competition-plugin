@@ -127,6 +127,12 @@ class RestApi
                 ],
             ]);
 
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/standings', [
+                'methods'             => 'GET',
+                'callback'            => [$seasons, 'standings'],
+                'permission_callback' => '__return_true',
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players', [
                 [
                     'methods'             => 'POST',

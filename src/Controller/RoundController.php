@@ -11,14 +11,13 @@ use SCS\Entity\Enum\RoundStatus;
 use SCS\Exception\NotFoundException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
-use SCS\Repository\PlayerRepository;
 use SCS\Repository\RoundRepository;
-use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Request\CreateRoundRequest;
 use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdateRoundStatusRequest;
+use SCS\Services\PlayerDisplayService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -30,8 +29,7 @@ class RoundController extends RestController
         private readonly GameRepository $gameRepository,
         private readonly AttendanceRepository $attendanceRepository,
         private readonly SeasonRepository $seasonRepository,
-        private readonly SeasonPlayerRepository $seasonPlayerRepository,
-        private readonly PlayerRepository $playerRepository,
+        private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -65,7 +63,7 @@ class RoundController extends RestController
             // Resolve season_player ids to display info (name + category + elo)
             // server-side, so a single request renders the whole round without
             // the client joining games → season_players → players.
-            $display = $this->playerDisplayMap($round->season_id);
+            $display = $this->playerDisplay->mapForSeason($round->season_id);
 
             $games = array_map(fn ($g) => [
                 'id'     => $g->id,
@@ -93,34 +91,6 @@ class RoundController extends RestController
                 'byes'  => $byes,
             ]);
         });
-    }
-
-    /**
-     * Builds a season_player_id → display map (name, category, elo) for a
-     * season. Shared by the round payload's games and byes; a player's name
-     * comes from the roster, their category/elo from the season enrollment.
-     *
-     * @return array<int, array{season_player_id: int, name: ?string, category: ?string, elo: int}>
-     */
-    private function playerDisplayMap(int $season_id): array
-    {
-        $names = [];
-        foreach ($this->playerRepository->findAll() as $player) {
-            $names[$player->id] = $player->name;
-        }
-
-        $map = [];
-        foreach ($this->seasonPlayerRepository->findBySeason($season_id) as $sp) {
-            $map[$sp->id] = [
-                'season_player_id' => $sp->id,
-                'player_id'        => $sp->player_id,
-                'name'             => $names[$sp->player_id] ?? null,
-                'category'         => $sp->category,
-                'elo'              => $sp->elo_rating,
-            ];
-        }
-
-        return $map;
     }
 
     public function store(\WP_REST_Request $request): \WP_REST_Response
