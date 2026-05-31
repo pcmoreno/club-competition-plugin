@@ -6,6 +6,7 @@ namespace SCS\Services;
 
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Entity\Enum\MemberStatus;
+use SCS\Entity\Enum\Role;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
@@ -34,8 +35,8 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($member->id, 'ROLE_MEMBER'),
-                'role'  => 'member',
+                'token' => $this->jwtService->issue($member->id, Role::Member),
+                'role'  => Role::Member->value,
             ];
         }
 
@@ -49,8 +50,8 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($admin->id, 'ROLE_ADMIN'),
-                'role'  => 'admin',
+                'token' => $this->jwtService->issue($admin->id, Role::Admin),
+                'role'  => Role::Admin->value,
             ];
         }
 

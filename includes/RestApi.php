@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\includes;
 
 use SCS\Controller\AuthController;
+use SCS\Entity\Enum\Role;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Security\Csrf\CsrfToken;
 
@@ -23,7 +24,7 @@ class RestApi
             $isAdmin = function (\WP_REST_Request $request) use ($jwtService, $csrfManager) {
                 $token  = $_COOKIE['scs_token'] ?? null;
                 $claims = $token ? $jwtService->parse($token) : null;
-                if (!$claims || $claims['role'] !== 'ROLE_ADMIN') {
+                if (!$claims || $claims['role'] !== Role::Admin->value) {
                     return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
                 }
 

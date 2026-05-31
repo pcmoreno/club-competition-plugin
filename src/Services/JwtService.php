@@ -10,6 +10,7 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Validation\Constraint\LooseValidAt;
 use Lcobucci\JWT\Validation\Constraint\SignedWith;
 use Psr\Clock\ClockInterface;
+use SCS\Entity\Enum\Role;
 
 class JwtService
 {
@@ -33,15 +34,17 @@ class JwtService
         };
     }
 
-    public function issue(int $subject, string $role): string
+    public function issue(int $subject, Role $role): string
     {
         $now = $this->clock->now();
 
         return $this->config->builder()
             ->issuedAt($now)
             ->expiresAt($now->modify('+' . self::TOKEN_TTL_SECONDS . ' seconds'))
-            ->withClaim('sub', $subject)
-            ->withClaim('role', $role)
+            // `sub` is a registered claim — lcobucci rejects withClaim() for it,
+            // so use the dedicated relatedTo() builder method.
+            ->relatedTo((string)$subject)
+            ->withClaim('role', $role->value)
             ->getToken($this->config->signer(), $this->config->signingKey())
             ->toString();
     }

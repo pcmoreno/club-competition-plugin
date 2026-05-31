@@ -48,9 +48,24 @@ class SeasonController extends RestController
 
             $seasonPlayers = $this->seasonPlayerRepository->findBySeason($season->id);
 
+            // Resolve player names server-side so the roster renders without a
+            // separate fetch (season_players is a join table without names).
+            $names = [];
+            foreach ($this->playerRepository->findAll() as $player) {
+                $names[$player->id] = $player->name;
+            }
+
+            $players = array_map(fn ($sp) => [
+                'season_player_id' => $sp->id,
+                'player_id'        => $sp->player_id,
+                'name'             => $names[$sp->player_id] ?? null,
+                'category'         => $sp->category,
+                'elo'              => $sp->elo_rating,
+            ], $seasonPlayers);
+
             return $this->ok([
                 'season'  => $this->serializer->serialize($season),
-                'players' => array_map($this->serializer->serialize(...), $seasonPlayers),
+                'players' => $players,
             ]);
         });
     }

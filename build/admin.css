@@ -1054,6 +1054,9 @@ input:where([type='file']):focus{
 .text-center{
   text-align: center;
 }
+.text-right{
+  text-align: right;
+}
 .align-middle{
   vertical-align: middle;
 }
@@ -1155,6 +1158,10 @@ input:where([type='file']):focus{
 
 .hover\:bg-ink-2:hover{
   background-color: var(--ink-2);
+}
+
+.hover\:text-accent:hover{
+  color: var(--accent);
 }
 
 .hover\:text-ink:hover{
