@@ -1,0 +1,1 @@
+(()=>{"use strict";const e=window.wp.element,t=window.ReactJSXRuntime,n=document.getElementById("scs-admin");n&&(0,e.createRoot)(n).render((0,t.jsx)("div",{className:"mx-auto max-w-page px-7 py-8 text-ink-3",children:"Admin sub-app — not built yet."}))})();

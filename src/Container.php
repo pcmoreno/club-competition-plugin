@@ -24,7 +24,10 @@ class Container
 
             $container = self::$instance;
             includes\RestApi::register($container);
-            add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
+            $jwtService = $container->get('jwt_service');
+            add_action('wp_enqueue_scripts', function () use ($jwtService) {
+                includes\Assets::enqueue_frontend($jwtService);
+            });
             add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
 
             if (defined('WP_CLI') && WP_CLI) {

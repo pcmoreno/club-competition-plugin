@@ -7,7 +7,9 @@ Makefile
 
 # Node
 /node_modules/
-/build/
+
+# build/ is intentionally committed: SiteGround has no Node.js, so the
+# compiled frontend must be built locally and shipped via git. See CLAUDE.md.
 
 # IDEs
 .vscode/

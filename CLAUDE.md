@@ -282,26 +282,38 @@ Controllers catch and return appropriate HTTP responses.
 
 ### Git → SiteGround Workflow
 
+**SiteGround has no Node.js** (Shared & Cloud plans), so `npm run build` cannot
+run on the host. The compiled frontend in `build/` is therefore **committed to
+git** (not gitignored) and shipped with the pull. Always rebuild and commit
+`build/` before deploying any frontend change — the server only runs Composer.
+
 ```bash
-# 1. Push to GitHub
+# 1. Build the frontend locally and commit the artifacts
+npm run build
+git add build/
+git commit -m "Build frontend"   # on a branch, then merge per Git Workflow
+
+# 2. Push to GitHub
 git push origin main
 
-# 2. SSH into SiteGround
+# 3. SSH into SiteGround
 ssh user@domain.com
 
-# 3. Pull and install
+# 4. Pull and install PHP deps (no npm on host)
 cd /wp-content/plugins/club-competition-plugin
 git pull origin main
 composer install
 
-# 4. Run migrations
+# 5. Run migrations
 wp scs migrate
 
-# 5. Clear cache (if using SG CachePress)
+# 6. Clear cache (if using SG CachePress)
 wp siteground-cache purge
 ```
 
-**Important**: Test locally first. No staging environment — deployments go straight to production.
+**Important**: Test locally first. No staging environment — deployments go
+straight to production. If you forget to rebuild + commit `build/`, the site
+ships stale (or missing) frontend assets.
 
 ### Database Backups
 
