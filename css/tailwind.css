@@ -1,3 +1,77 @@
+/* Webfonts: IBM Plex Sans (body), Newsreader (headings), IBM Plex Mono (scores). */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ==========================================================
+   Design tokens — ported from the hi-fi design system
+   (../documents/santpoort-chess-competition/project/hifi-styles.css).
+   Warm paper, deep ink, a single forest-green accent.
+   Tailwind aliases (bg-paper, text-ink, font-serif, …) resolve to these.
+   ========================================================== */
+@layer base {
+  :root {
+    --paper:       #faf7f1;
+    --surface:     #ffffff;
+    --surface-2:   #f2ede2;
+    --surface-3:   #e8e1d0;
+    --ink:         #1a1612;
+    --ink-2:       #3d362c;
+    --ink-3:       #6b6457;
+    --muted:       #8a8275;
+    --rule:        #d8d0bd;
+    --rule-soft:   #e7e0cd;
+    --rule-strong: #2a241b;
+
+    --accent:      oklch(48% 0.08 145);
+    --accent-2:    oklch(38% 0.08 145);
+    --accent-soft: oklch(94% 0.03 145);
+    --accent-rim:  oklch(72% 0.06 145);
+
+    --win:  oklch(48% 0.08 145);
+    --loss: oklch(50% 0.13 25);
+    --draw: #8a8275;
+
+    --white-sq:  #f1e9d2;
+    --black-sq:  #2a241b;
+    --board-rim: #1a1612;
+
+    --shadow-sm: 0 1px 0 rgba(26, 22, 18, 0.04), 0 1px 3px rgba(26, 22, 18, 0.06);
+    --shadow-md: 0 2px 0 rgba(26, 22, 18, 0.04), 0 4px 14px rgba(26, 22, 18, 0.08);
+
+    --radius-sm: 4px;
+    --radius:    6px;
+    --radius-lg: 10px;
+  }
+
+  /* Scope to the app mount so the plugin never restyles the host theme. */
+  #scs-app {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: theme('fontFamily.sans');
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #scs-app h1,
+  #scs-app h2,
+  #scs-app h3,
+  #scs-app h4,
+  #scs-app h5 {
+    font-family: theme('fontFamily.serif');
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+  }
+}
+
+@layer utilities {
+  /* Tabular figures for all scores/ratings, matching the design system. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+}
