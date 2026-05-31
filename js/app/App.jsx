@@ -44,6 +44,7 @@ function resolveView( path, ctx ) {
 	}
 
 	switch ( path ) {
+		case '/':
 		case '/pairings':
 			return {
 				need: 'public',
@@ -76,28 +77,22 @@ function Shell() {
 	const { isMember, isAdmin } = useAuth();
 	const [ seasonId, setSeasonId ] = useState( null );
 
-	// Land "/" on the default public view.
+	// Normalise the bare "/" URL to the default public view (cosmetic — "/" is
+	// already resolved to Pairings below, so there is no not-found flash).
 	useEffect( () => {
 		if ( path === '/' ) {
 			navigate( '/pairings' );
 		}
 	}, [ path ] );
 
-	// Auth screens: bare chrome.
 	const AuthView = AUTH_ROUTES[ path ];
-	if ( AuthView ) {
-		return (
-			<div className="min-h-screen">
-				<TopBar seasonId={ seasonId } onSeasonChange={ setSeasonId } />
-				<AuthView />
-			</div>
-		);
-	}
-
-	const view = resolveView( path, { seasonId } );
+	const view = AuthView ? null : resolveView( path, { seasonId } );
 
 	let body;
-	if ( ! view ) {
+	if ( AuthView ) {
+		// Auth screens render without the page tabs.
+		body = <AuthView />;
+	} else if ( ! view ) {
 		body = (
 			<Placeholder title="Not found">
 				That page does not exist.{ ' ' }
@@ -108,7 +103,7 @@ function Shell() {
 		( view.need === 'member' && ! isMember ) ||
 		( view.need === 'admin' && ! isAdmin )
 	) {
-		// Gated route, insufficient role → send to sign in.
+		// Gated route, insufficient role → prompt sign in.
 		body = (
 			<Placeholder title="Members only">
 				Please <a href="#/login">sign in</a> to view this page.
@@ -118,10 +113,13 @@ function Shell() {
 		body = view.node;
 	}
 
+	// TopBar is rendered once, above the auth/shell branch, so it (and the
+	// tournament-switcher query) is not remounted when navigating between an
+	// auth screen and a normal view.
 	return (
 		<div className="min-h-screen">
 			<TopBar seasonId={ seasonId } onSeasonChange={ setSeasonId } />
-			<SubNav activePath={ path } />
+			{ ! AuthView && <SubNav activePath={ path } /> }
 			{ body }
 		</div>
 	);

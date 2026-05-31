@@ -1,3 +1,4 @@
+import { useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -15,6 +16,16 @@ export function TournamentSwitcher( { value, onChange } ) {
 		queryFn: () => api.get( 'seasons' ),
 	} );
 	const seasons = all.filter( ( s ) => s.status === 'active' );
+
+	// Establish a selected season as soon as the list loads, so every view is
+	// scoped from first paint. Covers both the single-season (no <select>) and
+	// multi-season cases, and keeps the controlled <select> value always
+	// matching an <option>.
+	useEffect( () => {
+		if ( value === null && seasons.length > 0 ) {
+			onChange( seasons[ 0 ].id );
+		}
+	}, [ value, seasons, onChange ] );
 
 	// Hide the control entirely when there's nothing (or only one thing) to pick.
 	if ( isLoading || seasons.length <= 1 ) {
