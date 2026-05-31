@@ -120,6 +120,8 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->compile();
