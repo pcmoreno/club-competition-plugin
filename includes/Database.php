@@ -53,8 +53,12 @@ class Database
                 );
             }
 
-            // Mark applied only after the migration completed without error.
-            // dbDelta is idempotent, so a failed migration safely retries next run.
+            // Mark applied only after the migration completed without error. The
+            // marker is what prevents re-runs — these migrations issue raw SQL
+            // (not dbDelta), so idempotency is each migration's own job: if the
+            // update_option below ever failed after a partial apply, the retry
+            // must tolerate re-running. Guard non-idempotent statements (e.g.
+            // ADD COLUMN) accordingly.
             $applied[] = $number;
             update_option(self::APPLIED_OPTION, $applied);
         }

@@ -50,6 +50,9 @@ class Assets
             'apiRoot'   => esc_url_raw(rest_url('scs/v1/')),
             'restNonce' => wp_create_nonce('wp_rest'),
             'role'      => $claims['role'] ?? null,
+            // The logged-in member's player id (null for anonymous/admins), so
+            // the frontend can identify "you" — e.g. highlight your own game.
+            'playerId'  => $claims['pid'] ?? null,
             'buildUrl'  => plugins_url('build/', dirname(__FILE__)),
         ]);
     }

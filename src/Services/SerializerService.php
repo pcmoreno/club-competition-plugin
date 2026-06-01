@@ -119,6 +119,7 @@ class SerializerService
         return [
             'id'                     => $g->id,
             'round_id'               => $g->round_id,
+            'board'                  => $g->board,
             'white_season_player_id' => $g->white_season_player_id,
             'black_season_player_id' => $g->black_season_player_id,
             'result'                 => $g->result?->value,

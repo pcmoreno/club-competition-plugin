@@ -21,6 +21,8 @@ class GameRepository
             ->from('wp_scs_games')
             ->where('round_id = :round_id')
             ->setParameter('round_id', $round_id)
+            ->orderBy('board', 'ASC')
+            ->addOrderBy('id', 'ASC')
             ->fetchAllAssociative();
 
         return array_map($this->hydrate(...), $rows);
@@ -53,10 +55,11 @@ class GameRepository
         return array_map($this->hydrate(...), $rows);
     }
 
-    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id): Game
+    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null): Game
     {
         $this->connection->insert('wp_scs_games', [
             'round_id'               => $round_id,
+            'board'                  => $board,
             'white_season_player_id' => $white_season_player_id,
             'black_season_player_id' => $black_season_player_id,
             'result'                 => null,
@@ -82,6 +85,7 @@ class GameRepository
         return new Game(
             id:                      (int)$row['id'],
             round_id:                (int)$row['round_id'],
+            board:                   $row['board'] !== null ? (int)$row['board'] : null,
             white_season_player_id:  (int)$row['white_season_player_id'],
             black_season_player_id:  (int)$row['black_season_player_id'],
             result:                  $row['result'] !== null ? GameResult::from($row['result']) : null,

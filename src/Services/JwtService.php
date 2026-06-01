@@ -10,6 +10,7 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Validation\Constraint\LooseValidAt;
 use Lcobucci\JWT\Validation\Constraint\SignedWith;
 use Psr\Clock\ClockInterface;
+use SCS\Entity\Enum\Role;
 
 class JwtService
 {
@@ -33,20 +34,30 @@ class JwtService
         };
     }
 
-    public function issue(int $subject, string $role): string
+    public function issue(int $subject, Role $role, ?int $playerId = null): string
     {
         $now = $this->clock->now();
 
-        return $this->config->builder()
+        $builder = $this->config->builder()
             ->issuedAt($now)
             ->expiresAt($now->modify('+' . self::TOKEN_TTL_SECONDS . ' seconds'))
-            ->withClaim('sub', $subject)
-            ->withClaim('role', $role)
+            // `sub` is a registered claim — lcobucci rejects withClaim() for it,
+            // so use the dedicated relatedTo() builder method.
+            ->relatedTo((string)$subject)
+            ->withClaim('role', $role->value);
+
+        // Members carry their player id so the frontend can identify "you"
+        // (e.g. highlight your own game). Admins have no associated player.
+        if ($playerId !== null) {
+            $builder = $builder->withClaim('pid', $playerId);
+        }
+
+        return $builder
             ->getToken($this->config->signer(), $this->config->signingKey())
             ->toString();
     }
 
-    /** @return array{sub: int, role: string}|null */
+    /** @return array{sub: int, role: string, pid: int|null}|null */
     public function parse(string $tokenString): ?array
     {
         try {
@@ -58,9 +69,12 @@ class JwtService
                 new LooseValidAt($this->clock),
             );
 
+            $claims = $token->claims();
+
             return [
-                'sub'  => (int)$token->claims()->get('sub'),
-                'role' => (string)$token->claims()->get('role'),
+                'sub'  => (int)$claims->get('sub'),
+                'role' => (string)$claims->get('role'),
+                'pid'  => $claims->has('pid') ? (int)$claims->get('pid') : null,
             ];
         } catch (\Throwable) {
             return null;

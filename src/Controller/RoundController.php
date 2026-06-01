@@ -17,6 +17,7 @@ use SCS\Request\CreateRoundRequest;
 use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdateRoundStatusRequest;
+use SCS\Services\PlayerDisplayService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -28,6 +29,7 @@ class RoundController extends RestController
         private readonly GameRepository $gameRepository,
         private readonly AttendanceRepository $attendanceRepository,
         private readonly SeasonRepository $seasonRepository,
+        private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -58,10 +60,35 @@ class RoundController extends RestController
             $games      = $this->gameRepository->findByRound($round->id);
             $attendance = $this->attendanceRepository->findByRound($round->id);
 
+            // Resolve season_player ids to display info (name + category + elo)
+            // server-side, so a single request renders the whole round without
+            // the client joining games → season_players → players.
+            $display = $this->playerDisplay->mapForSeason($round->season_id);
+
+            $games = array_map(fn ($g) => [
+                'id'     => $g->id,
+                'board'  => $g->board,
+                'result' => $g->result?->value,
+                'white'  => $display[$g->white_season_player_id] ?? null,
+                'black'  => $display[$g->black_season_player_id] ?? null,
+            ], $games);
+
+            // Byes (the odd-player-out and any sit-outs) are attendance rows
+            // carrying a bye_type, not games.
+            $byes = array_values(array_map(
+                fn ($a) => [
+                    'season_player_id' => $a->season_player_id,
+                    'name'             => $display[$a->season_player_id]['name'] ?? null,
+                    'category'         => $display[$a->season_player_id]['category'] ?? null,
+                    'bye_type'         => $a->bye_type?->value,
+                ],
+                array_filter($attendance, fn ($a) => $a->bye_type !== null)
+            ));
+
             return $this->ok([
-                'round'      => $this->serializer->serialize($round),
-                'games'      => array_map($this->serializer->serialize(...), $games),
-                'attendance' => array_map($this->serializer->serialize(...), $attendance),
+                'round' => $this->serializer->serialize($round),
+                'games' => $games,
+                'byes'  => $byes,
             ]);
         });
     }

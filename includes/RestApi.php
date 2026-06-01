@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\includes;
 
 use SCS\Controller\AuthController;
+use SCS\Entity\Enum\Role;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Security\Csrf\CsrfToken;
 
@@ -23,13 +24,27 @@ class RestApi
             $isAdmin = function (\WP_REST_Request $request) use ($jwtService, $csrfManager) {
                 $token  = $_COOKIE['scs_token'] ?? null;
                 $claims = $token ? $jwtService->parse($token) : null;
-                if (!$claims || $claims['role'] !== 'ROLE_ADMIN') {
+                if (!$claims || $claims['role'] !== Role::Admin->value) {
                     return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
                 }
 
                 $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
                 if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
                     return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
+                }
+
+                return true;
+            };
+
+            // Any signed-in user (member or admin). No CSRF check — applied only
+            // to GET reads. Note this gates the standalone roster and player
+            // detail; pairings/results stay public, so player names and Elo are
+            // still reachable through the public round endpoints.
+            $isMember = function () use ($jwtService) {
+                $token  = $_COOKIE['scs_token'] ?? null;
+                $claims = $token ? $jwtService->parse($token) : null;
+                if (!$claims || !in_array($claims['role'], [Role::Member->value, Role::Admin->value], true)) {
+                    return new \WP_Error('forbidden', 'Member access required.', ['status' => 403]);
                 }
 
                 return true;
@@ -90,7 +105,7 @@ class RestApi
                 [
                     'methods'             => 'GET',
                     'callback'            => [$players, 'show'],
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => $isMember,
                 ],
                 [
                     'methods'             => 'PATCH',
@@ -117,13 +132,19 @@ class RestApi
                 [
                     'methods'             => 'GET',
                     'callback'            => [$seasons, 'show'],
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => $isMember,
                 ],
                 [
                     'methods'             => 'PATCH',
                     'callback'            => [$seasons, 'update'],
                     'permission_callback' => $isAdmin,
                 ],
+            ]);
+
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/standings', [
+                'methods'             => 'GET',
+                'callback'            => [$seasons, 'standings'],
+                'permission_callback' => '__return_true',
             ]);
 
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players', [

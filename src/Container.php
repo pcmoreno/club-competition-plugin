@@ -65,6 +65,9 @@ class Container
         $container->register('game_repository', Repository\GameRepository::class)
             ->addArgument(new Reference('db_connection'));
 
+        $container->register('standings_snapshot_repository', Repository\StandingsSnapshotRepository::class)
+            ->addArgument(new Reference('db_connection'));
+
         $container->register('member_repository', Repository\MemberRepository::class)
             ->addArgument(new Reference('db_connection'));
 
@@ -84,6 +87,10 @@ class Container
             ->addArgument(new Reference('email_notification_service'));
 
         $container->register('serializer_service', Services\SerializerService::class);
+
+        $container->register('player_display_service', Services\PlayerDisplayService::class)
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('player_repository'));
 
         $container->register('validator', ValidatorInterface::class)
             ->setFactory([self::class, 'createValidator']);
@@ -111,6 +118,8 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('player_display_service'))
+            ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('round_controller', Controller\RoundController::class)
@@ -120,6 +129,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->compile();

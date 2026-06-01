@@ -749,6 +749,12 @@ input:where([type='file']):focus{
     font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    /* Break out of block themes' constrained content width (e.g. Twenty
+       Twenty-Five wraps the shortcode in .is-layout-constrained, which caps
+       children at ~620px). The app manages its own max-width via .max-w-page.
+       The theme's constraint uses zero-specificity :where() rules, so this id
+       rule overrides it. */
+    max-width: none;
   }
 
 #scs-app h1,
@@ -800,8 +806,20 @@ input:where([type='file']):focus{
 .mb-5{
   margin-bottom: 1.25rem;
 }
+.mb-6{
+  margin-bottom: 1.5rem;
+}
+.ml-1{
+  margin-left: 0.25rem;
+}
 .ml-1\.5{
   margin-left: 0.375rem;
+}
+.ml-2{
+  margin-left: 0.5rem;
+}
+.mr-2{
+  margin-right: 0.5rem;
 }
 .mt-1{
   margin-top: 0.25rem;
@@ -812,11 +830,23 @@ input:where([type='file']):focus{
 .mt-4{
   margin-top: 1rem;
 }
+.mt-6{
+  margin-top: 1.5rem;
+}
 .block{
   display: block;
 }
+.inline-block{
+  display: inline-block;
+}
+.inline{
+  display: inline;
+}
 .flex{
   display: flex;
+}
+.inline-flex{
+  display: inline-flex;
 }
 .table{
   display: table;
@@ -824,11 +854,35 @@ input:where([type='file']):focus{
 .grid{
   display: grid;
 }
+.h-3{
+  height: 0.75rem;
+}
+.h-7{
+  height: 1.75rem;
+}
 .h-8{
   height: 2rem;
 }
 .min-h-screen{
   min-height: 100vh;
+}
+.w-10{
+  width: 2.5rem;
+}
+.w-16{
+  width: 4rem;
+}
+.w-20{
+  width: 5rem;
+}
+.w-24{
+  width: 6rem;
+}
+.w-3{
+  width: 0.75rem;
+}
+.w-7{
+  width: 1.75rem;
 }
 .w-8{
   width: 2rem;
@@ -845,11 +899,20 @@ input:where([type='file']):focus{
 .max-w-page{
   max-width: 1240px;
 }
+.flex-1{
+  flex: 1 1 0%;
+}
 .grid-cols-2{
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.flex-wrap{
+  flex-wrap: wrap;
+}
 .items-center{
   align-items: center;
+}
+.items-baseline{
+  align-items: baseline;
 }
 .justify-between{
   justify-content: space-between;
@@ -881,6 +944,12 @@ input:where([type='file']):focus{
 .rounded{
   border-radius: var(--radius);
 }
+.rounded-\[2px\]{
+  border-radius: 2px;
+}
+.rounded-full{
+  border-radius: 9999px;
+}
 .rounded-sm{
   border-radius: var(--radius-sm);
 }
@@ -896,6 +965,9 @@ input:where([type='file']):focus{
 .border-b-2{
   border-bottom-width: 2px;
 }
+.border-t{
+  border-top-width: 1px;
+}
 .border-dashed{
   border-style: dashed;
 }
@@ -908,8 +980,14 @@ input:where([type='file']):focus{
 .border-rule{
   border-color: var(--rule);
 }
+.border-rule-soft{
+  border-color: var(--rule-soft);
+}
 .border-transparent{
   border-color: transparent;
+}
+.bg-accent-soft{
+  background-color: var(--accent-soft);
 }
 .bg-black-sq{
   background-color: var(--black-sq);
@@ -923,15 +1001,29 @@ input:where([type='file']):focus{
 .bg-surface{
   background-color: var(--surface);
 }
+.bg-surface-2{
+  background-color: var(--surface-2);
+}
 .bg-white-sq{
   background-color: var(--white-sq);
+}
+.p-5{
+  padding: 1.25rem;
 }
 .p-6{
   padding: 1.5rem;
 }
+.px-1\.5{
+  padding-left: 0.375rem;
+  padding-right: 0.375rem;
+}
 .px-2{
   padding-left: 0.5rem;
   padding-right: 0.5rem;
+}
+.px-2\.5{
+  padding-left: 0.625rem;
+  padding-right: 0.625rem;
 }
 .px-3{
   padding-left: 0.75rem;
@@ -945,9 +1037,17 @@ input:where([type='file']):focus{
   padding-left: 1rem;
   padding-right: 1rem;
 }
+.px-5{
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
 .px-7{
   padding-left: 1.75rem;
   padding-right: 1.75rem;
+}
+.py-0\.5{
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
 }
 .py-1{
   padding-top: 0.25rem;
@@ -960,6 +1060,10 @@ input:where([type='file']):focus{
 .py-2\.5{
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
+}
+.py-3{
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 .py-3\.5{
   padding-top: 0.875rem;
@@ -981,6 +1085,21 @@ input:where([type='file']):focus{
 .pt-8{
   padding-top: 2rem;
 }
+.text-left{
+  text-align: left;
+}
+.text-center{
+  text-align: center;
+}
+.text-right{
+  text-align: right;
+}
+.align-middle{
+  vertical-align: middle;
+}
+.font-mono{
+  font-family: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+}
 .font-serif{
   font-family: Newsreader, "Source Serif 4", Georgia, serif;
 }
@@ -996,9 +1115,17 @@ input:where([type='file']):focus{
 .text-\[38px\]{
   font-size: 38px;
 }
+.text-base{
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
 .text-sm{
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+.text-xl{
+  font-size: 1.25rem;
+  line-height: 1.75rem;
 }
 .text-xs{
   font-size: 0.75rem;
@@ -1024,6 +1151,12 @@ input:where([type='file']):focus{
 }
 .tracking-\[0\.08em\]{
   letter-spacing: 0.08em;
+}
+.tracking-wide{
+  letter-spacing: 0.025em;
+}
+.text-accent-2{
+  color: var(--accent-2);
 }
 .text-ink{
   color: var(--ink);
@@ -1055,6 +1188,10 @@ input:where([type='file']):focus{
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
 }
 /* Tabular figures for all scores/ratings, matching the design system. */
+.num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
 
 /* ==========================================================
    Design tokens — ported from the hi-fi design system
@@ -1065,6 +1202,14 @@ input:where([type='file']):focus{
 
 .hover\:bg-ink-2:hover{
   background-color: var(--ink-2);
+}
+
+.hover\:bg-surface-2:hover{
+  background-color: var(--surface-2);
+}
+
+.hover\:text-accent:hover{
+  color: var(--accent);
 }
 
 .hover\:text-ink:hover{
@@ -1079,7 +1224,22 @@ input:where([type='file']):focus{
   --tw-ring-color: var(--accent);
 }
 
+.disabled\:opacity-40:disabled{
+  opacity: 0.4;
+}
+
 .disabled\:opacity-60:disabled{
   opacity: 0.6;
+}
+
+@media (min-width: 1024px){
+
+  .lg\:col-span-2{
+    grid-column: span 2 / span 2;
+  }
+
+  .lg\:grid-cols-3{
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 

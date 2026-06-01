@@ -11,9 +11,11 @@ use SCS\Exception\ValidationException;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
+use SCS\Repository\StandingsSnapshotRepository;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
+use SCS\Services\PlayerDisplayService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -24,6 +26,8 @@ class SeasonController extends RestController
         private readonly SeasonRepository $seasonRepository,
         private readonly SeasonPlayerRepository $seasonPlayerRepository,
         private readonly PlayerRepository $playerRepository,
+        private readonly PlayerDisplayService $playerDisplay,
+        private readonly StandingsSnapshotRepository $standingsSnapshotRepository,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -46,11 +50,56 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
-            $seasonPlayers = $this->seasonPlayerRepository->findBySeason($season->id);
+            // Display-ready enrolled players (name + category + elo), resolved
+            // server-side so the roster renders without a separate fetch.
+            $players = array_values($this->playerDisplay->mapForSeason($season->id));
 
             return $this->ok([
                 'season'  => $this->serializer->serialize($season),
-                'players' => array_map($this->serializer->serialize(...), $seasonPlayers),
+                'players' => $players,
+            ]);
+        });
+    }
+
+    public function standings(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            // The current standings = the latest round's frozen snapshot
+            // (empty until at least one round is complete). Each row is
+            // enriched with the player's display info.
+            $snapshots = $this->standingsSnapshotRepository->findLatestForSeason($season->id);
+            $display   = $this->playerDisplay->mapForSeason($season->id);
+
+            $standings = array_map(function ($s) use ($display) {
+                $d = $display[$s->season_player_id] ?? null;
+
+                return [
+                    'rank'             => $s->rank,
+                    'season_player_id' => $s->season_player_id,
+                    'player_id'        => $d['player_id'] ?? null,
+                    'name'             => $d['name'] ?? null,
+                    'category'         => $d['category'] ?? null,
+                    'elo'              => $d['elo'] ?? null,
+                    'keizer_score'     => $s->keizer_score,
+                    'classical_points' => $s->classical_points,
+                    'wins'             => $s->wins,
+                    'draws'            => $s->draws,
+                    'losses'           => $s->losses,
+                    'games'            => $s->games,
+                    'byes'             => $s->byes,
+                    'color_balance'    => $s->color_balance,
+                    'tpr'              => $s->tpr,
+                ];
+            }, $snapshots);
+
+            return $this->ok([
+                'season'    => $this->serializer->serialize($season),
+                'standings' => $standings,
             ]);
         });
     }

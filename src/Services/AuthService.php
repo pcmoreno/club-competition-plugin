@@ -6,6 +6,7 @@ namespace SCS\Services;
 
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Entity\Enum\MemberStatus;
+use SCS\Entity\Enum\Role;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
@@ -21,7 +22,7 @@ class AuthService
     ) {
     }
 
-    /** @return array{token: string, role: string} */
+    /** @return array{token: string, role: string, player_id: int|null} */
     public function login(string $email, string $password): array
     {
         $member = $this->memberRepository->findByEmail($email);
@@ -34,8 +35,9 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($member->id, 'ROLE_MEMBER'),
-                'role'  => 'member',
+                'token'     => $this->jwtService->issue($member->id, Role::Member, $member->player_id),
+                'role'      => Role::Member->value,
+                'player_id' => $member->player_id,
             ];
         }
 
@@ -49,8 +51,9 @@ class AuthService
             }
 
             return [
-                'token' => $this->jwtService->issue($admin->id, 'ROLE_ADMIN'),
-                'role'  => 'admin',
+                'token'     => $this->jwtService->issue($admin->id, Role::Admin),
+                'role'      => Role::Admin->value,
+                'player_id' => null,
             ];
         }
 
