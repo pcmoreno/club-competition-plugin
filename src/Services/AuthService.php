@@ -22,7 +22,7 @@ class AuthService
     ) {
     }
 
-    /** @return array{token: string, role: string} */
+    /** @return array{token: string, role: string, player_id: int|null} */
     public function login(string $email, string $password): array
     {
         $member = $this->memberRepository->findByEmail($email);

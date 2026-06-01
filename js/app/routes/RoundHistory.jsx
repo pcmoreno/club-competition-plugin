@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
 import { useAuth } from '../auth/AuthContext';
-import { Notice, YouTag, youRowClass } from '../components/ui';
+import { Notice, YouTag, youRowClass, formatDate } from '../components/ui';
 import { Square, resultToken } from '../components/game';
 
 // MEMBER. Browse any played round: a round navigator + the round's games.
@@ -199,13 +199,7 @@ function RoundNavigator( {
 
 function GamesCard( { round, data, meId } ) {
 	const { games = [], byes = [] } = data;
-	const dateLabel = round?.date
-		? new Date( round.date ).toLocaleDateString( undefined, {
-				day: 'numeric',
-				month: 'long',
-				year: 'numeric',
-		  } )
-		: null;
+	const dateLabel = formatDate( round?.date );
 
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">

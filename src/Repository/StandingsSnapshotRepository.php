@@ -35,18 +35,24 @@ class StandingsSnapshotRepository
      */
     public function findLatestForSeason(int $season_id): array
     {
-        $maxRoundId = $this->connection->createQueryBuilder()
-            ->select('MAX(round_id)')
-            ->from('wp_scs_standings_snapshots')
-            ->where('season_id = :season_id')
+        // "Latest" means the highest round_number that has a snapshot — not the
+        // highest round_id. A deleted-and-recreated or out-of-order round would
+        // break id ordering, so resolve it through the rounds table instead.
+        $latestRoundId = $this->connection->createQueryBuilder()
+            ->select('s.round_id')
+            ->from('wp_scs_standings_snapshots', 's')
+            ->innerJoin('s', 'wp_scs_rounds', 'r', 's.round_id = r.id')
+            ->where('s.season_id = :season_id')
             ->setParameter('season_id', $season_id)
+            ->orderBy('r.round_number', 'DESC')
+            ->setMaxResults(1)
             ->fetchOne();
 
-        if ($maxRoundId === false || $maxRoundId === null) {
+        if ($latestRoundId === false || $latestRoundId === null) {
             return [];
         }
 
-        return $this->findByRound((int)$maxRoundId);
+        return $this->findByRound((int)$latestRoundId);
     }
 
     public function findByRoundAndSeasonPlayer(int $round_id, int $season_player_id): ?StandingsSnapshot

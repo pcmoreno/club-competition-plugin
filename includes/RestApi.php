@@ -36,6 +36,20 @@ class RestApi
                 return true;
             };
 
+            // Any signed-in user (member or admin). No CSRF check — applied only
+            // to GET reads. Note this gates the standalone roster and player
+            // detail; pairings/results stay public, so player names and Elo are
+            // still reachable through the public round endpoints.
+            $isMember = function () use ($jwtService) {
+                $token  = $_COOKIE['scs_token'] ?? null;
+                $claims = $token ? $jwtService->parse($token) : null;
+                if (!$claims || !in_array($claims['role'], [Role::Member->value, Role::Admin->value], true)) {
+                    return new \WP_Error('forbidden', 'Member access required.', ['status' => 403]);
+                }
+
+                return true;
+            };
+
             // ── Auth ──────────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/auth/login', [
                 'methods'             => 'POST',
@@ -91,7 +105,7 @@ class RestApi
                 [
                     'methods'             => 'GET',
                     'callback'            => [$players, 'show'],
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => $isMember,
                 ],
                 [
                     'methods'             => 'PATCH',
@@ -118,7 +132,7 @@ class RestApi
                 [
                     'methods'             => 'GET',
                     'callback'            => [$seasons, 'show'],
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => $isMember,
                 ],
                 [
                     'methods'             => 'PATCH',

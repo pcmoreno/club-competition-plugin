@@ -192,7 +192,13 @@ export function Standings( { seasonId } ) {
 										{ r.keizer_score }
 									</td>
 									<td className="num px-4 py-2.5 font-mono">
-										{ r.classical_points }
+										{ Number.isFinite(
+											Number( r.classical_points )
+										)
+											? Number(
+													r.classical_points
+											  ).toFixed( 1 )
+											: '—' }
 									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.wins }/{ r.draws }/{ r.losses }

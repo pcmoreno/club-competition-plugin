@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
-import { Notice } from '../components/ui';
+import { Notice, formatDate } from '../components/ui';
 import { Square, resultToken, categoryLabel } from '../components/game';
 
 // PUBLIC. Shows the most-recent non-draft round of the selected tournament:
@@ -98,13 +98,7 @@ export function Pairings( { seasonId } ) {
 
 function RoundTable( { round, data } ) {
 	const { games = [], byes = [] } = data;
-	const dateLabel = round.date
-		? new Date( round.date ).toLocaleDateString( undefined, {
-				day: 'numeric',
-				month: 'long',
-				year: 'numeric',
-		  } )
-		: null;
+	const dateLabel = formatDate( round.date );
 
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">

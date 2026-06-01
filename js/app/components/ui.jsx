@@ -18,3 +18,21 @@ export function YouTag() {
 
 // Tailwind classes for a highlighted "this is you" table row.
 export const youRowClass = 'bg-accent-soft';
+
+// Formats a date-only 'YYYY-MM-DD' string for display. Parsed from its parts as
+// a *local* date — `new Date('2026-06-01')` parses as UTC midnight, which renders
+// the previous day in negative-offset timezones. Returns null on empty/invalid.
+export function formatDate( ymd ) {
+	if ( ! ymd ) {
+		return null;
+	}
+	const [ y, m, d ] = String( ymd ).split( '-' ).map( Number );
+	if ( ! y || ! m || ! d ) {
+		return null;
+	}
+	return new Date( y, m - 1, d ).toLocaleDateString( undefined, {
+		day: 'numeric',
+		month: 'long',
+		year: 'numeric',
+	} );
+}
