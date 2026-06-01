@@ -24,17 +24,26 @@ export function setCsrfToken( token ) {
 
 const WRITE_METHODS = new Set( [ 'POST', 'PUT', 'PATCH', 'DELETE' ] );
 
-function buildUrl( path ) {
+function buildUrl( path, params ) {
 	// `path` is relative to the REST namespace root, e.g. 'seasons' or
 	// 'rounds/12/status'. Leading slashes are tolerated.
-	return (
+	let url =
 		bootstrap.apiRoot.replace( /\/$/, '' ) +
 		'/' +
-		String( path ).replace( /^\//, '' )
-	);
+		String( path ).replace( /^\//, '' );
+	// Append query params with the right separator: under plain permalinks
+	// apiRoot is already a query string ('?rest_route=…'), so a further param
+	// must use '&', not a second '?'.
+	if ( params ) {
+		const qs = new URLSearchParams( params ).toString();
+		if ( qs ) {
+			url += ( url.includes( '?' ) ? '&' : '?' ) + qs;
+		}
+	}
+	return url;
 }
 
-async function request( method, path, { body, signal } = {} ) {
+async function request( method, path, { body, signal, params } = {} ) {
 	const headers = { Accept: 'application/json' };
 	if ( bootstrap.restNonce ) {
 		headers[ 'X-WP-Nonce' ] = bootstrap.restNonce;
@@ -47,7 +56,7 @@ async function request( method, path, { body, signal } = {} ) {
 		headers[ 'X-SCS-CSRF-Token' ] = csrfToken;
 	}
 
-	const res = await fetch( buildUrl( path ), {
+	const res = await fetch( buildUrl( path, params ), {
 		method,
 		headers,
 		// Send the httpOnly scs_token (JWT) and scs_csrf cookies.

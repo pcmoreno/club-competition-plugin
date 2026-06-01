@@ -55,6 +55,28 @@ class StandingsSnapshotRepository
         return $this->findByRound((int)$latestRoundId);
     }
 
+    /**
+     * The round_id of the snapshot-bearing round immediately before $round_id
+     * (by round_number) in the season, or null if it's the first. Used to diff
+     * standings for movers (▲/▼). Skips rounds without a snapshot.
+     */
+    public function findPreviousRoundId(int $season_id, int $round_id): ?int
+    {
+        $previous = $this->connection->createQueryBuilder()
+            ->select('s.round_id')
+            ->from('wp_scs_standings_snapshots', 's')
+            ->innerJoin('s', 'wp_scs_rounds', 'r', 's.round_id = r.id')
+            ->where('s.season_id = :season_id')
+            ->andWhere('r.round_number < (SELECT round_number FROM wp_scs_rounds WHERE id = :round_id)')
+            ->setParameter('season_id', $season_id)
+            ->setParameter('round_id', $round_id)
+            ->orderBy('r.round_number', 'DESC')
+            ->setMaxResults(1)
+            ->fetchOne();
+
+        return $previous === false || $previous === null ? null : (int)$previous;
+    }
+
     public function findByRoundAndSeasonPlayer(int $round_id, int $season_player_id): ?StandingsSnapshot
     {
         $row = $this->connection->createQueryBuilder()

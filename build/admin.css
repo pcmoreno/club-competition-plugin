@@ -869,6 +869,9 @@ input:where([type='file']):focus{
 .w-10{
   width: 2.5rem;
 }
+.w-12{
+  width: 3rem;
+}
 .w-16{
   width: 4rem;
 }
@@ -1158,6 +1161,9 @@ input:where([type='file']):focus{
 .text-accent-2{
   color: var(--accent-2);
 }
+.text-draw{
+  color: var(--draw);
+}
 .text-ink{
   color: var(--ink);
 }
@@ -1175,6 +1181,9 @@ input:where([type='file']):focus{
 }
 .text-paper{
   color: var(--paper);
+}
+.text-win{
+  color: var(--win);
 }
 .no-underline{
   text-decoration-line: none;
