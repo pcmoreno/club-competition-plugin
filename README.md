@@ -77,3 +77,12 @@ GPL-2.0-or-later
 ## Author
 
 Paulo Moreno
+
+## Snapshots
+
+<img width="1487" height="957" alt="image" src="https://github.com/user-attachments/assets/ee2b636b-513d-4352-b9b8-e17ad83ab174" />
+<img width="1438" height="1221" alt="image" src="https://github.com/user-attachments/assets/730e5e92-c31e-41b9-a714-216cf042ccf1" />
+<img width="1306" height="1088" alt="image" src="https://github.com/user-attachments/assets/1aec5021-aea3-4e27-a926-c086c9aeb248" />
+
+
+
