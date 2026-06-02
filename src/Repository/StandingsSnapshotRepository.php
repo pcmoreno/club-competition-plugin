@@ -28,6 +28,28 @@ class StandingsSnapshotRepository
     }
 
     /**
+     * Snapshot rows for a round, scoped to a season. Returns [] when the round
+     * does not belong to the season — prevents reading another (concurrently
+     * active) season's standings via ?round= on this season's URL.
+     *
+     * @return StandingsSnapshot[] ordered by rank
+     */
+    public function findByRoundForSeason(int $round_id, int $season_id): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from('wp_scs_standings_snapshots')
+            ->where('round_id = :round_id')
+            ->andWhere('season_id = :season_id')
+            ->setParameter('round_id', $round_id)
+            ->setParameter('season_id', $season_id)
+            ->orderBy('rank_position', 'ASC')
+            ->fetchAllAssociative();
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
+    /**
      * The current standings: the snapshot of the most-recently-completed round
      * that has one. Empty until at least one round is complete.
      *

@@ -75,7 +75,7 @@ class SeasonController extends RestController
             // player's display info.
             $roundParam = $request->get_param('round');
             $snapshots  = $roundParam !== null
-                ? $this->standingsSnapshotRepository->findByRound((int)$roundParam)
+                ? $this->standingsSnapshotRepository->findByRoundForSeason((int)$roundParam, $season->id)
                 : $this->standingsSnapshotRepository->findLatestForSeason($season->id);
             $display = $this->playerDisplay->mapForSeason($season->id);
 
