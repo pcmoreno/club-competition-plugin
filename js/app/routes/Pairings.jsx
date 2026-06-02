@@ -149,12 +149,12 @@ function RoundTable( { round, data } ) {
 				</tbody>
 			</table>
 
-			{ byes.length > 0 && (
-				<div className="border-t border-rule px-5 py-3 text-sm text-ink-3">
-					<span className="font-medium text-ink-2">Bye:</span>{ ' ' }
-					{ byes.map( ( b ) => b.name ?? '—' ).join( ', ' ) }
-				</div>
-			) }
+			<div className="border-t border-rule px-5 py-3 text-sm text-ink-3">
+				<span className="font-medium text-ink-2">Bye:</span>{ ' ' }
+				{ byes.length > 0
+					? byes.map( ( b ) => b.name ?? '—' ).join( ', ' )
+					: 'none' }
+			</div>
 		</div>
 	);
 }

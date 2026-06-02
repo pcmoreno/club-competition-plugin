@@ -69,13 +69,31 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
-            // The current standings = the latest round's frozen snapshot
-            // (empty until at least one round is complete). Each row is
-            // enriched with the player's display info.
-            $snapshots = $this->standingsSnapshotRepository->findLatestForSeason($season->id);
-            $display   = $this->playerDisplay->mapForSeason($season->id);
+            // Standings as of a specific round (?round=ID) — used by the round
+            // history "standings after round N" panel — or, by default, the
+            // latest completed round's snapshot. Each row is enriched with the
+            // player's display info.
+            $roundParam = $request->get_param('round');
+            $snapshots  = $roundParam !== null
+                ? $this->standingsSnapshotRepository->findByRoundForSeason((int)$roundParam, $season->id)
+                : $this->standingsSnapshotRepository->findLatestForSeason($season->id);
+            $display = $this->playerDisplay->mapForSeason($season->id);
 
-            $standings = array_map(function ($s) use ($display) {
+            // Movers: each player's rank change vs the previous snapshot-bearing
+            // round. rank_delta > 0 means moved up (rank number got smaller);
+            // null means no prior snapshot (first round, or a new entrant).
+            $previousRank = [];
+            if ($snapshots !== []) {
+                $previousRoundId = $this->standingsSnapshotRepository
+                    ->findPreviousRoundId($season->id, $snapshots[0]->round_id);
+                if ($previousRoundId !== null) {
+                    foreach ($this->standingsSnapshotRepository->findByRound($previousRoundId) as $p) {
+                        $previousRank[$p->season_player_id] = $p->rank;
+                    }
+                }
+            }
+
+            $standings = array_map(function ($s) use ($display, $previousRank) {
                 $d = $display[$s->season_player_id] ?? null;
 
                 return [
@@ -94,6 +112,9 @@ class SeasonController extends RestController
                     'byes'             => $s->byes,
                     'color_balance'    => $s->color_balance,
                     'tpr'              => $s->tpr,
+                    'rank_delta'       => isset($previousRank[$s->season_player_id])
+                        ? $previousRank[$s->season_player_id] - $s->rank
+                        : null,
                 ];
             }, $snapshots);
 

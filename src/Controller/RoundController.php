@@ -73,8 +73,10 @@ class RoundController extends RestController
                 'black'  => $display[$g->black_season_player_id] ?? null,
             ], $games);
 
-            // Byes (the odd-player-out and any sit-outs) are attendance rows
-            // carrying a bye_type, not games.
+            // The pairing sheet's "Bye" line lists only *pairing* byes — the
+            // present-but-unpaired player(s). Absences (status absent, e.g. a
+            // personal/club-duty no-show) are tracked in attendance but are not
+            // byes and must not appear here.
             $byes = array_values(array_map(
                 fn ($a) => [
                     'season_player_id' => $a->season_player_id,
@@ -82,7 +84,7 @@ class RoundController extends RestController
                     'category'         => $display[$a->season_player_id]['category'] ?? null,
                     'bye_type'         => $a->bye_type?->value,
                 ],
-                array_filter($attendance, fn ($a) => $a->bye_type !== null)
+                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::ParingBye)
             ));
 
             return $this->ok([

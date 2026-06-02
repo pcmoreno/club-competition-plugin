@@ -6,11 +6,10 @@ import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass, formatDate } from '../components/ui';
 import { Square, resultToken } from '../components/game';
 
-// MEMBER. Browse any played round: a round navigator + the round's games.
-// Backed by GET /seasons/{id}/rounds (navigator) + GET /rounds/{id} (games +
-// byes). The "Standings after Rd N" snapshot and Movers are blocked on
-// ScoringService / per-round ranking snapshots, so the right column is a
-// placeholder for now.
+// MEMBER. Browse any played round: a round navigator + the round's games, with
+// the standings as of that round (movers ▲/▼ vs the previous round) alongside.
+// Backed by GET /seasons/{id}/rounds (navigator), GET /rounds/{id} (games +
+// byes) and GET /seasons/{id}/standings?round={id} (the frozen snapshot).
 
 // Name with category + elo inline, e.g. "Peter de Roode (A · 2121)".
 function PlayerInline( { player, color } ) {
@@ -40,8 +39,10 @@ export function RoundHistory( { seasonId } ) {
 		enabled: seasonId !== null,
 	} );
 
+	// History is for played rounds only — a published/finalised round whose
+	// results aren't in yet belongs on Pairings, not here.
 	const rounds = ( roundsQuery.data ?? [] )
-		.filter( ( r ) => r.status !== 'draft' )
+		.filter( ( r ) => r.status === 'complete' )
 		.sort( ( a, b ) => a.round_number - b.round_number );
 
 	const [ selectedId, setSelectedId ] = useState( null );
@@ -119,7 +120,11 @@ export function RoundHistory( { seasonId } ) {
 					) }
 				</div>
 				<div>
-					<StandingsAfterPlaceholder round={ selected } />
+					<StandingsAfter
+						round={ selected }
+						seasonId={ seasonId }
+						meId={ playerId }
+					/>
 				</div>
 			</div>
 		</Shell>
@@ -273,18 +278,116 @@ function GamesCard( { round, data, meId } ) {
 	);
 }
 
-function StandingsAfterPlaceholder( { round } ) {
+// Rank change vs the previous round: ▲ up (good), ▼ down, = unchanged. Null
+// (first round / new entrant) renders nothing.
+function Mover( { delta } ) {
+	if ( delta === null || delta === undefined ) {
+		return null;
+	}
+	if ( delta === 0 ) {
+		return <span className="text-xs text-draw">=</span>;
+	}
+	const up = delta > 0;
 	return (
-		<div className="rounded border border-rule bg-surface shadow-sm">
+		<span className={ `text-xs ${ up ? 'text-win' : 'text-loss' }` }>
+			{ up ? '▲' : '▼' }
+			{ Math.abs( delta ) }
+		</span>
+	);
+}
+
+// The frozen standings snapshot for the selected round, with movers (▲/▼)
+// diffed against the previous round's snapshot.
+function StandingsAfter( { round, seasonId, meId } ) {
+	const { data, isLoading, isError } = useQuery( {
+		queryKey: [ 'round-standings', round?.id ],
+		queryFn: () =>
+			api.get( `seasons/${ seasonId }/standings`, {
+				params: { round: round.id },
+			} ),
+		enabled: seasonId !== null && Boolean( round?.id ),
+	} );
+
+	const rows = data?.standings ?? [];
+
+	let body;
+	if ( isLoading ) {
+		body = <div className="p-5 text-sm text-ink-3">Loading…</div>;
+	} else if ( isError ) {
+		body = (
+			<div className="p-5 text-sm text-ink-3">
+				Couldn’t load standings.
+			</div>
+		);
+	} else if ( rows.length === 0 ) {
+		body = (
+			<div className="p-5 text-sm text-ink-3">
+				No standings snapshot for this round yet.
+			</div>
+		);
+	} else {
+		body = (
+			<table className="w-full text-sm">
+				<thead>
+					<tr className="border-b border-rule text-left text-xs uppercase tracking-wide text-muted">
+						<th className="w-10 px-4 py-2 font-medium">#</th>
+						<th className="px-4 py-2 font-medium">Player</th>
+						<th className="w-12 px-2 py-2 text-center font-medium">
+							±
+						</th>
+						<th className="w-16 px-4 py-2 text-right font-medium">
+							Score
+						</th>
+						<th className="w-12 px-4 py-2 text-right font-medium">
+							Pts
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					{ rows.map( ( r ) => {
+						const isMe = meId !== null && r.player_id === meId;
+						return (
+							<tr
+								key={ r.season_player_id }
+								className={ [
+									'border-b border-rule-soft',
+									isMe ? youRowClass : '',
+								].join( ' ' ) }
+							>
+								<td className="num px-4 py-2 text-ink-3">
+									{ r.rank }
+								</td>
+								<td className="px-4 py-2">
+									{ r.name ?? '—' }
+									{ isMe && <YouTag /> }
+								</td>
+								<td className="num px-2 py-2 text-center">
+									<Mover delta={ r.rank_delta } />
+								</td>
+								<td className="num px-4 py-2 text-right font-mono text-ink">
+									{ r.keizer_score }
+								</td>
+								<td className="num px-4 py-2 text-right font-mono text-ink-3">
+									{ Number( r.classical_points ).toFixed(
+										1
+									) }
+								</td>
+							</tr>
+						);
+					} ) }
+				</tbody>
+			</table>
+		);
+	}
+
+	return (
+		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<div className="border-b border-rule px-5 py-3.5">
 				<h2 className="font-serif text-xl">
 					Standings after Round { round?.round_number }
 				</h2>
 			</div>
-			<div className="p-5 text-sm text-ink-3">
-				The per-round standings snapshot and movers (▲/▼) arrive with
-				the scoring engine (Keizer). Not available yet.
-			</div>
+			{ body }
 		</div>
 	);
 }
