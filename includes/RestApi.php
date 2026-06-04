@@ -50,6 +50,19 @@ class RestApi
                 return true;
             };
 
+            // Admin-only GET reads. Same as $isAdmin but without the CSRF check,
+            // which only applies to writes — reads don't mutate state and the
+            // frontend doesn't send the CSRF header on GETs.
+            $isAdminRead = function () use ($jwtService) {
+                $token  = $_COOKIE['scs_token'] ?? null;
+                $claims = $token ? $jwtService->parse($token) : null;
+                if (!$claims || $claims['role'] !== Role::Admin->value) {
+                    return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
+                }
+
+                return true;
+            };
+
             // ── Auth ──────────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/auth/login', [
                 'methods'             => 'POST',
@@ -92,7 +105,7 @@ class RestApi
                 [
                     'methods'             => 'GET',
                     'callback'            => [$players, 'index'],
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => $isAdminRead,
                 ],
                 [
                     'methods'             => 'POST',

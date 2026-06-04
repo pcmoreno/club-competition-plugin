@@ -11,7 +11,7 @@ import { Standings } from './routes/Standings';
 import { RoundHistory } from './routes/RoundHistory';
 import { Players } from './routes/Players';
 import { PlayerDetail } from './routes/PlayerDetail';
-import { Admin } from './routes/Admin';
+import { AdminApp } from './admin/AdminApp';
 import {
 	Login,
 	ForgotPassword,
@@ -35,6 +35,12 @@ const AUTH_ROUTES = {
 };
 
 function resolveView( path, ctx ) {
+	// The admin sub-app owns everything under /admin/* and brings its own
+	// sidebar layout (the page-tab SubNav is suppressed for it in Shell).
+	if ( path === '/admin' || path.startsWith( '/admin/' ) ) {
+		return { need: 'admin', node: <AdminApp path={ path } /> };
+	}
+
 	const playerMatch = matchPath( '/players/:id', path );
 	if ( playerMatch ) {
 		return {
@@ -65,8 +71,6 @@ function resolveView( path, ctx ) {
 				need: 'member',
 				node: <Players seasonId={ ctx.seasonId } />,
 			};
-		case '/admin':
-			return { need: 'admin', node: <Admin /> };
 		default:
 			return null;
 	}
@@ -87,6 +91,8 @@ function Shell() {
 
 	const AuthView = AUTH_ROUTES[ path ];
 	const view = AuthView ? null : resolveView( path, { seasonId } );
+	// The admin sub-app supplies its own sidebar, so hide the page-tab SubNav.
+	const isAdminMode = path === '/admin' || path.startsWith( '/admin/' );
 
 	let body;
 	if ( AuthView ) {
@@ -119,7 +125,7 @@ function Shell() {
 	return (
 		<div className="min-h-screen">
 			<TopBar seasonId={ seasonId } onSeasonChange={ setSeasonId } />
-			{ ! AuthView && <SubNav activePath={ path } /> }
+			{ ! AuthView && ! isAdminMode && <SubNav activePath={ path } /> }
 			{ body }
 		</div>
 	);

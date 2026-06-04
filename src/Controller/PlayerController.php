@@ -6,6 +6,7 @@ namespace SCS\Controller;
 
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
+use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Request\CreatePlayerRequest;
 use SCS\Request\UpdatePlayerRequest;
@@ -17,17 +18,38 @@ class PlayerController extends RestController
     public function __construct(
         ValidatorInterface $validator,
         private readonly PlayerRepository $playerRepository,
+        private readonly MemberRepository $memberRepository,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
     }
 
+    /**
+     * Full club roster (admin only) — every player, active or not, each
+     * enriched with their member account's email + status (null when the
+     * player has no login account). Admin-scoped because email is PII.
+     */
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () {
-            $players = $this->playerRepository->findActive();
+            // player_id => Member, so each player resolves its account in one
+            // pass without an N+1 of findByPlayerId() calls.
+            $membersByPlayer = [];
+            foreach ($this->memberRepository->findAll() as $member) {
+                $membersByPlayer[$member->player_id] = $member;
+            }
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            $players = array_map(function ($player) use ($membersByPlayer) {
+                $data   = $this->serializer->serialize($player, SerializerService::GROUP_ADMIN);
+                $member = $membersByPlayer[$player->id] ?? null;
+
+                $data['email']         = $member?->email;
+                $data['member_status'] = $member?->status->value;
+
+                return $data;
+            }, $this->playerRepository->findAll());
+
+            return $this->ok($players);
         });
     }
 
