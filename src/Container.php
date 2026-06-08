@@ -32,6 +32,7 @@ class Container
 
             if (defined('WP_CLI') && WP_CLI) {
                 \WP_CLI::add_command('scs migrate', new Command\MigrateCommand());
+                \WP_CLI::add_command('scs create-admin', $container->get('create_admin_command'));
             }
         }
 
@@ -110,6 +111,7 @@ class Container
             ->setPublic(true)
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
@@ -131,6 +133,10 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'));
+
+        $container->register('create_admin_command', Command\CreateAdminCommand::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('admin_repository'));
 
         $container->compile();
 

@@ -26,6 +26,17 @@ class MemberRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /** @return Member[] */
+    public function findAll(): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from('wp_scs_members')
+            ->fetchAllAssociative();
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
     public function findByEmail(string $email): ?Member
     {
         $row = $this->connection->createQueryBuilder()
