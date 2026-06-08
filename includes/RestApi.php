@@ -21,43 +21,51 @@ class RestApi
             $seasons         = $container->get('season_controller');
             $rounds          = $container->get('round_controller');
 
-            $isAdmin = function (\WP_REST_Request $request) use ($jwtService, $csrfManager) {
-                $token  = $_COOKIE['scs_token'] ?? null;
-                $claims = $token ? $jwtService->parse($token) : null;
-                if (!$claims || $claims['role'] !== Role::Admin->value) {
-                    return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
-                }
+            // Parse the auth cookie's JWT into its claims, or null when the
+            // cookie is absent/invalid. Single source for every role check below.
+            $claims = function () use ($jwtService) {
+                $token = $_COOKIE['scs_token'] ?? null;
 
-                $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
-                if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
-                    return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
-                }
+                return $token ? $jwtService->parse($token) : null;
+            };
 
-                return true;
+            // Build a permission callback that requires the signed-in user to
+            // hold one of $roles. CSRF (writes only) is layered on top in
+            // $isAdmin — the role gate itself is shared by reads and writes.
+            $requireRole = function (array $roles, string $message) use ($claims) {
+                return function () use ($claims, $roles, $message) {
+                    $c = $claims();
+                    if (!$c || !in_array($c['role'], $roles, true)) {
+                        return new \WP_Error('forbidden', $message, ['status' => 403]);
+                    }
+
+                    return true;
+                };
             };
 
             // Any signed-in user (member or admin). No CSRF check — applied only
             // to GET reads. Note this gates the standalone roster and player
             // detail; pairings/results stay public, so player names and Elo are
             // still reachable through the public round endpoints.
-            $isMember = function () use ($jwtService) {
-                $token  = $_COOKIE['scs_token'] ?? null;
-                $claims = $token ? $jwtService->parse($token) : null;
-                if (!$claims || !in_array($claims['role'], [Role::Member->value, Role::Admin->value], true)) {
-                    return new \WP_Error('forbidden', 'Member access required.', ['status' => 403]);
+            $isMember = $requireRole([Role::Member->value, Role::Admin->value], 'Member access required.');
+
+            // Admin-only GET reads: same role gate as $isAdmin but without the
+            // CSRF check, which only applies to writes — reads don't mutate
+            // state and the frontend doesn't send the CSRF header on GETs.
+            $isAdminRead = $requireRole([Role::Admin->value], 'Admin access required.');
+
+            // Admin write endpoints: the admin role gate plus a valid CSRF
+            // header. Reuses $isAdminRead for the role half so the cookie/role
+            // logic lives in exactly one place.
+            $isAdmin = function (\WP_REST_Request $request) use ($isAdminRead, $csrfManager) {
+                $allowed = $isAdminRead();
+                if ($allowed !== true) {
+                    return $allowed;
                 }
 
-                return true;
-            };
-
-            // Admin-only GET reads. Same as $isAdmin but without the CSRF check,
-            // which only applies to writes — reads don't mutate state and the
-            // frontend doesn't send the CSRF header on GETs.
-            $isAdminRead = function () use ($jwtService) {
-                $token  = $_COOKIE['scs_token'] ?? null;
-                $claims = $token ? $jwtService->parse($token) : null;
-                if (!$claims || $claims['role'] !== Role::Admin->value) {
-                    return new \WP_Error('forbidden', 'Admin access required.', ['status' => 403]);
+                $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
+                if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
+                    return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
                 }
 
                 return true;
