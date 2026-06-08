@@ -34,10 +34,16 @@ const AUTH_ROUTES = {
 	'/accept-invite': AcceptInvite,
 };
 
+// The admin sub-app owns everything under /admin/*. Single predicate so the
+// route resolution and the SubNav suppression in Shell can't drift apart.
+function isAdminPath( path ) {
+	return path === '/admin' || path.startsWith( '/admin/' );
+}
+
 function resolveView( path, ctx ) {
-	// The admin sub-app owns everything under /admin/* and brings its own
-	// sidebar layout (the page-tab SubNav is suppressed for it in Shell).
-	if ( path === '/admin' || path.startsWith( '/admin/' ) ) {
+	// The admin sub-app brings its own sidebar layout (the page-tab SubNav is
+	// suppressed for it in Shell).
+	if ( isAdminPath( path ) ) {
 		return { need: 'admin', node: <AdminApp path={ path } /> };
 	}
 
@@ -92,7 +98,7 @@ function Shell() {
 	const AuthView = AUTH_ROUTES[ path ];
 	const view = AuthView ? null : resolveView( path, { seasonId } );
 	// The admin sub-app supplies its own sidebar, so hide the page-tab SubNav.
-	const isAdminMode = path === '/admin' || path.startsWith( '/admin/' );
+	const isAdminMode = isAdminPath( path );
 
 	let body;
 	if ( AuthView ) {
