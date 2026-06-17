@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^18",
     "react-dom": "^18",
-    "@wordpress/scripts": "^28",
+    "@wordpress/scripts": "^32",
     "@wordpress/element": "^5",
     "@wordpress/api-fetch": "^7",
     "@wordpress/components": "^25",
@@ -29,6 +29,6 @@
   },
   "devDependencies": {},
   "engines": {
-    "node": ">=16"
+    "node": ">=18.12.0"
   }
 }
