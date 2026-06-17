@@ -1,9 +1,19 @@
 /* Webfonts: IBM Plex Sans (body), Newsreader (headings), IBM Plex Mono (scores). */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@config '../tailwind.config.js';
+
+/* Break out of block themes' constrained content width (e.g. Twenty
+   Twenty-Five wraps the shortcode in .is-layout-constrained, which caps
+   children at ~620px via an unlayered :where() rule). The app manages its own
+   max-width via .max-w-page. This rule is intentionally kept OUTSIDE @layer so
+   it stays unlayered — under v4's native cascade layers, unlayered styles beat
+   layered ones, so a layered override would lose to the theme's unlayered
+   :where() constraint. Unlayered + #id specificity beats :where()'s zero. */
+#scs-app {
+  max-width: none;
+}
 
 /* ==========================================================
    Design tokens — ported from the hi-fi design system
@@ -54,12 +64,6 @@
     font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    /* Break out of block themes' constrained content width (e.g. Twenty
-       Twenty-Five wraps the shortcode in .is-layout-constrained, which caps
-       children at ~620px). The app manages its own max-width via .max-w-page.
-       The theme's constraint uses zero-specificity :where() rules, so this id
-       rule overrides it. */
-    max-width: none;
   }
 
   #scs-app h1,
