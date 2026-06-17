@@ -65,7 +65,6 @@ module.exports = {
   },
   plugins: [
     require('@tailwindcss/forms'),
-    require('@tailwindcss/aspect-ratio'),
-    // line-clamp is bundled into Tailwind core as of v3.3.
+    // aspect-ratio and line-clamp are built into Tailwind core as of v4.
   ],
 }
