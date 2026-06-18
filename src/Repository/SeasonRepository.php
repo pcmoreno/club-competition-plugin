@@ -57,6 +57,18 @@ class SeasonRepository
         return array_map($this->hydrate(...), $rows);
     }
 
+    public function findByName(string $name): ?Season
+    {
+        $row = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from('wp_scs_seasons')
+            ->where('name = :name')
+            ->setParameter('name', $name)
+            ->fetchAssociative();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories): Season
     {
         $this->connection->insert('wp_scs_seasons', [

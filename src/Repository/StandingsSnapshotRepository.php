@@ -150,6 +150,11 @@ class StandingsSnapshotRepository
         $this->connection->delete('wp_scs_standings_snapshots', [ 'round_id' => $round_id ]);
     }
 
+    public function deleteBySeason(int $season_id): void
+    {
+        $this->connection->delete('wp_scs_standings_snapshots', [ 'season_id' => $season_id ]);
+    }
+
     private function hydrate(array $row): StandingsSnapshot
     {
         return new StandingsSnapshot(

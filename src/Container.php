@@ -93,8 +93,15 @@ class Container
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'));
 
-        $container->register('fixture_loader', Services\FixtureLoader::class)
+        $container->register('season_import_service', Services\SeasonImportService::class)
             ->addArgument(new Reference('db_connection'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(SCS_PLUGIN_PATH . 'fixtures');
 
         $container->register('validator', ValidatorInterface::class)
@@ -141,7 +148,7 @@ class Container
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)
             ->addArgument(new Reference('validator'))
-            ->addArgument(new Reference('fixture_loader'));
+            ->addArgument(new Reference('season_import_service'));
 
         $container->register('create_admin_command', Command\CreateAdminCommand::class)
             ->setPublic(true)

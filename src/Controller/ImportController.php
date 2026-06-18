@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Request\ImportFixtureRequest;
-use SCS\Services\FixtureLoader;
+use SCS\Services\SeasonImportService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ImportController extends RestController
 {
     public function __construct(
         ValidatorInterface $validator,
-        private readonly FixtureLoader $fixtureLoader,
+        private readonly SeasonImportService $importService,
     ) {
         parent::__construct($validator);
     }
@@ -20,7 +20,7 @@ class ImportController extends RestController
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () {
-            return $this->ok($this->fixtureLoader->availableFixtures());
+            return $this->ok($this->importService->availableFixtures());
         });
     }
 
@@ -30,7 +30,7 @@ class ImportController extends RestController
             $input = ImportFixtureRequest::fromRequest($request);
             $this->validate($input);
 
-            return $this->ok($this->fixtureLoader->load($input->name));
+            return $this->ok($this->importService->import($input->name));
         });
     }
 }

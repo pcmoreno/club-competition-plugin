@@ -49,6 +49,18 @@ class PlayerRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function findByName(string $name): ?Player
+    {
+        $row = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from('wp_scs_players')
+            ->where('name = :name')
+            ->setParameter('name', $name)
+            ->fetchAssociative();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function create(string $name, ?string $knsb_id, ?int $knsb_elo, ?string $gender, ?string $date_of_birth): Player
     {
         $this->connection->insert('wp_scs_players', [

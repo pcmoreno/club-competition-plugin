@@ -63,6 +63,17 @@ class AttendanceRepository
         }
     }
 
+    public function deleteBySeason(int $season_id): void
+    {
+        // Attendance references a round, not the season directly. Multi-table
+        // DELETE isn't expressible via the query builder, so this is a bound
+        // raw statement.
+        $this->connection->executeStatement(
+            'DELETE a FROM wp_scs_attendance a JOIN wp_scs_rounds r ON r.id = a.round_id WHERE r.season_id = ?',
+            [$season_id]
+        );
+    }
+
     /**
      * @param list<array{season_player_id: int, status: AttendanceStatus, bye_type: ?ByeType}> $entries
      */

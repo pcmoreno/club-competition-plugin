@@ -74,6 +74,11 @@ class SeasonPlayerRepository
         $this->connection->delete('wp_scs_season_players', [ 'id' => $id ]);
     }
 
+    public function deleteBySeason(int $season_id): void
+    {
+        $this->connection->delete('wp_scs_season_players', [ 'season_id' => $season_id ]);
+    }
+
     private function hydrate(array $row): SeasonPlayer
     {
         return new SeasonPlayer(

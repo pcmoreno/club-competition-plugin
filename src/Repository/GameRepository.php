@@ -55,14 +55,14 @@ class GameRepository
         return array_map($this->hydrate(...), $rows);
     }
 
-    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null): Game
+    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null, ?GameResult $result = null): Game
     {
         $this->connection->insert('wp_scs_games', [
             'round_id'               => $round_id,
             'board'                  => $board,
             'white_season_player_id' => $white_season_player_id,
             'black_season_player_id' => $black_season_player_id,
-            'result'                 => null,
+            'result'                 => $result?->value,
         ]);
 
         return $this->findById((int)$this->connection->lastInsertId());
@@ -78,6 +78,17 @@ class GameRepository
     public function deleteByRound(int $round_id): void
     {
         $this->connection->delete('wp_scs_games', [ 'round_id' => $round_id ]);
+    }
+
+    public function deleteBySeason(int $season_id): void
+    {
+        // Games reference a round, not the season directly — delete all games
+        // whose round belongs to the season. Multi-table DELETE isn't expressible
+        // via the query builder, so this is a bound raw statement.
+        $this->connection->executeStatement(
+            'DELETE g FROM wp_scs_games g JOIN wp_scs_rounds r ON r.id = g.round_id WHERE r.season_id = ?',
+            [$season_id]
+        );
     }
 
     private function hydrate(array $row): Game
