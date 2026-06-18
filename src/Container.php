@@ -93,6 +93,10 @@ class Container
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'));
 
+        $container->register('fixture_loader', Services\FixtureLoader::class)
+            ->addArgument(new Reference('db_connection'))
+            ->addArgument(SCS_PLUGIN_PATH . 'fixtures');
+
         $container->register('validator', ValidatorInterface::class)
             ->setFactory([self::class, 'createValidator']);
 
@@ -133,6 +137,11 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'));
+
+        $container->register('import_controller', Controller\ImportController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('fixture_loader'));
 
         $container->register('create_admin_command', Command\CreateAdminCommand::class)
             ->setPublic(true)

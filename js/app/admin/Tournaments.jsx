@@ -1,6 +1,8 @@
+import { useState } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { AdminHeader } from './AdminLayout';
+import { ImportSeasonDialog } from './ImportSeasonDialog';
 import { Notice, formatDate } from '../components/ui';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
@@ -22,6 +24,7 @@ const GROUPS = [
 ];
 
 export function Tournaments() {
+	const [ importing, setImporting ] = useState( false );
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'seasons' ],
 		queryFn: () => api.get( 'seasons' ),
@@ -56,8 +59,22 @@ export function Tournaments() {
 
 	return (
 		<>
-			<AdminHeader title="Tournaments" />
+			<AdminHeader
+				title="Tournaments"
+				action={
+					<button
+						type="button"
+						className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2"
+						onClick={ () => setImporting( true ) }
+					>
+						Import season
+					</button>
+				}
+			/>
 			{ content }
+			{ importing && (
+				<ImportSeasonDialog onClose={ () => setImporting( false ) } />
+			) }
 		</>
 	);
 }
