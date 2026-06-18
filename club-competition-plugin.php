@@ -28,6 +28,16 @@ require_once SCS_PLUGIN_PATH . 'vendor/autoload.php';
 register_activation_hook(__FILE__, [ \SCS\includes\Database::class, 'activate' ]);
 register_deactivation_hook(__FILE__, [ \SCS\includes\Database::class, 'deactivate' ]);
 
+// Apply any pending schema migrations on load. WordPress only fires the
+// activation hook on manual activation, never on update, so updates that ship
+// new migration files (e.g. via the GitHub-Releases update path) would
+// otherwise leave the schema stale. migrate() self-gates via the
+// scs_applied_migrations option, so this is a cheap no-op once everything is
+// applied. Runs before Container::boot so services see the current schema.
+add_action('plugins_loaded', function () {
+    \SCS\includes\Database::migrate();
+}, 5);
+
 add_action('plugins_loaded', function () {
     \SCS\Container::boot();
 }, 10);
