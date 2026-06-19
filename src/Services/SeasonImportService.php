@@ -175,7 +175,8 @@ class SeasonImportService
                     $round->id,
                     $resolveEnrolment($s['name']),
                     (int)$s['rank'],
-                    (int)$s['keizer_score'],
+                    // Null for seasons ranked by classical points, not Keizer.
+                    isset($s['keizer_score']) ? (int)$s['keizer_score'] : null,
                     (float)((int)$s['wins'] + 0.5 * (int)$s['draws']),
                     (int)$s['wins'],
                     (int)$s['draws'],

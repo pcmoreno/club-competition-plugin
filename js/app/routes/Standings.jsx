@@ -106,6 +106,10 @@ export function Standings( { seasonId } ) {
 				: { key: col.key, dir: col.dir }
 		);
 
+	// Some seasons rank by classical points and carry no Keizer score — hide
+	// the Score column entirely when no row has one.
+	const hasScore = rows.some( ( r ) => r.keizer_score != null );
+
 	return (
 		<Wrap
 			rounds={ data.completed_rounds }
@@ -125,12 +129,14 @@ export function Standings( { seasonId } ) {
 							/>
 							<th className="px-4 py-2 font-medium">Player</th>
 							<th className="w-16 px-4 py-2 font-medium">Cat</th>
-							<SortTh
-								col={ COL.score }
-								sort={ sort }
-								onSort={ onSort }
-								className="w-20"
-							/>
+							{ hasScore && (
+								<SortTh
+									col={ COL.score }
+									sort={ sort }
+									onSort={ onSort }
+									className="w-20"
+								/>
+							) }
 							<SortTh
 								col={ COL.points }
 								sort={ sort }
@@ -207,9 +213,11 @@ export function Standings( { seasonId } ) {
 									<td className="px-4 py-2.5 text-ink-3">
 										{ r.category ?? '—' }
 									</td>
-									<td className="num px-4 py-2.5 font-mono text-ink">
-										{ r.keizer_score }
-									</td>
+									{ hasScore && (
+										<td className="num px-4 py-2.5 font-mono text-ink">
+											{ r.keizer_score ?? '—' }
+										</td>
+									) }
 									<td className="num px-4 py-2.5 font-mono">
 										{ Number.isFinite(
 											Number( r.classical_points )
