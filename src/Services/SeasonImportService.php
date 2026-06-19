@@ -175,7 +175,8 @@ class SeasonImportService
                     $round->id,
                     $resolveEnrolment($s['name']),
                     (int)$s['rank'],
-                    (int)$s['keizer_score'],
+                    // Null for seasons ranked by classical points, not Keizer.
+                    isset($s['keizer_score']) ? (int)$s['keizer_score'] : null,
                     (float)((int)$s['wins'] + 0.5 * (int)$s['draws']),
                     (int)$s['wins'],
                     (int)$s['draws'],
@@ -212,7 +213,10 @@ class SeasonImportService
             'start_date'     => $s['start_date'] ?? null,
             'end_date'       => $s['end_date'] ?? null,
             'pairing_system' => (PairingSystem::from($s['pairing_system'] ?? PairingSystem::Keizer->value))->value,
-            'status'         => (SeasonStatus::from($s['status'] ?? SeasonStatus::Active->value))->value,
+            // An import always seeds a finished, historical competition (a full
+            // scrape of a past season), so it is always marked "completed" —
+            // regardless of what the fixture's status field says.
+            'status'         => SeasonStatus::Completed->value,
             'categories'     => json_encode($s['categories'] ?? []),
         ]);
 

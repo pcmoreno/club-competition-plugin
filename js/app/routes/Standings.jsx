@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
@@ -37,12 +37,14 @@ function pieceForRank( rank, total ) {
 // pairing systems rank by their own metric.
 const COL = {
 	rank: { key: 'rank', label: 'Rank', dir: 'asc' },
+	games: { key: 'games', label: 'Games', dir: 'desc' },
 	score: { key: 'keizer_score', label: 'Score', dir: 'desc' },
 	points: { key: 'classical_points', label: 'Pts', dir: 'desc' },
 	wins: { key: 'wins', label: 'W', dir: 'desc' },
 	draws: { key: 'draws', label: 'D', dir: 'desc' },
 	losses: { key: 'losses', label: 'L', dir: 'desc' },
 	byes: { key: 'byes', label: 'Byes', dir: 'desc' },
+	colorBalance: { key: 'color_balance', label: 'Color', dir: 'desc' },
 	tpr: { key: 'tpr', label: 'TPR', dir: 'desc' },
 };
 
@@ -50,6 +52,13 @@ export function Standings( { seasonId } ) {
 	const { playerId } = useAuth();
 	const [ sort, setSort ] = useState( { key: 'rank', dir: 'asc' } );
 	const [ category, setCategory ] = useState( 'Overall' );
+
+	// A sort/category is a per-season view; reset to the default ranking when
+	// the selected tournament changes so it doesn't carry over to another season.
+	useEffect( () => {
+		setSort( { key: 'rank', dir: 'asc' } );
+		setCategory( 'Overall' );
+	}, [ seasonId ] );
 
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'standings', seasonId ],
@@ -106,6 +115,13 @@ export function Standings( { seasonId } ) {
 				: { key: col.key, dir: col.dir }
 		);
 
+	// Hide columns that carry no data for this season: Score (point-ranked
+	// seasons have no Keizer score), Category (an undivided single-pool season),
+	// and Byes (a season that recorded none).
+	const hasScore = rows.some( ( r ) => r.keizer_score != null );
+	const hasCat = rows.some( ( r ) => r.category != null && r.category !== '' );
+	const hasByes = rows.some( ( r ) => ( r.byes ?? 0 ) > 0 );
+
 	return (
 		<Wrap
 			rounds={ data.completed_rounds }
@@ -124,13 +140,25 @@ export function Standings( { seasonId } ) {
 								className="w-16"
 							/>
 							<th className="px-4 py-2 font-medium">Player</th>
-							<th className="w-16 px-4 py-2 font-medium">Cat</th>
+							{ hasCat && (
+								<th className="w-16 px-4 py-2 font-medium">
+									Cat
+								</th>
+							) }
 							<SortTh
-								col={ COL.score }
+								col={ COL.games }
 								sort={ sort }
 								onSort={ onSort }
-								className="w-20"
+								className="w-16"
 							/>
+							{ hasScore && (
+								<SortTh
+									col={ COL.score }
+									sort={ sort }
+									onSort={ onSort }
+									className="w-20"
+								/>
+							) }
 							<SortTh
 								col={ COL.points }
 								sort={ sort }
@@ -155,8 +183,16 @@ export function Standings( { seasonId } ) {
 								onSort={ onSort }
 								className="w-12"
 							/>
+							{ hasByes && (
+								<SortTh
+									col={ COL.byes }
+									sort={ sort }
+									onSort={ onSort }
+									className="w-16"
+								/>
+							) }
 							<SortTh
-								col={ COL.byes }
+								col={ COL.colorBalance }
 								sort={ sort }
 								onSort={ onSort }
 								className="w-16"
@@ -192,24 +228,25 @@ export function Standings( { seasonId } ) {
 											{ r.name ?? '—' }
 										</span>
 										{ isMe && <YouTag /> }
-										<span className="num ml-2 text-xs text-muted">
-											{ r.elo ? `${ r.elo }` : '' }
-											{ Number.isFinite( r.color_balance )
-												? ` · S ${
-														r.color_balance > 0
-															? '+'
-															: ''
-												  }${ r.color_balance }`
-												: '' }
-											{ ` · ${ r.games }` }
-										</span>
+										{ r.elo ? (
+											<span className="num ml-2 text-xs text-muted">
+												{ r.elo }
+											</span>
+										) : null }
 									</td>
-									<td className="px-4 py-2.5 text-ink-3">
-										{ r.category ?? '—' }
+									{ hasCat && (
+										<td className="px-4 py-2.5 text-ink-3">
+											{ r.category ?? '—' }
+										</td>
+									) }
+									<td className="num px-4 py-2.5 font-mono text-ink-3">
+										{ r.games }
 									</td>
-									<td className="num px-4 py-2.5 font-mono text-ink">
-										{ r.keizer_score }
-									</td>
+									{ hasScore && (
+										<td className="num px-4 py-2.5 font-mono text-ink">
+											{ r.keizer_score ?? '—' }
+										</td>
+									) }
 									<td className="num px-4 py-2.5 font-mono">
 										{ Number.isFinite(
 											Number( r.classical_points )
@@ -228,8 +265,15 @@ export function Standings( { seasonId } ) {
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.losses }
 									</td>
+									{ hasByes && (
+										<td className="num px-4 py-2.5 font-mono text-ink-3">
+											{ r.byes }
+										</td>
+									) }
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
-										{ r.byes }
+										{ Number.isFinite( r.color_balance )
+											? `${ r.color_balance > 0 ? '+' : '' }${ r.color_balance }`
+											: '—' }
 									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.tpr ?? '—' }

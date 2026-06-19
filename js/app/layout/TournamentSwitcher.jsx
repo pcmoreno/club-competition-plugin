@@ -3,19 +3,28 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 
 // Global tournament switcher — scopes every member/public view at once.
-// Lists active seasons only (multiple can be active: a league plus side
-// tournaments). Archive/past-season browsing is a later feature.
+// Normally lists active seasons (multiple can be active: a league plus side
+// tournaments). In the off-season, when nothing is active, it falls back to
+// completed seasons (most recent first) so the public viewer isn't empty —
+// which doubles as past-season browsing.
 //
 // Reads/writes the selected season id via the `value`/`onChange` props so the
 // App owns the single source of truth (and can persist it later).
 export function TournamentSwitcher( { value, onChange } ) {
 	// GET /seasons returns all seasons (no status filter server-side yet);
-	// narrow to active ones here.
+	// narrow here: active ones while a competition is running, else the
+	// completed ones (newest first) so the off-season still shows a season.
 	const { data: all = [], isLoading } = useQuery( {
 		queryKey: [ 'seasons' ],
 		queryFn: () => api.get( 'seasons' ),
 	} );
-	const seasons = all.filter( ( s ) => s.status === 'active' );
+	const active = all.filter( ( s ) => s.status === 'active' );
+	const completed = all
+		.filter( ( s ) => s.status === 'completed' )
+		.sort( ( a, b ) =>
+			( b.start_date ?? '' ).localeCompare( a.start_date ?? '' )
+		);
+	const seasons = active.length > 0 ? active : completed;
 
 	// Establish a selected season as soon as the list loads, so every view is
 	// scoped from first paint. Covers both the single-season (no <select>) and
@@ -44,7 +53,7 @@ export function TournamentSwitcher( { value, onChange } ) {
 			</label>
 			<select
 				id="scs-tournament"
-				className="rounded border-rule bg-surface px-2 py-1 text-sm text-ink"
+				className="min-w-[15rem] rounded border-rule bg-surface px-2 py-1 text-sm text-ink"
 				value={ value ?? '' }
 				onChange={ ( e ) => onChange( Number( e.target.value ) ) }
 			>

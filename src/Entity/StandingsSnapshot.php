@@ -17,7 +17,9 @@ class StandingsSnapshot
         public readonly int $round_id,
         public readonly int $season_player_id,
         public readonly int $rank,
-        public readonly int $keizer_score,
+        // Null for seasons that don't rank by a Keizer value (they rank by
+        // classical_points instead); see migration 0006.
+        public readonly ?int $keizer_score,
         public readonly float $classical_points,
         public readonly int $wins,
         public readonly int $draws,
