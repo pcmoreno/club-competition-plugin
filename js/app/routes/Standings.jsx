@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
@@ -50,6 +50,13 @@ export function Standings( { seasonId } ) {
 	const { playerId } = useAuth();
 	const [ sort, setSort ] = useState( { key: 'rank', dir: 'asc' } );
 	const [ category, setCategory ] = useState( 'Overall' );
+
+	// A sort/category is a per-season view; reset to the default ranking when
+	// the selected tournament changes so it doesn't carry over to another season.
+	useEffect( () => {
+		setSort( { key: 'rank', dir: 'asc' } );
+		setCategory( 'Overall' );
+	}, [ seasonId ] );
 
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'standings', seasonId ],
@@ -106,9 +113,12 @@ export function Standings( { seasonId } ) {
 				: { key: col.key, dir: col.dir }
 		);
 
-	// Some seasons rank by classical points and carry no Keizer score — hide
-	// the Score column entirely when no row has one.
+	// Hide columns that carry no data for this season: Score (point-ranked
+	// seasons have no Keizer score), Category (an undivided single-pool season),
+	// and Byes (a season that recorded none).
 	const hasScore = rows.some( ( r ) => r.keizer_score != null );
+	const hasCat = rows.some( ( r ) => r.category != null && r.category !== '' );
+	const hasByes = rows.some( ( r ) => ( r.byes ?? 0 ) > 0 );
 
 	return (
 		<Wrap
@@ -128,7 +138,11 @@ export function Standings( { seasonId } ) {
 								className="w-16"
 							/>
 							<th className="px-4 py-2 font-medium">Player</th>
-							<th className="w-16 px-4 py-2 font-medium">Cat</th>
+							{ hasCat && (
+								<th className="w-16 px-4 py-2 font-medium">
+									Cat
+								</th>
+							) }
 							{ hasScore && (
 								<SortTh
 									col={ COL.score }
@@ -161,12 +175,14 @@ export function Standings( { seasonId } ) {
 								onSort={ onSort }
 								className="w-12"
 							/>
-							<SortTh
-								col={ COL.byes }
-								sort={ sort }
-								onSort={ onSort }
-								className="w-16"
-							/>
+							{ hasByes && (
+								<SortTh
+									col={ COL.byes }
+									sort={ sort }
+									onSort={ onSort }
+									className="w-16"
+								/>
+							) }
 							<SortTh
 								col={ COL.tpr }
 								sort={ sort }
@@ -210,9 +226,11 @@ export function Standings( { seasonId } ) {
 											{ ` · ${ r.games }` }
 										</span>
 									</td>
-									<td className="px-4 py-2.5 text-ink-3">
-										{ r.category ?? '—' }
-									</td>
+									{ hasCat && (
+										<td className="px-4 py-2.5 text-ink-3">
+											{ r.category ?? '—' }
+										</td>
+									) }
 									{ hasScore && (
 										<td className="num px-4 py-2.5 font-mono text-ink">
 											{ r.keizer_score ?? '—' }
@@ -236,9 +254,11 @@ export function Standings( { seasonId } ) {
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.losses }
 									</td>
-									<td className="num px-4 py-2.5 font-mono text-ink-3">
-										{ r.byes }
-									</td>
+									{ hasByes && (
+										<td className="num px-4 py-2.5 font-mono text-ink-3">
+											{ r.byes }
+										</td>
+									) }
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.tpr ?? '—' }
 									</td>

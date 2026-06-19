@@ -53,7 +53,7 @@ export function TournamentSwitcher( { value, onChange } ) {
 			</label>
 			<select
 				id="scs-tournament"
-				className="rounded border-rule bg-surface px-2 py-1 text-sm text-ink"
+				className="min-w-[15rem] rounded border-rule bg-surface px-2 py-1 text-sm text-ink"
 				value={ value ?? '' }
 				onChange={ ( e ) => onChange( Number( e.target.value ) ) }
 			>
