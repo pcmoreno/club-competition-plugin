@@ -55,6 +55,19 @@ class RoundRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /** How many rounds in the season are complete — i.e. counted in standings. */
+    public function countCompletedBySeason(int $season_id): int
+    {
+        return (int)$this->connection->createQueryBuilder()
+            ->select('COUNT(*)')
+            ->from('wp_scs_rounds')
+            ->where('season_id = :season_id')
+            ->andWhere('status = :status')
+            ->setParameter('season_id', $season_id)
+            ->setParameter('status', RoundStatus::Complete->value)
+            ->fetchOne();
+    }
+
     /**
      * Create a round with an explicit number and status. Used by the season
      * import, which seeds historical rounds verbatim (already complete) rather
