@@ -18,7 +18,7 @@ class MemberRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -31,7 +31,7 @@ class MemberRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->fetchAllAssociative();
 
         return array_map($this->hydrate(...), $rows);
@@ -41,7 +41,7 @@ class MemberRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->where('email = :email')
             ->setParameter('email', $email)
             ->fetchAssociative();
@@ -53,7 +53,7 @@ class MemberRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->where('player_id = :player_id')
             ->setParameter('player_id', $player_id)
             ->fetchAssociative();
@@ -65,7 +65,7 @@ class MemberRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->where('invite_token = :token')
             ->setParameter('token', $token)
             ->fetchAssociative();
@@ -77,7 +77,7 @@ class MemberRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_members')
+            ->from(SCS_TABLE_PREFIX . 'members')
             ->where('reset_token = :token')
             ->setParameter('token', $token)
             ->fetchAssociative();
@@ -87,7 +87,7 @@ class MemberRepository
 
     public function create(int $player_id, string $email, string $invite_token, \DateTimeImmutable $invite_expires_at): Member
     {
-        $this->connection->insert('wp_scs_members', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'members', [
             'player_id'         => $player_id,
             'email'             => $email,
             'invite_token'      => $invite_token,
@@ -100,7 +100,7 @@ class MemberRepository
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_members', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'members', $data, [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Member

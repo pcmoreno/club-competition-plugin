@@ -18,7 +18,7 @@ class AdminRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_admins')
+            ->from(SCS_TABLE_PREFIX . 'admins')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -30,7 +30,7 @@ class AdminRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_admins')
+            ->from(SCS_TABLE_PREFIX . 'admins')
             ->where('email = :email')
             ->setParameter('email', $email)
             ->fetchAssociative();
@@ -40,7 +40,7 @@ class AdminRepository
 
     public function create(string $name, string $email, string $password_hash): Admin
     {
-        $this->connection->insert('wp_scs_admins', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'admins', [
             'name'          => $name,
             'email'         => $email,
             'password_hash' => $password_hash,
@@ -52,7 +52,7 @@ class AdminRepository
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_admins', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'admins', $data, [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Admin

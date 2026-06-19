@@ -19,7 +19,7 @@ class AttendanceRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_attendance')
+            ->from(SCS_TABLE_PREFIX . 'attendance')
             ->where('round_id = :round_id')
             ->setParameter('round_id', $round_id)
             ->fetchAllAssociative();
@@ -31,7 +31,7 @@ class AttendanceRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_attendance')
+            ->from(SCS_TABLE_PREFIX . 'attendance')
             ->where('round_id = :round_id')
             ->andWhere('season_player_id = :season_player_id')
             ->setParameter('round_id', $round_id)
@@ -51,12 +51,12 @@ class AttendanceRepository
         ];
 
         if ($existing) {
-            $this->connection->update('wp_scs_attendance', $data, [
+            $this->connection->update(SCS_TABLE_PREFIX . 'attendance', $data, [
                 'round_id'         => $round_id,
                 'season_player_id' => $season_player_id,
             ]);
         } else {
-            $this->connection->insert('wp_scs_attendance', array_merge($data, [
+            $this->connection->insert(SCS_TABLE_PREFIX . 'attendance', array_merge($data, [
                 'round_id'         => $round_id,
                 'season_player_id' => $season_player_id,
             ]));
@@ -69,7 +69,7 @@ class AttendanceRepository
         // DELETE isn't expressible via the query builder, so this is a bound
         // raw statement.
         $this->connection->executeStatement(
-            'DELETE a FROM wp_scs_attendance a JOIN wp_scs_rounds r ON r.id = a.round_id WHERE r.season_id = ?',
+            'DELETE a FROM ' . SCS_TABLE_PREFIX . 'attendance a JOIN ' . SCS_TABLE_PREFIX . 'rounds r ON r.id = a.round_id WHERE r.season_id = ?',
             [$season_id]
         );
     }

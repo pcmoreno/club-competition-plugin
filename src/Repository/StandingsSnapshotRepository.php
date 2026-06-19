@@ -18,7 +18,7 @@ class StandingsSnapshotRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_standings_snapshots')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots')
             ->where('round_id = :round_id')
             ->setParameter('round_id', $round_id)
             ->orderBy('rank_position', 'ASC')
@@ -38,7 +38,7 @@ class StandingsSnapshotRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_standings_snapshots')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots')
             ->where('round_id = :round_id')
             ->andWhere('season_id = :season_id')
             ->setParameter('round_id', $round_id)
@@ -62,8 +62,8 @@ class StandingsSnapshotRepository
         // break id ordering, so resolve it through the rounds table instead.
         $latestRoundId = $this->connection->createQueryBuilder()
             ->select('s.round_id')
-            ->from('wp_scs_standings_snapshots', 's')
-            ->innerJoin('s', 'wp_scs_rounds', 'r', 's.round_id = r.id')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots', 's')
+            ->innerJoin('s', SCS_TABLE_PREFIX . 'rounds', 'r', 's.round_id = r.id')
             ->where('s.season_id = :season_id')
             ->setParameter('season_id', $season_id)
             ->orderBy('r.round_number', 'DESC')
@@ -86,10 +86,10 @@ class StandingsSnapshotRepository
     {
         $previous = $this->connection->createQueryBuilder()
             ->select('s.round_id')
-            ->from('wp_scs_standings_snapshots', 's')
-            ->innerJoin('s', 'wp_scs_rounds', 'r', 's.round_id = r.id')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots', 's')
+            ->innerJoin('s', SCS_TABLE_PREFIX . 'rounds', 'r', 's.round_id = r.id')
             ->where('s.season_id = :season_id')
-            ->andWhere('r.round_number < (SELECT round_number FROM wp_scs_rounds WHERE id = :round_id)')
+            ->andWhere('r.round_number < (SELECT round_number FROM ' . SCS_TABLE_PREFIX . 'rounds WHERE id = :round_id)')
             ->setParameter('season_id', $season_id)
             ->setParameter('round_id', $round_id)
             ->orderBy('r.round_number', 'DESC')
@@ -103,7 +103,7 @@ class StandingsSnapshotRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_standings_snapshots')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots')
             ->where('round_id = :round_id')
             ->andWhere('season_player_id = :sp_id')
             ->setParameter('round_id', $round_id)
@@ -128,7 +128,7 @@ class StandingsSnapshotRepository
         int $color_balance,
         ?int $tpr,
     ): void {
-        $this->connection->insert('wp_scs_standings_snapshots', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'standings_snapshots', [
             'season_id'        => $season_id,
             'round_id'         => $round_id,
             'season_player_id' => $season_player_id,
@@ -147,12 +147,12 @@ class StandingsSnapshotRepository
 
     public function deleteByRound(int $round_id): void
     {
-        $this->connection->delete('wp_scs_standings_snapshots', [ 'round_id' => $round_id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'standings_snapshots', [ 'round_id' => $round_id ]);
     }
 
     public function deleteBySeason(int $season_id): void
     {
-        $this->connection->delete('wp_scs_standings_snapshots', [ 'season_id' => $season_id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'standings_snapshots', [ 'season_id' => $season_id ]);
     }
 
     private function hydrate(array $row): StandingsSnapshot

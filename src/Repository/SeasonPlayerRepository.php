@@ -17,7 +17,7 @@ class SeasonPlayerRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_season_players')
+            ->from(SCS_TABLE_PREFIX . 'season_players')
             ->where('season_id = :season_id')
             ->setParameter('season_id', $season_id)
             ->orderBy('enrolled_at', 'ASC')
@@ -30,7 +30,7 @@ class SeasonPlayerRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_season_players')
+            ->from(SCS_TABLE_PREFIX . 'season_players')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -42,7 +42,7 @@ class SeasonPlayerRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_season_players')
+            ->from(SCS_TABLE_PREFIX . 'season_players')
             ->where('season_id = :season_id')
             ->andWhere('player_id = :player_id')
             ->setParameter('season_id', $season_id)
@@ -54,7 +54,7 @@ class SeasonPlayerRepository
 
     public function create(int $season_id, int $player_id, ?string $category, int $elo_rating): SeasonPlayer
     {
-        $this->connection->insert('wp_scs_season_players', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'season_players', [
             'season_id'  => $season_id,
             'player_id'  => $player_id,
             'category'   => $category,
@@ -66,17 +66,17 @@ class SeasonPlayerRepository
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_season_players', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'season_players', $data, [ 'id' => $id ]);
     }
 
     public function delete(int $id): void
     {
-        $this->connection->delete('wp_scs_season_players', [ 'id' => $id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'id' => $id ]);
     }
 
     public function deleteBySeason(int $season_id): void
     {
-        $this->connection->delete('wp_scs_season_players', [ 'season_id' => $season_id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'season_id' => $season_id ]);
     }
 
     private function hydrate(array $row): SeasonPlayer

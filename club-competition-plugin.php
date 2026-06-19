@@ -23,6 +23,13 @@ define('SCS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SCS_VERSION', '1.0.0');
 define('SCS_DB_VERSION', '1.0.0');
 
+// The plugin's tables share the site's WordPress table prefix (which is not
+// always "wp_" — SiteGround and many hosts randomise it). Migrations create
+// them as "{$wpdb->prefix}scs_*", so the data layer must reference them through
+// this same prefix rather than a hardcoded "wp_scs_".
+global $wpdb;
+define('SCS_TABLE_PREFIX', $wpdb->prefix . 'scs_');
+
 require_once SCS_PLUGIN_PATH . 'vendor/autoload.php';
 
 register_activation_hook(__FILE__, [ \SCS\includes\Database::class, 'activate' ]);
