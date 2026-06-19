@@ -16,22 +16,61 @@ class JwtService
 {
     public const TOKEN_TTL_SECONDS = 86400;
 
+    /** Option holding the auto-generated signing key when no constant is set. */
+    private const SECRET_OPTION = 'scs_jwt_secret';
+
+    /** Placeholder value that must never be accepted as a real secret. */
+    private const PLACEHOLDER = 'dev-secret-change-in-production';
+
     private Configuration $config;
     private ClockInterface $clock;
 
     public function __construct()
     {
-        if (!defined('SCS_JWT_SECRET') || SCS_JWT_SECRET === '' || SCS_JWT_SECRET === 'dev-secret-change-in-production') {
-            throw new \RuntimeException('SCS_JWT_SECRET must be defined in wp-config.php with a strong secret.');
-        }
-
-        $this->config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText(SCS_JWT_SECRET));
+        $this->config = Configuration::forSymmetricSigner(new Sha256(), InMemory::plainText(self::resolveSecret()));
         $this->clock  = new class () implements ClockInterface {
             public function now(): \DateTimeImmutable
             {
                 return new \DateTimeImmutable();
             }
         };
+    }
+
+    /**
+     * The JWT signing key.
+     *
+     * Prefer an explicit SCS_JWT_SECRET constant (defined in wp-config.php) so
+     * each environment can control its own key. When none is set, fall back to
+     * a strong secret generated once and stored in the options table — so a
+     * fresh install authenticates with no manual config, and the key is unique
+     * per site and never shipped in the plugin artifact or committed to git.
+     */
+    private static function resolveSecret(): string
+    {
+        if (defined('SCS_JWT_SECRET') && SCS_JWT_SECRET !== '' && SCS_JWT_SECRET !== self::PLACEHOLDER) {
+            return SCS_JWT_SECRET;
+        }
+
+        return self::ensureGeneratedSecret();
+    }
+
+    /**
+     * Return the stored auto-generated secret, creating it on first use.
+     * Idempotent: only generates when the option is missing/empty.
+     */
+    public static function ensureGeneratedSecret(): string
+    {
+        $secret = get_option(self::SECRET_OPTION, '');
+        if (!is_string($secret) || $secret === '') {
+            $secret = bin2hex(random_bytes(32));
+            // Autoloaded — read on most authenticated requests. add_option is a
+            // no-op if another request already created it; re-read to be safe.
+            add_option(self::SECRET_OPTION, $secret, '', true);
+            $stored = get_option(self::SECRET_OPTION, $secret);
+            $secret = is_string($stored) && $stored !== '' ? $stored : $secret;
+        }
+
+        return $secret;
     }
 
     public function issue(int $subject, Role $role, ?int $playerId = null): string
