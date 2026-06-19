@@ -2,7 +2,7 @@
   "name": "schaakclub-santpoort/club-competition-plugin",
   "description": "WordPress plugin for managing chess competition pairings, standings, and results for Schaakclub Santpoort",
   "type": "wordpress-plugin",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "GPL-2.0-or-later",
   "authors": [
     {
