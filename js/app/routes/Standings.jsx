@@ -44,7 +44,7 @@ const COL = {
 	draws: { key: 'draws', label: 'D', dir: 'desc' },
 	losses: { key: 'losses', label: 'L', dir: 'desc' },
 	byes: { key: 'byes', label: 'Byes', dir: 'desc' },
-	colorBalance: { key: 'color_balance', label: 'Color B', dir: 'desc' },
+	colorBalance: { key: 'color_balance', label: 'Color', dir: 'desc' },
 	tpr: { key: 'tpr', label: 'TPR', dir: 'desc' },
 };
 
