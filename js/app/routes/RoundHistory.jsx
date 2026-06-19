@@ -309,6 +309,8 @@ function StandingsAfter( { round, seasonId, meId } ) {
 	} );
 
 	const rows = data?.standings ?? [];
+	// Point-ranked seasons have no Keizer score — hide the Score column.
+	const hasScore = rows.some( ( r ) => r.keizer_score != null );
 
 	let body;
 	if ( isLoading ) {
@@ -335,9 +337,11 @@ function StandingsAfter( { round, seasonId, meId } ) {
 						<th className="w-12 px-2 py-2 text-center font-medium">
 							±
 						</th>
-						<th className="w-16 px-4 py-2 text-right font-medium">
-							Score
-						</th>
+						{ hasScore && (
+							<th className="w-16 px-4 py-2 text-right font-medium">
+								Score
+							</th>
+						) }
 						<th className="w-12 px-4 py-2 text-right font-medium">
 							Pts
 						</th>
@@ -364,9 +368,11 @@ function StandingsAfter( { round, seasonId, meId } ) {
 								<td className="num px-2 py-2 text-center">
 									<Mover delta={ r.rank_delta } />
 								</td>
-								<td className="num px-4 py-2 text-right font-mono text-ink">
-									{ r.keizer_score }
-								</td>
+								{ hasScore && (
+									<td className="num px-4 py-2 text-right font-mono text-ink">
+										{ r.keizer_score ?? '—' }
+									</td>
+								) }
 								<td className="num px-4 py-2 text-right font-mono text-ink-3">
 									{ Number( r.classical_points ).toFixed(
 										1
