@@ -3,12 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
 
-// ADMIN. Modal launched from the Tournaments tab. Lists the plugin-shipped SQL
+// ADMIN. Modal launched from the Tournaments tab. Lists the plugin-shipped
 // fixtures (GET /fixtures) and loads one on demand (POST /fixtures/load). The
-// load is DESTRUCTIVE — it replaces all competition data — so each fixture
-// requires an explicit in-dialog confirm before it fires. On success the
-// returned row counts are shown and the seasons list is invalidated so the
-// Tournaments table behind the dialog refreshes.
+// load is DESTRUCTIVE for the target season — it replaces that season's rounds,
+// games and standings (players are upserted by name and preserved; other
+// seasons are untouched) — so each fixture requires an explicit in-dialog
+// confirm before it fires. On success the returned row counts are shown and the
+// seasons list is invalidated so the Tournaments table behind the dialog
+// refreshes.
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60';
@@ -155,10 +157,13 @@ export function ImportSeasonDialog( { onClose } ) {
 				{ confirming && ! result && (
 					<div className="mt-4 rounded border border-loss/40 bg-surface p-4">
 						<p className="text-sm text-ink">
-							This replaces <strong>all</strong> competition data
-							(seasons, players, rounds, games, standings) with{ ' ' }
-							<span className="font-mono">{ confirming }</span>.
-							Members and admins are kept. Continue?
+							This replaces the rounds, games and standings for{ ' ' }
+							<strong>
+								{ data?.find?.( ( f ) => f.name === confirming )
+									?.description || confirming }
+							</strong>
+							. Players are preserved and other seasons are
+							untouched. Members and admins are kept. Continue?
 						</p>
 						<div className="mt-3 flex justify-end gap-2">
 							<button

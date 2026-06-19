@@ -126,11 +126,14 @@ class SeasonImportService
 
         // Resolve a (possibly guest) player name to its enrolment id, enrolling
         // on the fly if a games-only participant isn't in the roster.
-        $resolveEnrolment = function (string $playerName) use (&$playerIdByName, &$seasonPlayerIdByName, $seasonId): int {
+        $resolveEnrolment = function (string $playerName) use (&$playerIdByName, &$seasonPlayerIdByName, &$playersCreated, $seasonId): int {
             if (!isset($seasonPlayerIdByName[$playerName])) {
                 if (!isset($playerIdByName[$playerName])) {
-                    $player = $this->players->findByName($playerName)
-                        ?? $this->players->create($playerName, null, null, null, null);
+                    $player = $this->players->findByName($playerName);
+                    if ($player === null) {
+                        $player = $this->players->create($playerName, null, null, null, null);
+                        $playersCreated++;
+                    }
                     $playerIdByName[$playerName] = $player->id;
                 }
                 $sp = $this->seasonPlayers->create($seasonId, $playerIdByName[$playerName], null, 0);
