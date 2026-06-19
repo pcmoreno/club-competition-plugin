@@ -37,12 +37,14 @@ function pieceForRank( rank, total ) {
 // pairing systems rank by their own metric.
 const COL = {
 	rank: { key: 'rank', label: 'Rank', dir: 'asc' },
+	games: { key: 'games', label: 'Games', dir: 'desc' },
 	score: { key: 'keizer_score', label: 'Score', dir: 'desc' },
 	points: { key: 'classical_points', label: 'Pts', dir: 'desc' },
 	wins: { key: 'wins', label: 'W', dir: 'desc' },
 	draws: { key: 'draws', label: 'D', dir: 'desc' },
 	losses: { key: 'losses', label: 'L', dir: 'desc' },
 	byes: { key: 'byes', label: 'Byes', dir: 'desc' },
+	colorBalance: { key: 'color_balance', label: 'Color B', dir: 'desc' },
 	tpr: { key: 'tpr', label: 'TPR', dir: 'desc' },
 };
 
@@ -143,6 +145,12 @@ export function Standings( { seasonId } ) {
 									Cat
 								</th>
 							) }
+							<SortTh
+								col={ COL.games }
+								sort={ sort }
+								onSort={ onSort }
+								className="w-16"
+							/>
 							{ hasScore && (
 								<SortTh
 									col={ COL.score }
@@ -184,6 +192,12 @@ export function Standings( { seasonId } ) {
 								/>
 							) }
 							<SortTh
+								col={ COL.colorBalance }
+								sort={ sort }
+								onSort={ onSort }
+								className="w-16"
+							/>
+							<SortTh
 								col={ COL.tpr }
 								sort={ sort }
 								onSort={ onSort }
@@ -214,23 +228,20 @@ export function Standings( { seasonId } ) {
 											{ r.name ?? '—' }
 										</span>
 										{ isMe && <YouTag /> }
-										<span className="num ml-2 text-xs text-muted">
-											{ r.elo ? `${ r.elo }` : '' }
-											{ Number.isFinite( r.color_balance )
-												? ` · S ${
-														r.color_balance > 0
-															? '+'
-															: ''
-												  }${ r.color_balance }`
-												: '' }
-											{ ` · ${ r.games }` }
-										</span>
+										{ r.elo ? (
+											<span className="num ml-2 text-xs text-muted">
+												{ r.elo }
+											</span>
+										) : null }
 									</td>
 									{ hasCat && (
 										<td className="px-4 py-2.5 text-ink-3">
 											{ r.category ?? '—' }
 										</td>
 									) }
+									<td className="num px-4 py-2.5 font-mono text-ink-3">
+										{ r.games }
+									</td>
 									{ hasScore && (
 										<td className="num px-4 py-2.5 font-mono text-ink">
 											{ r.keizer_score ?? '—' }
@@ -259,6 +270,11 @@ export function Standings( { seasonId } ) {
 											{ r.byes }
 										</td>
 									) }
+									<td className="num px-4 py-2.5 font-mono text-ink-3">
+										{ Number.isFinite( r.color_balance )
+											? `${ r.color_balance > 0 ? '+' : '' }${ r.color_balance }`
+											: '—' }
+									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.tpr ?? '—' }
 									</td>
