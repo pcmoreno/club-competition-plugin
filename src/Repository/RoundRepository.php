@@ -55,6 +55,28 @@ class RoundRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /**
+     * Create a round with an explicit number and status. Used by the season
+     * import, which seeds historical rounds verbatim (already complete) rather
+     * than appending the next draft round — see createNextForSeason for that.
+     */
+    public function create(int $season_id, int $round_number, ?string $date, RoundStatus $status): Round
+    {
+        $this->connection->insert('wp_scs_rounds', [
+            'season_id'    => $season_id,
+            'round_number' => $round_number,
+            'date'         => $date,
+            'status'       => $status->value,
+        ]);
+
+        return $this->findById((int)$this->connection->lastInsertId());
+    }
+
+    public function deleteBySeason(int $season_id): void
+    {
+        $this->connection->delete('wp_scs_rounds', [ 'season_id' => $season_id ]);
+    }
+
     public function createNextForSeason(int $season_id, ?string $date): Round
     {
         return $this->connection->transactional(function () use ($season_id, $date): Round {

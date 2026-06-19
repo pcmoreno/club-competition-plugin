@@ -20,6 +20,7 @@ class RestApi
             $players         = $container->get('player_controller');
             $seasons         = $container->get('season_controller');
             $rounds          = $container->get('round_controller');
+            $import          = $container->get('import_controller');
 
             // Parse the auth cookie's JWT into its claims, or null when the
             // cookie is absent/invalid. Single source for every role check below.
@@ -220,6 +221,22 @@ class RestApi
             register_rest_route('scs/v1', '/games/(?P<id>\d+)/result', [
                 'methods'             => 'PATCH',
                 'callback'            => [$rounds, 'updateGameResult'],
+                'permission_callback' => $isAdmin,
+            ]);
+
+            // ── Fixtures / import ─────────────────────────────────────────────
+            // Seeds a whole season from a plugin-shipped SQL fixture. The load is
+            // destructive (full-replace of competition tables), so it goes
+            // through $isAdmin (role + CSRF), not just $isAdminRead.
+            register_rest_route('scs/v1', '/fixtures', [
+                'methods'             => 'GET',
+                'callback'            => [$import, 'index'],
+                'permission_callback' => $isAdminRead,
+            ]);
+
+            register_rest_route('scs/v1', '/fixtures/load', [
+                'methods'             => 'POST',
+                'callback'            => [$import, 'load'],
                 'permission_callback' => $isAdmin,
             ]);
         });
