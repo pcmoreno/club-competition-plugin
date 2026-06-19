@@ -212,7 +212,10 @@ class SeasonImportService
             'start_date'     => $s['start_date'] ?? null,
             'end_date'       => $s['end_date'] ?? null,
             'pairing_system' => (PairingSystem::from($s['pairing_system'] ?? PairingSystem::Keizer->value))->value,
-            'status'         => (SeasonStatus::from($s['status'] ?? SeasonStatus::Active->value))->value,
+            // An import always seeds a finished, historical competition (a full
+            // scrape of a past season), so it is always marked "completed" —
+            // regardless of what the fixture's status field says.
+            'status'         => SeasonStatus::Completed->value,
             'categories'     => json_encode($s['categories'] ?? []),
         ]);
 
