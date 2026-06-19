@@ -133,6 +133,7 @@ class Container
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('standings_snapshot_repository'))
+            ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('round_controller', Controller\RoundController::class)

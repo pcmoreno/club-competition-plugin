@@ -10,6 +10,7 @@ use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\SeasonPlayerRepository;
+use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Repository\StandingsSnapshotRepository;
 use SCS\Request\CreateSeasonRequest;
@@ -28,6 +29,7 @@ class SeasonController extends RestController
         private readonly PlayerRepository $playerRepository,
         private readonly PlayerDisplayService $playerDisplay,
         private readonly StandingsSnapshotRepository $standingsSnapshotRepository,
+        private readonly RoundRepository $roundRepository,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -119,8 +121,9 @@ class SeasonController extends RestController
             }, $snapshots);
 
             return $this->ok([
-                'season'    => $this->serializer->serialize($season),
-                'standings' => $standings,
+                'season'           => $this->serializer->serialize($season),
+                'completed_rounds' => $this->roundRepository->countCompletedBySeason($season->id),
+                'standings'        => $standings,
             ]);
         });
     }

@@ -39,6 +39,9 @@ const COL = {
 	rank: { key: 'rank', label: 'Rank', dir: 'asc' },
 	score: { key: 'keizer_score', label: 'Score', dir: 'desc' },
 	points: { key: 'classical_points', label: 'Pts', dir: 'desc' },
+	wins: { key: 'wins', label: 'W', dir: 'desc' },
+	draws: { key: 'draws', label: 'D', dir: 'desc' },
+	losses: { key: 'losses', label: 'L', dir: 'desc' },
 	byes: { key: 'byes', label: 'Byes', dir: 'desc' },
 	tpr: { key: 'tpr', label: 'TPR', dir: 'desc' },
 };
@@ -105,6 +108,7 @@ export function Standings( { seasonId } ) {
 
 	return (
 		<Wrap
+			rounds={ data.completed_rounds }
 			categories={ categories }
 			category={ category }
 			onCategory={ setCategory }
@@ -133,9 +137,24 @@ export function Standings( { seasonId } ) {
 								onSort={ onSort }
 								className="w-16"
 							/>
-							<th className="w-24 px-4 py-2 font-medium">
-								W/D/L
-							</th>
+							<SortTh
+								col={ COL.wins }
+								sort={ sort }
+								onSort={ onSort }
+								className="w-12"
+							/>
+							<SortTh
+								col={ COL.draws }
+								sort={ sort }
+								onSort={ onSort }
+								className="w-12"
+							/>
+							<SortTh
+								col={ COL.losses }
+								sort={ sort }
+								onSort={ onSort }
+								className="w-12"
+							/>
 							<SortTh
 								col={ COL.byes }
 								sort={ sort }
@@ -201,7 +220,13 @@ export function Standings( { seasonId } ) {
 											: '—' }
 									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
-										{ r.wins }/{ r.draws }/{ r.losses }
+										{ r.wins }
+									</td>
+									<td className="num px-4 py-2.5 font-mono text-ink-3">
+										{ r.draws }
+									</td>
+									<td className="num px-4 py-2.5 font-mono text-ink-3">
+										{ r.losses }
 									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
 										{ r.byes }
@@ -219,12 +244,18 @@ export function Standings( { seasonId } ) {
 	);
 }
 
-function Wrap( { children, categories, category, onCategory } ) {
+function Wrap( { children, rounds, categories, category, onCategory } ) {
+	const title =
+		rounds > 0
+			? `Standings (after ${ rounds } ${
+					rounds === 1 ? 'round' : 'rounds'
+			  })`
+			: 'Standings';
 	return (
 		<Page>
 			<div className="mb-6 flex flex-wrap items-center justify-between gap-4">
 				<h1 className="font-serif text-[38px] leading-[1.1]">
-					Standings
+					{ title }
 				</h1>
 				{ categories && categories.length > 2 && (
 					<div className="flex flex-wrap gap-1">
