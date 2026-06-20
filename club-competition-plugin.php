@@ -3,9 +3,9 @@
 declare(strict_types=1);
 /**
  * Plugin Name: Club Competition Manager
- * Plugin URI: https://www.schaakclubsantpoort.nl
+ * Plugin URI: https://github.com/pcmoreno/club-competition-plugin
  * Description: Manage chess competition pairings, standings, and results for Schaakclub Santpoort
- * Version: 1.0.0
+ * Version: 0.1.0
  * Author: Paulo Moreno
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,8 +20,8 @@ if (! defined('ABSPATH')) {
 
 define('SCS_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('SCS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SCS_VERSION', '1.0.0');
-define('SCS_DB_VERSION', '1.0.0');
+define('SCS_VERSION', '0.1.0');
+define('SCS_DB_VERSION', '0.1.0');
 
 // The plugin's tables share the site's WordPress table prefix (which is not
 // always "wp_" — SiteGround and many hosts randomise it). Migrations create
