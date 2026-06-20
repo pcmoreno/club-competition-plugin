@@ -82,6 +82,10 @@
   font-family: theme('fontFamily.sans');
   font-size: 15px;
   line-height: 1.5;
+  /* Reset the host's inherited letter-spacing (Elementor's kit sets 1px on
+     <body>, which otherwise leaks into all app text). Tracking utilities still
+     override per element where the design wants them. */
+  letter-spacing: normal;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -106,6 +110,7 @@
    outranks 0,1,1). Buttons the app deliberately styles set bg/padding/etc. via
    utilities, which sit above this reset thanks to important:true. */
 #scs-app button {
+  margin: 0;
   background-color: transparent;
   background-image: none;
   border: 0;
