@@ -20,7 +20,12 @@ export function TopBar( { seasonId, onSeasonChange } ) {
 	return (
 		<header className="border-b border-rule bg-paper">
 			<div className="mx-auto flex max-w-page items-center justify-between gap-6 px-7 py-3.5">
-				<div className="flex items-center gap-3">
+				<button
+					type="button"
+					onClick={ () => navigate( '/pairings' ) }
+					aria-label="Go to home"
+					className="flex items-center gap-3 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+				>
 					<BrandMark />
 					<div className="leading-tight">
 						<div className="font-serif text-[19px] font-medium tracking-[-0.01em] text-ink">
@@ -30,7 +35,7 @@ export function TopBar( { seasonId, onSeasonChange } ) {
 							Schaakclub Santpoort
 						</div>
 					</div>
-				</div>
+				</button>
 
 				<div className="flex items-center gap-4">
 					<TournamentSwitcher
