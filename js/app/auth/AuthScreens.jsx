@@ -68,7 +68,7 @@ function Field( { label, error, children } ) {
 const inputClass =
 	'w-full rounded border-rule bg-surface px-3 py-2 text-ink focus:border-accent focus:ring-accent';
 const primaryBtn =
-	'w-full rounded bg-ink px-4 py-2.5 font-medium text-paper hover:bg-ink-2 disabled:opacity-60';
+	'w-full rounded bg-ink px-4 py-2.5 text-center font-medium text-paper hover:bg-ink-2 disabled:opacity-60';
 
 // Turns an ApiError/Error into a user-facing string.
 function errorMessage( err ) {
