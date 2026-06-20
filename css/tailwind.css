@@ -82,6 +82,10 @@
   font-family: theme('fontFamily.sans');
   font-size: 15px;
   line-height: 1.5;
+  /* Reset the host's inherited letter-spacing (Elementor's kit sets 1px on
+     <body>, which otherwise leaks into all app text). Tracking utilities still
+     override per element where the design wants them. */
+  letter-spacing: normal;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -94,6 +98,30 @@
   font-weight: 500;
   letter-spacing: -0.005em;
   color: var(--ink);
+}
+
+/* Neutralize host-theme button chrome that bleeds into the app's <button>
+   elements. Elementor's global kit ships `.elementor-kit-NNNN button { … }`
+   (specificity 0,1,1) which paints every bare <button> with the site accent
+   colour + Roboto + padding — so the viewer's "ghost" buttons (brand, Sign in,
+   Print, the auth ×) rendered as solid orange buttons on production. Tailwind's
+   own button reset is in the (layered) preflight and loses to that unlayered
+   kit rule, so we re-assert it here scoped to #scs-app (specificity 1,0,1, which
+   outranks 0,1,1). Buttons the app deliberately styles set bg/padding/etc. via
+   utilities, which sit above this reset thanks to important:true. */
+#scs-app button {
+  margin: 0;
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: pointer;
 }
 
 /* Tabular figures for all scores/ratings, matching the design system. */

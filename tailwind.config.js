@@ -12,6 +12,16 @@ module.exports = {
   content: [
     './js/**/*.{js,jsx}',
   ],
+  // The viewer is embedded in WordPress hosts whose themes target generic
+  // elements with selectors that tie/exceed our single-class utilities and load
+  // after viewer.css (e.g. Hello Elementor's `.page-content a`, `button`,
+  // `input`, table rules), so they win on specificity/source order. Marking our
+  // utilities !important makes them beat those *normal* host rules regardless of
+  // specificity or order. Verified the conflicting host rules are NOT themselves
+  // !important (Elementor's !important only target .elementor-* classes we never
+  // use), and the app uses no inline styles, so this has no downside here.
+  // Pairs with the unlayered-utilities setup in css/tailwind.css.
+  important: true,
   theme: {
     extend: {
       colors: {
