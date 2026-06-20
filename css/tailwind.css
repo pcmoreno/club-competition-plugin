@@ -124,6 +124,26 @@
   cursor: pointer;
 }
 
+/* Links inherit their colour/underline from context. The design sets link
+   colours via utilities where it wants them; without this the host theme paints
+   bare links (e.g. "Forgot your password?") with its own `a { color }`
+   (Elementor accent orange / Hello crimson) and `.page-content a { underline }`.
+   Scoped #scs-app a (1,0,1) beats the host's `.page-content a` (0,1,1); explicit
+   link styling via utilities (important:true) still overrides this. */
+#scs-app a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+/* Strip host-imposed margins on form controls so the form's vertical rhythm is
+   owned by the app's field wrappers (mb-4), not by the theme adding element
+   margins. */
+#scs-app input,
+#scs-app select,
+#scs-app textarea {
+  margin: 0;
+}
+
 /* Tabular figures for all scores/ratings, matching the design system. */
 .num {
   font-variant-numeric: tabular-nums;
