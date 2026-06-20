@@ -135,13 +135,37 @@
   text-decoration: inherit;
 }
 
-/* Strip host-imposed margins on form controls so the form's vertical rhythm is
-   owned by the app's field wrappers (mb-4), not by the theme adding element
-   margins. */
-#scs-app input,
-#scs-app select,
-#scs-app textarea {
+/* Re-assert preflight's margin reset for the block elements the app renders, so
+   host themes can't inject spacing the app didn't ask for (Hello/Elementor set
+   `p { margin-block-end:.9rem }`, `h1-h6 { margin:… }`, list margins, etc. — e.g.
+   the <p> around "Forgot your password?" gained a bottom margin, padding out the
+   card). Spacing is owned by utilities (mb-4, mt-8, …), which sit above this via
+   important:true. `#scs-app :where(…)` keeps specificity at the id (1,0,0): it
+   beats host element and `.page-content x` rules but loses to utilities. */
+#scs-app :where(
+  p, h1, h2, h3, h4, h5, h6,
+  ul, ol, li, dl, dd, figure, blockquote, hr, fieldset,
+  input, select, textarea
+) {
   margin: 0;
+}
+
+/* Tables: the app fully styles its cells with utilities (px-*, py-*, border-b on
+   rows, font-medium, text-*), so strip the host theme's table chrome — full cell
+   borders, 15px padding, zebra striping, forced width/font-size — which would
+   otherwise show as grid lines and striped rows the design never uses. Utilities
+   (important:true) re-apply the app's own borders/padding on top. */
+#scs-app :where(table) {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+#scs-app :where(th, td) {
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  font-weight: inherit;
+  text-align: inherit;
+  vertical-align: inherit;
 }
 
 /* Tabular figures for all scores/ratings, matching the design system. */
