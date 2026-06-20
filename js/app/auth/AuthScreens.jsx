@@ -5,8 +5,9 @@ import { api, ApiError } from '../api/client';
 import { navigate, getQueryParam, Link } from '../router/router';
 import { Page } from '../layout/Page';
 
-// Shared card chrome for the auth forms.
-function AuthCard( { title, intro, children } ) {
+// Shared card chrome for the auth forms. Pass `onClose` to show a × in the
+// card's top-right corner (used by the sign-in form to back out).
+function AuthCard( { title, intro, children, onClose } ) {
 	return (
 		<Page>
 			<div className="mx-auto max-w-md">
@@ -14,7 +15,29 @@ function AuthCard( { title, intro, children } ) {
 					{ title }
 				</h1>
 				{ intro && <p className="mb-5 text-ink-3">{ intro }</p> }
-				<div className="rounded border border-rule bg-surface p-6 shadow-sm">
+				<div className="relative rounded border border-rule bg-surface p-6 shadow-sm">
+					{ onClose && (
+						<button
+							type="button"
+							onClick={ onClose }
+							aria-label="Close"
+							className="absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded text-ink-3 hover:bg-rule/40 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+						>
+							<svg
+								viewBox="0 0 20 20"
+								fill="none"
+								aria-hidden="true"
+								className="h-4 w-4"
+							>
+								<path
+									d="M5 5l10 10M15 5L5 15"
+									stroke="currentColor"
+									strokeWidth="1.75"
+									strokeLinecap="round"
+								/>
+							</svg>
+						</button>
+					) }
 					{ children }
 				</div>
 			</div>
@@ -78,8 +101,18 @@ export function Login() {
 		}
 	};
 
+	// Back out of the form: return to the previous in-app view, or fall back to
+	// the public landing if sign-in was opened directly (no history to step to).
+	const onClose = () => {
+		if ( window.history.length > 1 ) {
+			window.history.back();
+		} else {
+			navigate( '/pairings' );
+		}
+	};
+
 	return (
-		<AuthCard title="Sign in">
+		<AuthCard title="Sign in" onClose={ onClose }>
 			<form onSubmit={ handleSubmit( onSubmit ) } noValidate>
 				<Field label="Email" error={ errors.email?.message }>
 					<input

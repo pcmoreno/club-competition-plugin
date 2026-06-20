@@ -1,16 +1,34 @@
 /* Webfonts: IBM Plex Sans (body), Newsreader (headings), IBM Plex Mono (scores). */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap');
 
-@import 'tailwindcss';
+/* Tailwind v4, imported in expanded form so we control the cascade layers.
+   CRITICAL: utilities are imported WITHOUT a layer (unlayered) on purpose.
+
+   The viewer is embedded in WordPress hosts whose themes add lots of *unlayered*
+   global element styles (production runs Hello Elementor + Optimizer + Elementor,
+   which set unlayered a / h1-h5 / button / p rules). Under v4's native cascade
+   layers, an unlayered rule beats ANY layered rule regardless of specificity, so
+   if our utilities lived in `@layer utilities` the theme's `h1 {}` / `a {}` would
+   override our `.font-serif` / `.text-ink-3` and the app renders half-themed
+   (this is the real production regression — it looks fine under Twenty
+   Twenty-Five locally because that theme has almost no unlayered globals).
+   Keeping utilities unlayered makes them win by specificity (.class 0,1,0 beats
+   element 0,0,1).
+
+   Preflight (Tailwind's reset) STAYS layered — it targets `*`/`body`/elements
+   globally and is NOT scoped to #scs-app, so unlayering it would reset the whole
+   surrounding WordPress page. Layered preflight only affects what the host
+   doesn't already style, which is what we want. */
+@layer theme, base, components;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css';
 @config '../tailwind.config.js';
 
 /* Break out of block themes' constrained content width (e.g. Twenty
    Twenty-Five wraps the shortcode in .is-layout-constrained, which caps
    children at ~620px via an unlayered :where() rule). The app manages its own
-   max-width via .max-w-page. This rule is intentionally kept OUTSIDE @layer so
-   it stays unlayered — under v4's native cascade layers, unlayered styles beat
-   layered ones, so a layered override would lose to the theme's unlayered
-   :where() constraint. Unlayered + #id specificity beats :where()'s zero. */
+   max-width via .max-w-page. Unlayered + #id specificity beats :where()'s zero. */
 #scs-app {
   max-width: none;
 }
@@ -20,68 +38,66 @@
    (../documents/santpoort-chess-competition/project/hifi-styles.css).
    Warm paper, deep ink, a single forest-green accent.
    Tailwind aliases (bg-paper, text-ink, font-serif, …) resolve to these.
+   Kept UNLAYERED (same reason as utilities) and #scs-app-scoped so the
+   typography beats the host theme's unlayered element styles.
    ========================================================== */
-@layer base {
-  :root {
-    --paper:       #faf7f1;
-    --surface:     #ffffff;
-    --surface-2:   #f2ede2;
-    --surface-3:   #e8e1d0;
-    --ink:         #1a1612;
-    --ink-2:       #3d362c;
-    --ink-3:       #6b6457;
-    --muted:       #8a8275;
-    --rule:        #d8d0bd;
-    --rule-soft:   #e7e0cd;
-    --rule-strong: #2a241b;
+:root {
+  --paper:       #faf7f1;
+  --surface:     #ffffff;
+  --surface-2:   #f2ede2;
+  --surface-3:   #e8e1d0;
+  --ink:         #1a1612;
+  --ink-2:       #3d362c;
+  --ink-3:       #6b6457;
+  --muted:       #8a8275;
+  --rule:        #d8d0bd;
+  --rule-soft:   #e7e0cd;
+  --rule-strong: #2a241b;
 
-    --accent:      oklch(48% 0.08 145);
-    --accent-2:    oklch(38% 0.08 145);
-    --accent-soft: oklch(94% 0.03 145);
-    --accent-rim:  oklch(72% 0.06 145);
+  --accent:      oklch(48% 0.08 145);
+  --accent-2:    oklch(38% 0.08 145);
+  --accent-soft: oklch(94% 0.03 145);
+  --accent-rim:  oklch(72% 0.06 145);
 
-    --win:  oklch(48% 0.08 145);
-    --loss: oklch(50% 0.13 25);
-    --draw: #8a8275;
+  --win:  oklch(48% 0.08 145);
+  --loss: oklch(50% 0.13 25);
+  --draw: #8a8275;
 
-    --white-sq:  #f1e9d2;
-    --black-sq:  #2a241b;
-    --board-rim: #1a1612;
+  --white-sq:  #f1e9d2;
+  --black-sq:  #2a241b;
+  --board-rim: #1a1612;
 
-    --shadow-sm: 0 1px 0 rgba(26, 22, 18, 0.04), 0 1px 3px rgba(26, 22, 18, 0.06);
-    --shadow-md: 0 2px 0 rgba(26, 22, 18, 0.04), 0 4px 14px rgba(26, 22, 18, 0.08);
+  --shadow-sm: 0 1px 0 rgba(26, 22, 18, 0.04), 0 1px 3px rgba(26, 22, 18, 0.06);
+  --shadow-md: 0 2px 0 rgba(26, 22, 18, 0.04), 0 4px 14px rgba(26, 22, 18, 0.08);
 
-    --radius-sm: 4px;
-    --radius:    6px;
-    --radius-lg: 10px;
-  }
-
-  /* Scope to the app mount so the plugin never restyles the host theme. */
-  #scs-app {
-    background: var(--paper);
-    color: var(--ink);
-    font-family: theme('fontFamily.sans');
-    font-size: 15px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  #scs-app h1,
-  #scs-app h2,
-  #scs-app h3,
-  #scs-app h4,
-  #scs-app h5 {
-    font-family: theme('fontFamily.serif');
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    color: var(--ink);
-  }
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
 }
 
-@layer utilities {
-  /* Tabular figures for all scores/ratings, matching the design system. */
-  .num {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum';
-  }
+/* Scope to the app mount so the plugin never restyles the host theme. */
+#scs-app {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: theme('fontFamily.sans');
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#scs-app h1,
+#scs-app h2,
+#scs-app h3,
+#scs-app h4,
+#scs-app h5 {
+  font-family: theme('fontFamily.serif');
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+
+/* Tabular figures for all scores/ratings, matching the design system. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
