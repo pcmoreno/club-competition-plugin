@@ -18,7 +18,7 @@ class RoundRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_rounds')
+            ->from(SCS_TABLE_PREFIX . 'rounds')
             ->where('season_id = :season_id')
             ->setParameter('season_id', $season_id)
             ->orderBy('round_number', 'ASC')
@@ -31,7 +31,7 @@ class RoundRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_rounds')
+            ->from(SCS_TABLE_PREFIX . 'rounds')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -43,7 +43,7 @@ class RoundRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_rounds')
+            ->from(SCS_TABLE_PREFIX . 'rounds')
             ->where('season_id = :season_id')
             ->andWhere('status != :status')
             ->setParameter('season_id', $season_id)
@@ -60,7 +60,7 @@ class RoundRepository
     {
         return (int)$this->connection->createQueryBuilder()
             ->select('COUNT(*)')
-            ->from('wp_scs_rounds')
+            ->from(SCS_TABLE_PREFIX . 'rounds')
             ->where('season_id = :season_id')
             ->andWhere('status = :status')
             ->setParameter('season_id', $season_id)
@@ -75,7 +75,7 @@ class RoundRepository
      */
     public function create(int $season_id, int $round_number, ?string $date, RoundStatus $status): Round
     {
-        $this->connection->insert('wp_scs_rounds', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'rounds', [
             'season_id'    => $season_id,
             'round_number' => $round_number,
             'date'         => $date,
@@ -87,7 +87,7 @@ class RoundRepository
 
     public function deleteBySeason(int $season_id): void
     {
-        $this->connection->delete('wp_scs_rounds', [ 'season_id' => $season_id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'rounds', [ 'season_id' => $season_id ]);
     }
 
     public function createNextForSeason(int $season_id, ?string $date): Round
@@ -99,7 +99,7 @@ class RoundRepository
             // DBAL platform may ignore the lock and reopen the race.
             $maxRow = $this->connection->createQueryBuilder()
                 ->select('COALESCE(MAX(round_number), 0) AS max_number')
-                ->from('wp_scs_rounds')
+                ->from(SCS_TABLE_PREFIX . 'rounds')
                 ->where('season_id = :season_id')
                 ->setParameter('season_id', $season_id)
                 ->forUpdate()
@@ -107,7 +107,7 @@ class RoundRepository
 
             $nextNumber = ((int)($maxRow['max_number'] ?? 0)) + 1;
 
-            $this->connection->insert('wp_scs_rounds', [
+            $this->connection->insert(SCS_TABLE_PREFIX . 'rounds', [
                 'season_id'    => $season_id,
                 'round_number' => $nextNumber,
                 'date'         => $date,
@@ -120,12 +120,12 @@ class RoundRepository
 
     public function updateStatus(int $id, RoundStatus $status): void
     {
-        $this->connection->update('wp_scs_rounds', [ 'status' => $status->value ], [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'rounds', [ 'status' => $status->value ], [ 'id' => $id ]);
     }
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_rounds', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'rounds', $data, [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Round

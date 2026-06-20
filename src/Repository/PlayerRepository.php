@@ -18,7 +18,7 @@ class PlayerRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_players')
+            ->from(SCS_TABLE_PREFIX . 'players')
             ->orderBy('name', 'ASC')
             ->fetchAllAssociative();
 
@@ -29,7 +29,7 @@ class PlayerRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_players')
+            ->from(SCS_TABLE_PREFIX . 'players')
             ->where('active = 1')
             ->orderBy('name', 'ASC')
             ->fetchAllAssociative();
@@ -41,7 +41,7 @@ class PlayerRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_players')
+            ->from(SCS_TABLE_PREFIX . 'players')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -53,7 +53,7 @@ class PlayerRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_players')
+            ->from(SCS_TABLE_PREFIX . 'players')
             ->where('name = :name')
             ->setParameter('name', $name)
             ->fetchAssociative();
@@ -63,7 +63,7 @@ class PlayerRepository
 
     public function create(string $name, ?string $knsb_id, ?int $knsb_elo, ?string $gender, ?string $date_of_birth): Player
     {
-        $this->connection->insert('wp_scs_players', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'players', [
             'name'          => $name,
             'knsb_id'       => $knsb_id,
             'knsb_elo'      => $knsb_elo,
@@ -77,12 +77,12 @@ class PlayerRepository
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_players', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'players', $data, [ 'id' => $id ]);
     }
 
     public function deactivate(int $id): void
     {
-        $this->connection->update('wp_scs_players', [ 'active' => 0 ], [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'players', [ 'active' => 0 ], [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Player

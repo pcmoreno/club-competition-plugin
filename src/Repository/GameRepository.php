@@ -18,7 +18,7 @@ class GameRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_games')
+            ->from(SCS_TABLE_PREFIX . 'games')
             ->where('round_id = :round_id')
             ->setParameter('round_id', $round_id)
             ->orderBy('board', 'ASC')
@@ -32,7 +32,7 @@ class GameRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_games')
+            ->from(SCS_TABLE_PREFIX . 'games')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -44,8 +44,8 @@ class GameRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('g.*')
-            ->from('wp_scs_games', 'g')
-            ->join('g', 'wp_scs_rounds', 'r', 'g.round_id = r.id')
+            ->from(SCS_TABLE_PREFIX . 'games', 'g')
+            ->join('g', SCS_TABLE_PREFIX . 'rounds', 'r', 'g.round_id = r.id')
             ->where('g.white_season_player_id = :sp_id')
             ->orWhere('g.black_season_player_id = :sp_id')
             ->setParameter('sp_id', $season_player_id)
@@ -57,7 +57,7 @@ class GameRepository
 
     public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null, ?GameResult $result = null): Game
     {
-        $this->connection->insert('wp_scs_games', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'games', [
             'round_id'               => $round_id,
             'board'                  => $board,
             'white_season_player_id' => $white_season_player_id,
@@ -70,14 +70,14 @@ class GameRepository
 
     public function updateResult(int $id, ?GameResult $result): void
     {
-        $this->connection->update('wp_scs_games', [
+        $this->connection->update(SCS_TABLE_PREFIX . 'games', [
             'result' => $result?->value,
         ], [ 'id' => $id ]);
     }
 
     public function deleteByRound(int $round_id): void
     {
-        $this->connection->delete('wp_scs_games', [ 'round_id' => $round_id ]);
+        $this->connection->delete(SCS_TABLE_PREFIX . 'games', [ 'round_id' => $round_id ]);
     }
 
     public function deleteBySeason(int $season_id): void
@@ -86,7 +86,7 @@ class GameRepository
         // whose round belongs to the season. Multi-table DELETE isn't expressible
         // via the query builder, so this is a bound raw statement.
         $this->connection->executeStatement(
-            'DELETE g FROM wp_scs_games g JOIN wp_scs_rounds r ON r.id = g.round_id WHERE r.season_id = ?',
+            'DELETE g FROM ' . SCS_TABLE_PREFIX . 'games g JOIN ' . SCS_TABLE_PREFIX . 'rounds r ON r.id = g.round_id WHERE r.season_id = ?',
             [$season_id]
         );
     }

@@ -19,7 +19,7 @@ class SeasonRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_seasons')
+            ->from(SCS_TABLE_PREFIX . 'seasons')
             ->orderBy('created_at', 'DESC')
             ->fetchAllAssociative();
 
@@ -30,7 +30,7 @@ class SeasonRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_seasons')
+            ->from(SCS_TABLE_PREFIX . 'seasons')
             ->where('id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
@@ -48,7 +48,7 @@ class SeasonRepository
     {
         $rows = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_seasons')
+            ->from(SCS_TABLE_PREFIX . 'seasons')
             ->where('status = :status')
             ->setParameter('status', SeasonStatus::Active->value)
             ->orderBy('created_at', 'DESC')
@@ -61,7 +61,7 @@ class SeasonRepository
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
-            ->from('wp_scs_seasons')
+            ->from(SCS_TABLE_PREFIX . 'seasons')
             ->where('name = :name')
             ->setParameter('name', $name)
             ->fetchAssociative();
@@ -71,7 +71,7 @@ class SeasonRepository
 
     public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories): Season
     {
-        $this->connection->insert('wp_scs_seasons', [
+        $this->connection->insert(SCS_TABLE_PREFIX . 'seasons', [
             'name'           => $name,
             'location'       => $location,
             'start_date'     => $start_date,
@@ -86,12 +86,12 @@ class SeasonRepository
 
     public function update(int $id, array $data): void
     {
-        $this->connection->update('wp_scs_seasons', $data, [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'seasons', $data, [ 'id' => $id ]);
     }
 
     public function updateStatus(int $id, SeasonStatus $status): void
     {
-        $this->connection->update('wp_scs_seasons', [ 'status' => $status->value ], [ 'id' => $id ]);
+        $this->connection->update(SCS_TABLE_PREFIX . 'seasons', [ 'status' => $status->value ], [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Season
