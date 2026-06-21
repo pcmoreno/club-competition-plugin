@@ -53,6 +53,21 @@ class SeasonImportService
     }
 
     /**
+     * Just the fixture names (basenames, no decode) — a cheap list for the
+     * auto-seeder's per-request "is everything seeded yet?" gate, which must not
+     * pay to json_decode every (large) fixture on every page load.
+     *
+     * @return list<string>
+     */
+    public function fixtureNames(): array
+    {
+        $files = glob($this->fixturesDir . '/*.json') ?: [];
+        sort($files);
+
+        return array_map(static fn (string $path): string => basename($path, '.json'), $files);
+    }
+
+    /**
      * The fixtures available to import, each with the season name as description.
      *
      * @return list<array{name: string, description: string}>

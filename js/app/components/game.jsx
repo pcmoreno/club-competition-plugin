@@ -1,6 +1,28 @@
 // Shared presentation for rendering a game's players and result, used by the
 // Pairings and Round history views (and later Player detail).
 
+// Chess-piece glyph by standings rank within a field of `total` players:
+// ♔ #1 → ♕ → ♖ → ♗ (top half) → ♘ (mid) → ♙. Shared by the standings table and
+// the player-detail header so a player's piece is the same in both.
+export function pieceForRank( rank, total ) {
+	if ( rank === 1 ) {
+		return '♔';
+	}
+	if ( rank === 2 ) {
+		return '♕';
+	}
+	if ( rank === 3 ) {
+		return '♖';
+	}
+	if ( rank <= total / 2 ) {
+		return '♗';
+	}
+	if ( rank <= total * 0.75 ) {
+		return '♘';
+	}
+	return '♙';
+}
+
 // Small chess-square swatch matching the hi-fi design system.
 export function Square( { color } ) {
 	return (

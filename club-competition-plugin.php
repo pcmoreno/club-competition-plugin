@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Plugin Name: Club Competition Manager
  * Plugin URI: https://github.com/pcmoreno/club-competition-plugin
  * Description: Manage chess competition pairings, standings, and results for Schaakclub Santpoort
- * Version: 0.1.5
+ * Version: 0.2.0
  * Author: Paulo Moreno
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,7 +20,7 @@ if (! defined('ABSPATH')) {
 
 define('SCS_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('SCS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SCS_VERSION', '0.1.5');
+define('SCS_VERSION', '0.2.0');
 define('SCS_DB_VERSION', '0.1.0');
 
 // The plugin's tables share the site's WordPress table prefix (which is not
@@ -48,3 +48,11 @@ add_action('plugins_loaded', function () {
 add_action('plugins_loaded', function () {
     \SCS\Container::boot();
 }, 10);
+
+// Seed the shipped season fixtures once each. Runs after the container is built
+// (priority 10) and is gated by the scs_seeded_fixtures option, so it's a cheap
+// no-op once everything is imported. On plugins_loaded rather than activation
+// because the deploy flow (upload + replace) never fires the activation hook.
+add_action('plugins_loaded', function () {
+    \SCS\includes\FixtureSeeder::seed();
+}, 15);

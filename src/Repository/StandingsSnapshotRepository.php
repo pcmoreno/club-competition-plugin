@@ -99,6 +99,27 @@ class StandingsSnapshotRepository
         return $previous === false || $previous === null ? null : (int)$previous;
     }
 
+    /**
+     * Every snapshot for one enrolled player across the season, ordered by
+     * round number — the per-round rank/score series behind a player's
+     * tournament detail (position graph) and their latest standing.
+     *
+     * @return StandingsSnapshot[] ordered by round_number ASC
+     */
+    public function findBySeasonPlayer(int $season_player_id): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('s.*')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots', 's')
+            ->innerJoin('s', SCS_TABLE_PREFIX . 'rounds', 'r', 's.round_id = r.id')
+            ->where('s.season_player_id = :sp_id')
+            ->setParameter('sp_id', $season_player_id)
+            ->orderBy('r.round_number', 'ASC')
+            ->fetchAllAssociative();
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
     public function findByRoundAndSeasonPlayer(int $round_id, int $season_player_id): ?StandingsSnapshot
     {
         $row = $this->connection->createQueryBuilder()

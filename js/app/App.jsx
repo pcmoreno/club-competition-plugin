@@ -11,6 +11,7 @@ import { Standings } from './routes/Standings';
 import { RoundHistory } from './routes/RoundHistory';
 import { Players } from './routes/Players';
 import { PlayerDetail } from './routes/PlayerDetail';
+import { PlayerTournamentDetails } from './routes/PlayerTournamentDetails';
 import { AdminApp } from './admin/AdminApp';
 import {
 	Login,
@@ -45,6 +46,24 @@ function resolveView( path, ctx ) {
 	// suppressed for it in Shell).
 	if ( isAdminPath( path ) ) {
 		return { need: 'admin', node: <AdminApp path={ path } /> };
+	}
+
+	// Season-scoped player detail (PlayerTournamentDetails). Public, like the
+	// standings it's reached from; checked before the global /players/:id below.
+	const tournamentPlayerMatch = matchPath(
+		'/seasons/:seasonId/players/:id',
+		path
+	);
+	if ( tournamentPlayerMatch ) {
+		return {
+			need: 'public',
+			node: (
+				<PlayerTournamentDetails
+					seasonId={ tournamentPlayerMatch.seasonId }
+					playerId={ tournamentPlayerMatch.id }
+				/>
+			),
+		};
 	}
 
 	const playerMatch = matchPath( '/players/:id', path );

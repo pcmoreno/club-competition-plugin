@@ -93,7 +93,17 @@ class Container
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'));
 
+        $container->register('player_tournament_service', Services\PlayerTournamentService::class)
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('standings_snapshot_repository'))
+            ->addArgument(new Reference('player_display_service'));
+
         $container->register('season_import_service', Services\SeasonImportService::class)
+            ->setPublic(true)
             ->addArgument(new Reference('db_connection'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('season_repository'))
@@ -134,6 +144,7 @@ class Container
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('player_tournament_service'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('round_controller', Controller\RoundController::class)
