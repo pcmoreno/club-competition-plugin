@@ -85,6 +85,20 @@ class PlayerRepository
         $this->connection->update(SCS_TABLE_PREFIX . 'players', [ 'active' => 0 ], [ 'id' => $id ]);
     }
 
+    /**
+     * Apply a KNSB rating refresh: set the rating and stamp when it was synced.
+     * knsb_synced_at tracks the last successful rating refresh (distinct from
+     * created_at, which is row creation).
+     */
+    public function markRatingSynced(int $id, int $knsb_elo, string $synced_at): void
+    {
+        $this->connection->update(
+            SCS_TABLE_PREFIX . 'players',
+            [ 'knsb_elo' => $knsb_elo, 'knsb_synced_at' => $synced_at ],
+            [ 'id' => $id ]
+        );
+    }
+
     private function hydrate(array $row): Player
     {
         return new Player(

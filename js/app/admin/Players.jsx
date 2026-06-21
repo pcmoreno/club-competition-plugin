@@ -1,8 +1,15 @@
 import { useState } from '@wordpress/element';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { Notice, formatDate } from '../components/ui';
+
+function errorMessage( err ) {
+	if ( err instanceof ApiError ) {
+		return err.message;
+	}
+	return 'Something went wrong. Please try again.';
+}
 
 // ADMIN. Full club roster (all players, active or not), from GET /players —
 // admin-scoped because it carries email + member-account status. Searchable by
@@ -251,9 +258,18 @@ function RosterTable( { players, sort, onSort, onSync } ) {
 	);
 }
 
-// Confirm dialog for re-syncing a player's KNSB rating. The sync itself isn't
-// built yet, so "Yes" currently just closes (same as "Back").
+// Confirm dialog that applies the player's rating from the last-fetched KNSB
+// list (POST /players/{id}/knsb-rating). On success it shows old → new and
+// refreshes the roster; errors (no list fetched, id not listed) surface inline.
 function SyncDialog( { player, onClose } ) {
+	const queryClient = useQueryClient();
+	const sync = useMutation( {
+		mutationFn: () => api.post( `players/${ player.id }/knsb-rating` ),
+		onSuccess: () =>
+			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } ),
+	} );
+	const updated = sync.data;
+
 	return (
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
@@ -266,26 +282,64 @@ function SyncDialog( { player, onClose } ) {
 				<h2 className="font-serif text-2xl leading-tight">
 					Sync rating
 				</h2>
-				<p className="mt-2 text-sm text-ink-3">
-					Do you want to sync the rating for{ ' ' }
-					<strong className="text-ink">{ player.name }</strong>?
-				</p>
-				<div className="mt-5 flex justify-end gap-2">
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-					>
-						Back
-					</button>
-					<button
-						type="button"
-						className={ primaryBtn }
-						onClick={ onClose }
-					>
-						Yes
-					</button>
-				</div>
+
+				{ updated ? (
+					<>
+						<p className="mt-2 text-sm text-ink-3">
+							Updated{ ' ' }
+							<strong className="text-ink">
+								{ player.name }
+							</strong>
+							:{ ' ' }
+							<span className="num font-mono text-ink">
+								{ player.knsb_elo ?? '—' } →{ ' ' }
+								{ updated.knsb_elo }
+							</span>
+						</p>
+						<div className="mt-5 flex justify-end">
+							<button
+								type="button"
+								className={ primaryBtn }
+								onClick={ onClose }
+							>
+								Done
+							</button>
+						</div>
+					</>
+				) : (
+					<>
+						<p className="mt-2 text-sm text-ink-3">
+							Do you want to sync the rating for{ ' ' }
+							<strong className="text-ink">
+								{ player.name }
+							</strong>{ ' ' }
+							from the latest KNSB list?
+						</p>
+						{ sync.isError && (
+							<p className="mt-3 text-sm text-loss">
+								{ errorMessage( sync.error ) }
+							</p>
+						) }
+						<div className="mt-5 flex justify-end gap-2">
+							<button
+								type="button"
+								className={ ghostBtn }
+								onClick={ onClose }
+								disabled={ sync.isPending }
+							>
+								Back
+							</button>
+							<button
+								type="button"
+								className={ primaryBtn }
+								onClick={ () => sync.mutate() }
+								disabled={ sync.isPending }
+							>
+								{ sync.isPending ? 'Syncing…' : 'Yes' }
+							</button>
+						</div>
+					</>
+				) }
 			</div>
 		</div>
 	);

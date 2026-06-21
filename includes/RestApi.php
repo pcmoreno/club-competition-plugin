@@ -136,6 +136,15 @@ class RestApi
                 ],
             ]);
 
+            // Apply the player's rating from the last-fetched KNSB list (admin).
+            register_rest_route('scs/v1', '/players/(?P<id>\d+)/knsb-rating', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$players, 'applyKnsbRating'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             // ── Seasons ───────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/seasons', [
                 [

@@ -21,6 +21,10 @@ Makefile
 .phpstorm.meta.php
 _ide_helper.php
 
+# KNSB rating data — fetched at runtime (wp scs fetch-knsb-ratings), not
+# committed. The folder itself ships via resources/KnsbRatings/.gitkeep.
+/resources/KnsbRatings/*.json
+
 # OS
 .DS_Store
 Thumbs.db
