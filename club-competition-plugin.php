@@ -48,3 +48,11 @@ add_action('plugins_loaded', function () {
 add_action('plugins_loaded', function () {
     \SCS\Container::boot();
 }, 10);
+
+// Seed the shipped season fixtures once each. Runs after the container is built
+// (priority 10) and is gated by the scs_seeded_fixtures option, so it's a cheap
+// no-op once everything is imported. On plugins_loaded rather than activation
+// because the deploy flow (upload + replace) never fires the activation hook.
+add_action('plugins_loaded', function () {
+    \SCS\includes\FixtureSeeder::seed();
+}, 15);

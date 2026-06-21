@@ -103,6 +103,7 @@ class Container
             ->addArgument(new Reference('player_display_service'));
 
         $container->register('season_import_service', Services\SeasonImportService::class)
+            ->setPublic(true)
             ->addArgument(new Reference('db_connection'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('season_repository'))
