@@ -63,6 +63,16 @@
   --loss: oklch(50% 0.13 25);
   --draw: #8a8275;
 
+  /* "Against you" head-to-head block — its OWN tinted bg + stronger border per
+     net result, kept independent of the accent palette so it can be restyled on
+     its own later. Green = winning record, red = losing, pale yellow = even. */
+  --h2h-win-bg:      oklch(96% 0.03 145);
+  --h2h-win-border:  oklch(62% 0.10 145);
+  --h2h-loss-bg:     oklch(95.5% 0.025 25);
+  --h2h-loss-border: oklch(60% 0.13 25);
+  --h2h-even-bg:     oklch(96.5% 0.045 95);
+  --h2h-even-border: oklch(78% 0.10 95);
+
   --white-sq:  #f1e9d2;
   --black-sq:  #2a241b;
   --board-rim: #1a1612;

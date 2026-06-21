@@ -4,6 +4,7 @@
 // where an opponent links to is supplied by an `opponentTo( opponent )` prop,
 // so the same block can link within a season or to a global profile.
 
+import { useState } from '@wordpress/element';
 import { Link } from '../../router/router';
 import { Notice } from '../ui';
 import { Square } from '../game';
@@ -46,6 +47,23 @@ function shortDate( ymd ) {
 	return new Date( y, m - 1, d ).toLocaleDateString( undefined, {
 		day: 'numeric',
 		month: 'short',
+	} );
+}
+
+// Day + short month + year, e.g. "16 Sep 2025" — used where the year matters
+// (the head-to-head games), unlike the compact streak ranges.
+function shortDateYear( ymd ) {
+	if ( ! ymd ) {
+		return null;
+	}
+	const [ y, m, d ] = String( ymd ).split( '-' ).map( Number );
+	if ( ! y || ! m || ! d ) {
+		return null;
+	}
+	return new Date( y, m - 1, d ).toLocaleDateString( undefined, {
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric',
 	} );
 }
 
@@ -307,6 +325,137 @@ export function Highlights( { games, opponentTo } ) {
 					opponentTo={ opponentTo }
 				/>
 			</div>
+		</div>
+	);
+}
+
+// ── Against you (head-to-head with the logged-in member) ─────────────────────
+
+// The subject's game flipped to the VIEWER's point of view: their colour is the
+// opposite of the subject's, their result the inverse.
+function fromViewer( g ) {
+	return {
+		round_number: g.round_number,
+		date: g.date,
+		color:
+			g.color === 'white'
+				? 'black'
+				: g.color === 'black'
+				? 'white'
+				: null,
+		result:
+			g.result === 'win'
+				? 'loss'
+				: g.result === 'loss'
+				? 'win'
+				: g.result === 'draw'
+				? 'draw'
+				: null,
+		is_bye: false,
+	};
+}
+
+// How the logged-in member has done against the player on this page: a
+// collapsible, head-to-head block (title · W/D/L · games) tinted by net result
+// (green ahead, red behind, yellow even). Renders only when a member is logged
+// in and has actually played the subject. Derived from the subject's games
+// (opponent === me), so it works unchanged on the global player page too.
+export function AgainstYou( { games, meId, title = 'Against you', className = '' } ) {
+	const [ open, setOpen ] = useState( true );
+	if ( meId == null ) {
+		return null;
+	}
+	const h2h = ( games ?? [] )
+		.filter( ( g ) => ! g.is_bye && g.opponent?.player_id === meId )
+		.map( fromViewer );
+	if ( h2h.length === 0 ) {
+		return null;
+	}
+
+	const { wins, draws, losses, decided } = record( h2h );
+	const net = wins - losses;
+	const tone =
+		net > 0
+			? 'bg-h2h-win border-h2h-win-rim'
+			: net < 0
+			? 'bg-h2h-loss border-h2h-loss-rim'
+			: 'bg-h2h-even border-h2h-even-rim';
+	const score = `${ wins }–${ draws }–${ losses }`;
+	// Classical score %: a win = 1, a draw = ½ (so 1 win + 1 draw of 2 = 75%).
+	const pct =
+		decided > 0
+			? Math.round( ( ( wins + 0.5 * draws ) / decided ) * 100 )
+			: null;
+
+	return (
+		<div className={ `rounded border ${ tone } ${ className }` }>
+			{ ! open ? (
+				<button
+					type="button"
+					onClick={ () => setOpen( true ) }
+					className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left"
+				>
+					<span className="font-serif text-xl">{ title }</span>
+					<span className="num text-sm text-ink-3">
+						{ score } · show ▸
+					</span>
+				</button>
+			) : (
+				<div className="grid gap-6 p-5 lg:grid-cols-5">
+					{ /* Same 5-col template as the content grid below: title +
+					     W/D/L (col-span 2 + 1) align to the games block's width,
+					     the head-to-head games (col-span 2) to the right column. */ }
+					<div className="flex items-start justify-between gap-2 lg:col-span-2">
+						<div>
+							<h2 className="font-serif text-xl">{ title }</h2>
+							{ pct != null && (
+								<div className="num mt-0.5 text-sm text-ink-3">
+									{ pct }% score
+								</div>
+							) }
+						</div>
+						<button
+							type="button"
+							onClick={ () => setOpen( false ) }
+							className="text-sm text-ink-3 hover:text-ink"
+						>
+							hide ▾
+						</button>
+					</div>
+
+					<dl className="space-y-1 text-sm lg:col-span-1">
+						<ValueRow label="wins" value={ wins } />
+						<ValueRow label="draws" value={ draws } />
+						<ValueRow label="losses" value={ losses } />
+					</dl>
+
+					<table className="w-full text-sm lg:col-span-2">
+						<tbody>
+							{ h2h.map( ( g, i ) => (
+								<tr
+									key={ `${ g.round_number }-${ i }` }
+									className="border-b border-rule-soft last:border-0"
+								>
+									<td className="num py-1 pr-2 text-ink-3">
+										round { g.round_number }
+									</td>
+									<td className="py-1 pr-2 text-ink-3">
+										{ shortDateYear( g.date ) || '—' }
+									</td>
+									<td className="py-1 pr-2">
+										{ g.color && (
+											<Square color={ g.color } />
+										) }
+									</td>
+									<td className="py-1 text-right">
+										<ResultPill game={ g } />
+									</td>
+								</tr>
+							) ) }
+						</tbody>
+					</table>
+				</div>
+			) }
 		</div>
 	);
 }
