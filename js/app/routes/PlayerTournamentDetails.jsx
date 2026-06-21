@@ -12,6 +12,7 @@ import {
 	GamesList,
 	PositionGraph,
 	Highlights,
+	AgainstYou,
 } from '../components/player/blocks';
 
 // PUBLIC. One player's whole run through a single season: their games (left),
@@ -69,6 +70,11 @@ export function PlayerTournamentDetails( { seasonId, playerId } ) {
 				tpr={ player.tpr }
 				seasonInProgress={ seasonInProgress }
 			/>
+
+			{ /* Personal head-to-head — self-hides unless a logged-in member has
+			     played this player. The subject's own page never matches (you
+			     don't play yourself), so no self-H2H. */ }
+			<AgainstYou games={ games } meId={ meId } className="mt-6" />
 
 			<div className="mt-6 grid gap-6 lg:grid-cols-5">
 				<div className="lg:col-span-3">

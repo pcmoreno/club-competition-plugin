@@ -53,6 +53,13 @@ module.exports = {
         draw: 'var(--draw)',
         'white-sq': 'var(--white-sq)',
         'black-sq': 'var(--black-sq)',
+        // "Against you" head-to-head block — independent of the accent palette.
+        'h2h-win': 'var(--h2h-win-bg)',
+        'h2h-win-rim': 'var(--h2h-win-border)',
+        'h2h-loss': 'var(--h2h-loss-bg)',
+        'h2h-loss-rim': 'var(--h2h-loss-border)',
+        'h2h-even': 'var(--h2h-even-bg)',
+        'h2h-even-rim': 'var(--h2h-even-border)',
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
