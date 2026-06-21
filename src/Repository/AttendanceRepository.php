@@ -41,6 +41,31 @@ class AttendanceRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /**
+     * Every attendance row for one enrolled player across the season, keyed by
+     * round id — lets a player's tournament detail mark the rounds they sat out
+     * (byes) without an N+1 of per-round lookups.
+     *
+     * @return array<int, Attendance> keyed by round_id
+     */
+    public function findBySeasonPlayer(int $season_player_id): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'attendance')
+            ->where('season_player_id = :season_player_id')
+            ->setParameter('season_player_id', $season_player_id)
+            ->fetchAllAssociative();
+
+        $byRound = [];
+        foreach ($rows as $row) {
+            $attendance              = $this->hydrate($row);
+            $byRound[$attendance->round_id] = $attendance;
+        }
+
+        return $byRound;
+    }
+
     public function save(int $round_id, int $season_player_id, AttendanceStatus $status, ?ByeType $bye_type): void
     {
         $existing = $this->findByRoundAndSeasonPlayer($round_id, $season_player_id);

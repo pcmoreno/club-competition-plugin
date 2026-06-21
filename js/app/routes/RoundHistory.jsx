@@ -2,6 +2,7 @@ import { useState, useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
+import { Link } from '../router/router';
 import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass, formatDate } from '../components/ui';
 import { Square, resultToken } from '../components/game';
@@ -11,18 +12,33 @@ import { Square, resultToken } from '../components/game';
 // Backed by GET /seasons/{id}/rounds (navigator), GET /rounds/{id} (games +
 // byes) and GET /seasons/{id}/standings?round={id} (the frozen snapshot).
 
-// Name with category + elo inline, e.g. "Peter de Roode (A · 2121)".
-function PlayerInline( { player, color } ) {
+// Name with category + elo inline, e.g. "Peter de Roode (A · 2121)". The name
+// links to the player's season detail when a season + player_id are known.
+function PlayerInline( { player, color, seasonId } ) {
 	const cat = player?.category;
 	const elo = player?.elo;
 	const meta = [ cat, elo ? String( elo ) : null ]
 		.filter( Boolean )
 		.join( ' · ' );
+	const name = player?.name ?? '—';
+	const to =
+		seasonId != null && player?.player_id != null
+			? `/seasons/${ seasonId }/players/${ player.player_id }`
+			: null;
 	return (
 		<span className="inline-flex items-center gap-2">
 			<Square color={ color } />
 			<span>
-				{ player?.name ?? '—' }
+				{ to ? (
+					<Link
+						to={ to }
+						className="text-ink no-underline hover:text-accent"
+					>
+						{ name }
+					</Link>
+				) : (
+					name
+				) }
 				{ meta && (
 					<span className="num ml-1 text-ink-3">({ meta })</span>
 				) }
@@ -116,6 +132,7 @@ export function RoundHistory( { seasonId } ) {
 							round={ selected }
 							data={ roundQuery.data }
 							meId={ playerId }
+							seasonId={ seasonId }
 						/>
 					) }
 				</div>
@@ -202,7 +219,7 @@ function RoundNavigator( {
 	);
 }
 
-function GamesCard( { round, data, meId } ) {
+function GamesCard( { round, data, meId, seasonId } ) {
 	const { games = [], byes = [] } = data;
 	const dateLabel = formatDate( round?.date );
 
@@ -249,6 +266,7 @@ function GamesCard( { round, data, meId } ) {
 									<PlayerInline
 										player={ g.white }
 										color="white"
+										seasonId={ seasonId }
 									/>
 									{ whiteIsMe && <YouTag /> }
 								</td>
@@ -259,6 +277,7 @@ function GamesCard( { round, data, meId } ) {
 									<PlayerInline
 										player={ g.black }
 										color="black"
+										seasonId={ seasonId }
 									/>
 									{ blackIsMe && <YouTag /> }
 								</td>
@@ -362,7 +381,16 @@ function StandingsAfter( { round, seasonId, meId } ) {
 									{ r.rank }
 								</td>
 								<td className="px-4 py-2">
-									{ r.name ?? '—' }
+									{ r.player_id ? (
+										<Link
+											to={ `/seasons/${ seasonId }/players/${ r.player_id }` }
+											className="text-ink no-underline hover:text-accent"
+										>
+											{ r.name ?? '—' }
+										</Link>
+									) : (
+										r.name ?? '—'
+									) }
 									{ isMe && <YouTag /> }
 								</td>
 								<td className="num px-2 py-2 text-center">

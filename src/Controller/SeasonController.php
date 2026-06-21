@@ -17,6 +17,7 @@ use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\PlayerDisplayService;
+use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -30,6 +31,7 @@ class SeasonController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly StandingsSnapshotRepository $standingsSnapshotRepository,
         private readonly RoundRepository $roundRepository,
+        private readonly PlayerTournamentService $playerTournament,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -125,6 +127,22 @@ class SeasonController extends RestController
                 'completed_rounds' => $this->roundRepository->countCompletedBySeason($season->id),
                 'standings'        => $standings,
             ]);
+        });
+    }
+
+    /**
+     * One player's whole run through this season: every game (opponent, colour,
+     * own-POV result), byes, the per-round position series, and the headline
+     * rank/TPR. The viewer derives W/D/L, streaks, per-category splits and
+     * best-win/worst-loss from the games list.
+     */
+    public function playerDetail(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            return $this->ok($this->playerTournament->detail(
+                (int)$request->get_param('id'),
+                (int)$request->get_param('player_id'),
+            ));
         });
     }
 

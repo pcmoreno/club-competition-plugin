@@ -2,8 +2,10 @@ import { useState, useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
+import { Link } from '../router/router';
 import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass } from '../components/ui';
+import { pieceForRank } from '../components/game';
 
 // PUBLIC. Pieces-ladder standings for the selected tournament, read from the
 // latest frozen StandingsSnapshot (no live compute). The piece reflects the
@@ -11,26 +13,6 @@ import { Notice, YouTag, youRowClass } from '../components/ui';
 // even when the table is re-sorted by another column — sort is a temporary
 // view, the piece always shows true standing. Δrank/Movers need a prior
 // snapshot and are omitted until the scoring engine produces per-round ones.
-
-// Chess-piece glyph by rank: ♔ #1 → ♕ → ♖ → ♗ (top half) → ♘ (mid) → ♙.
-function pieceForRank( rank, total ) {
-	if ( rank === 1 ) {
-		return '♔';
-	}
-	if ( rank === 2 ) {
-		return '♕';
-	}
-	if ( rank === 3 ) {
-		return '♖';
-	}
-	if ( rank <= total / 2 ) {
-		return '♗';
-	}
-	if ( rank <= total * 0.75 ) {
-		return '♘';
-	}
-	return '♙';
-}
 
 // Sortable numeric columns (name is intentionally not sortable). The score
 // column is labelled engine-neutrally ("Score", not "Keizer") since other
@@ -224,9 +206,18 @@ export function Standings( { seasonId } ) {
 										<span className="mr-2 text-base text-ink-2">
 											{ pieceForRank( r.rank, total ) }
 										</span>
-										<span className="text-ink">
-											{ r.name ?? '—' }
-										</span>
+										{ r.player_id ? (
+											<Link
+												to={ `/seasons/${ seasonId }/players/${ r.player_id }` }
+												className="text-ink no-underline hover:text-accent"
+											>
+												{ r.name ?? '—' }
+											</Link>
+										) : (
+											<span className="text-ink">
+												{ r.name ?? '—' }
+											</span>
+										) }
 										{ isMe && <YouTag /> }
 										{ r.elo ? (
 											<span className="num ml-2 text-xs text-muted">

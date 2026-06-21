@@ -30,7 +30,13 @@ export function Players( { seasonId } ) {
 		const players = [ ...data.players ].sort(
 			( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 )
 		);
-		content = <RosterTable players={ players } meId={ playerId } />;
+		content = (
+			<RosterTable
+				players={ players }
+				meId={ playerId }
+				seasonId={ seasonId }
+			/>
+		);
 	}
 
 	return (
@@ -43,7 +49,7 @@ export function Players( { seasonId } ) {
 	);
 }
 
-function RosterTable( { players, meId } ) {
+function RosterTable( { players, meId, seasonId } ) {
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<table className="w-full text-sm">
@@ -69,7 +75,7 @@ function RosterTable( { players, meId } ) {
 							>
 								<td className="px-4 py-2.5">
 									<Link
-										to={ `/players/${ p.player_id }` }
+										to={ `/seasons/${ seasonId }/players/${ p.player_id }` }
 										className="text-ink no-underline hover:text-accent"
 									>
 										{ p.name ?? '—' }

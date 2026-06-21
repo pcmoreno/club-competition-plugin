@@ -179,6 +179,11 @@ class RestApi
 
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)', [
                 [
+                    'methods'             => 'GET',
+                    'callback'            => [$seasons, 'playerDetail'],
+                    'permission_callback' => '__return_true',
+                ],
+                [
                     'methods'             => 'DELETE',
                     'callback'            => [$seasons, 'removePlayer'],
                     'permission_callback' => $isAdmin,

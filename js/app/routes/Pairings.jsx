@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
+import { Link } from '../router/router';
 import { Notice, formatDate } from '../components/ui';
 import { Square, resultToken, categoryLabel } from '../components/game';
 
@@ -27,12 +28,26 @@ function pickCurrentRound( rounds ) {
 	);
 }
 
-function PlayerCell( { player, color } ) {
+function PlayerCell( { player, color, seasonId } ) {
+	const name = player?.name ?? '—';
+	const to =
+		seasonId != null && player?.player_id != null
+			? `/seasons/${ seasonId }/players/${ player.player_id }`
+			: null;
 	return (
 		<span className="inline-flex items-center gap-2">
 			<Square color={ color } />
 			<span>
-				{ player?.name ?? '—' }
+				{ to ? (
+					<Link
+						to={ to }
+						className="text-ink no-underline hover:text-accent"
+					>
+						{ name }
+					</Link>
+				) : (
+					name
+				) }
 				{ player?.elo ? (
 					<span className="num ml-1 text-ink-3">
 						({ player.elo })
@@ -72,7 +87,13 @@ export function Pairings( { seasonId } ) {
 	} else if ( roundQuery.isError || ! roundQuery.data ) {
 		content = <Notice>Couldn’t load this round. Please try again.</Notice>;
 	} else {
-		content = <RoundTable round={ current } data={ roundQuery.data } />;
+		content = (
+			<RoundTable
+				round={ current }
+				data={ roundQuery.data }
+				seasonId={ seasonId }
+			/>
+		);
 	}
 
 	return (
@@ -96,7 +117,7 @@ export function Pairings( { seasonId } ) {
 	);
 }
 
-function RoundTable( { round, data } ) {
+function RoundTable( { round, data, seasonId } ) {
 	const { games = [], byes = [] } = data;
 	const dateLabel = formatDate( round.date );
 
@@ -133,13 +154,21 @@ function RoundTable( { round, data } ) {
 								{ g.board ?? '' }
 							</td>
 							<td className="px-4 py-2.5">
-								<PlayerCell player={ g.white } color="white" />
+								<PlayerCell
+									player={ g.white }
+									color="white"
+									seasonId={ seasonId }
+								/>
 							</td>
 							<td className="num px-4 py-2.5 text-center font-mono text-ink">
 								{ resultToken( g.result ) }
 							</td>
 							<td className="px-4 py-2.5">
-								<PlayerCell player={ g.black } color="black" />
+								<PlayerCell
+									player={ g.black }
+									color="black"
+									seasonId={ seasonId }
+								/>
 							</td>
 							<td className="px-4 py-2.5 text-ink-3">
 								{ categoryLabel( g.white, g.black ) }
