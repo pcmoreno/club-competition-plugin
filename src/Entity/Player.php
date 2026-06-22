@@ -17,6 +17,7 @@ class Player
         public readonly ?\DateTimeImmutable $date_of_birth,
         public readonly bool $active,
         public readonly \DateTimeImmutable $created_at,
+        public readonly ?\DateTimeImmutable $knsb_synced_at = null,
     ) {
     }
 }

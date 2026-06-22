@@ -96,6 +96,7 @@ class PlayerRepository
             date_of_birth: $row['date_of_birth'] !== null ? new \DateTimeImmutable($row['date_of_birth']) : null,
             active:        (bool)$row['active'],
             created_at:    new \DateTimeImmutable($row['created_at']),
+            knsb_synced_at: $row['knsb_synced_at'] !== null ? new \DateTimeImmutable($row['knsb_synced_at']) : null,
         );
     }
 }

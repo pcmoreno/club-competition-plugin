@@ -59,7 +59,8 @@ class SerializerService
         ];
 
         if ($group === self::GROUP_ADMIN) {
-            $data['created_at'] = $p->created_at->format('Y-m-d H:i:s');
+            $data['created_at']     = $p->created_at->format('Y-m-d H:i:s');
+            $data['knsb_synced_at'] = $p->knsb_synced_at?->format('Y-m-d H:i:s');
         }
 
         return $data;
