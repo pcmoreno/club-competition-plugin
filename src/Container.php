@@ -33,6 +33,7 @@ class Container
             if (defined('WP_CLI') && WP_CLI) {
                 \WP_CLI::add_command('scs migrate', new Command\MigrateCommand());
                 \WP_CLI::add_command('scs create-admin', $container->get('create_admin_command'));
+                \WP_CLI::add_command('scs fetch-knsb-ratings', $container->get('fetch_knsb_ratings_command'));
             }
         }
 
@@ -102,6 +103,11 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('player_display_service'));
 
+        $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
+
+        $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
+            ->addArgument(SCS_PLUGIN_PATH . 'resources/KnsbRatings');
+
         $container->register('season_import_service', Services\SeasonImportService::class)
             ->setPublic(true)
             ->addArgument(new Reference('db_connection'))
@@ -133,6 +139,7 @@ class Container
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('knsb_rating_store'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
@@ -165,6 +172,11 @@ class Container
         $container->register('create_admin_command', Command\CreateAdminCommand::class)
             ->setPublic(true)
             ->addArgument(new Reference('admin_repository'));
+
+        $container->register('fetch_knsb_ratings_command', Command\FetchKnsbRatingsCommand::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('knsb_rating_list_fetcher'))
+            ->addArgument(new Reference('knsb_rating_store'));
 
         $container->compile();
 
