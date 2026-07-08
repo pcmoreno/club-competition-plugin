@@ -54,7 +54,7 @@ class SerializerService
             'knsb_id'       => $p->knsb_id,
             'knsb_elo'      => $p->knsb_elo,
             'gender'        => $p->gender?->value,
-            'date_of_birth' => $p->date_of_birth?->format('Y-m-d'),
+            'birth_year'    => $p->birth_year,
             'active'        => $p->active,
         ];
 

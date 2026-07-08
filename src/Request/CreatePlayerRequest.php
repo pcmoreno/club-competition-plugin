@@ -20,8 +20,8 @@ class CreatePlayerRequest
     #[Assert\Choice(callback: [self::class, 'genderChoices'], message: 'Gender is not valid.')]
     public ?string $gender = null;
 
-    #[Assert\Date(message: 'Date of birth must be in YYYY-MM-DD format.')]
-    public ?string $date_of_birth = null;
+    #[Assert\Range(min: 1900, max: 2100, notInRangeMessage: 'Birth year must be between {{ min }} and {{ max }}.')]
+    public ?int $birth_year = null;
 
     /** @return list<string> */
     public static function genderChoices(): array
@@ -43,8 +43,8 @@ class CreatePlayerRequest
         if ($request->get_param('gender') !== null) {
             $dto->gender = (string)$request->get_param('gender');
         }
-        if ($request->get_param('date_of_birth') !== null) {
-            $dto->date_of_birth = (string)$request->get_param('date_of_birth');
+        if ($request->get_param('birth_year') !== null) {
+            $dto->birth_year = (int)$request->get_param('birth_year');
         }
 
         return $dto;

@@ -61,15 +61,15 @@ class PlayerRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(string $name, ?string $knsb_id, ?int $knsb_elo, ?string $gender, ?string $date_of_birth): Player
+    public function create(string $name, ?string $knsb_id, ?int $knsb_elo, ?string $gender, ?int $birth_year): Player
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'players', [
-            'name'          => $name,
-            'knsb_id'       => $knsb_id,
-            'knsb_elo'      => $knsb_elo,
-            'gender'        => $gender,
-            'date_of_birth' => $date_of_birth,
-            'active'        => 1,
+            'name'       => $name,
+            'knsb_id'    => $knsb_id,
+            'knsb_elo'   => $knsb_elo,
+            'gender'     => $gender,
+            'birth_year' => $birth_year,
+            'active'     => 1,
         ]);
 
         return $this->findById((int)$this->connection->lastInsertId());
@@ -86,15 +86,25 @@ class PlayerRepository
     }
 
     /**
-     * Apply a KNSB rating refresh: set the rating and stamp when it was synced.
-     * knsb_synced_at tracks the last successful rating refresh (distinct from
-     * created_at, which is row creation).
+     * Apply authoritative KNSB data to a player: name, birth year, and rating,
+     * stamping when it was synced. KNSB is treated as the source of truth, so
+     * name + birth_year overwrite whatever was there (correcting manual typos).
+     * knsb_synced_at tracks the last successful sync (distinct from created_at,
+     * which is row creation).
+     *
+     * @throws \Doctrine\DBAL\Exception\UniqueConstraintViolationException when
+     *   the name collides with another player (players.name is UNIQUE)
      */
-    public function markRatingSynced(int $id, int $knsb_elo, string $synced_at): void
+    public function applyKnsbData(int $id, string $name, ?int $birth_year, int $knsb_elo, string $synced_at): void
     {
         $this->connection->update(
             SCS_TABLE_PREFIX . 'players',
-            [ 'knsb_elo' => $knsb_elo, 'knsb_synced_at' => $synced_at ],
+            [
+                'name'           => $name,
+                'birth_year'     => $birth_year,
+                'knsb_elo'       => $knsb_elo,
+                'knsb_synced_at' => $synced_at,
+            ],
             [ 'id' => $id ]
         );
     }
@@ -107,7 +117,7 @@ class PlayerRepository
             knsb_id:       $row['knsb_id'],
             knsb_elo:      $row['knsb_elo'] !== null ? (int)$row['knsb_elo'] : null,
             gender:        $row['gender'] !== null ? Gender::from($row['gender']) : null,
-            date_of_birth: $row['date_of_birth'] !== null ? new \DateTimeImmutable($row['date_of_birth']) : null,
+            birth_year:    $row['birth_year'] !== null ? (int)$row['birth_year'] : null,
             active:        (bool)$row['active'],
             created_at:    new \DateTimeImmutable($row['created_at']),
             knsb_synced_at: $row['knsb_synced_at'] !== null ? new \DateTimeImmutable($row['knsb_synced_at']) : null,

@@ -14,7 +14,7 @@ class Player
         public readonly ?string $knsb_id,
         public readonly ?int $knsb_elo,
         public readonly ?Gender $gender,
-        public readonly ?\DateTimeImmutable $date_of_birth,
+        public readonly ?int $birth_year,
         public readonly bool $active,
         public readonly \DateTimeImmutable $created_at,
         public readonly ?\DateTimeImmutable $knsb_synced_at = null,

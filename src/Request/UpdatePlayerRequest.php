@@ -18,8 +18,8 @@ class UpdatePlayerRequest
     #[Assert\Choice(callback: [self::class, 'genderChoices'], message: 'Gender is not valid.')]
     public ?string $gender = null;
 
-    #[Assert\Date(message: 'Date of birth must be in YYYY-MM-DD format.')]
-    public ?string $date_of_birth = null;
+    #[Assert\Range(min: 1900, max: 2100, notInRangeMessage: 'Birth year must be between {{ min }} and {{ max }}.')]
+    public ?int $birth_year = null;
 
     public ?bool $active = null;
 
@@ -45,8 +45,8 @@ class UpdatePlayerRequest
         if ($request->get_param('gender') !== null) {
             $dto->gender = (string)$request->get_param('gender');
         }
-        if ($request->get_param('date_of_birth') !== null) {
-            $dto->date_of_birth = (string)$request->get_param('date_of_birth');
+        if ($request->get_param('birth_year') !== null) {
+            $dto->birth_year = (int)$request->get_param('birth_year');
         }
         if ($request->get_param('active') !== null) {
             $dto->active = (bool)$request->get_param('active');
@@ -71,8 +71,8 @@ class UpdatePlayerRequest
         if ($this->gender !== null) {
             $data['gender'] = $this->gender;
         }
-        if ($this->date_of_birth !== null) {
-            $data['date_of_birth'] = $this->date_of_birth;
+        if ($this->birth_year !== null) {
+            $data['birth_year'] = $this->birth_year;
         }
         if ($this->active !== null) {
             $data['active'] = (int)$this->active;
