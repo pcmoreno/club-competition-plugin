@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { EditPlayerDialog } from './EditPlayerDialog';
+import { InviteMemberDialog } from './InviteMemberDialog';
 import { Notice } from '../components/ui';
 
 function errorMessage( err ) {
@@ -72,6 +73,7 @@ export function Players() {
 	const [ sort, setSort ] = useState( { key: 'knsb_elo', dir: 'desc' } );
 	const [ syncTarget, setSyncTarget ] = useState( null );
 	const [ editTarget, setEditTarget ] = useState( null );
+	const [ inviteTarget, setInviteTarget ] = useState( null );
 
 	let content;
 	if ( isLoading ) {
@@ -109,6 +111,7 @@ export function Players() {
 					onSort={ setSort }
 					onSync={ setSyncTarget }
 					onEdit={ setEditTarget }
+					onInvite={ setInviteTarget }
 				/>
 			);
 		}
@@ -141,6 +144,12 @@ export function Players() {
 					onClose={ () => setEditTarget( null ) }
 				/>
 			) }
+			{ inviteTarget && (
+				<InviteMemberDialog
+					player={ inviteTarget }
+					onClose={ () => setInviteTarget( null ) }
+				/>
+			) }
 		</>
 	);
 }
@@ -170,7 +179,7 @@ function SortHeader( { label, col, sort, onSort, align = 'left', width } ) {
 	);
 }
 
-function RosterTable( { players, sort, onSort, onSync, onEdit } ) {
+function RosterTable( { players, sort, onSort, onSync, onEdit, onInvite } ) {
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<table className="w-full text-sm">
@@ -246,7 +255,28 @@ function RosterTable( { players, sort, onSort, onSync, onEdit } ) {
 									{ p.active ? 'Yes' : 'No' }
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
-									{ p.member_status ?? '—' }
+									{ p.member_status === 'invited' ? (
+										<button
+											type="button"
+											onClick={ () => onInvite( p ) }
+											title="Resend invite"
+											className="group inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+										>
+											invited
+											<MailIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+										</button>
+									) : p.member_status ? (
+										p.member_status
+									) : (
+										<button
+											type="button"
+											onClick={ () => onInvite( p ) }
+											className="inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+										>
+											<MailIcon />
+											Invite
+										</button>
+									) }
 								</td>
 								<td className="px-4 py-2.5">
 									{ canSync ? (
@@ -428,6 +458,26 @@ function PencilIcon( { className } ) {
 			aria-hidden="true"
 		>
 			<path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5Z" />
+		</svg>
+	);
+}
+
+function MailIcon( { className } ) {
+	return (
+		<svg
+			className={ className }
+			width="14"
+			height="14"
+			viewBox="0 0 16 16"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.4"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<rect x="1.5" y="3" width="13" height="10" rx="1.5" />
+			<path d="m2 4 6 5 6-5" />
 		</svg>
 	);
 }

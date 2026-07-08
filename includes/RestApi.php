@@ -91,6 +91,12 @@ class RestApi
                 'permission_callback' => '__return_true',
             ]);
 
+            register_rest_route('scs/v1', '/auth/invite-status', [
+                'methods'             => 'GET',
+                'callback'            => [$auth, 'inviteStatus'],
+                'permission_callback' => '__return_true',
+            ]);
+
             register_rest_route('scs/v1', '/auth/forgot-password', [
                 'methods'             => 'POST',
                 'callback'            => [$auth, 'forgotPassword'],
@@ -141,6 +147,15 @@ class RestApi
                 [
                     'methods'             => 'POST',
                     'callback'            => [$players, 'applyKnsbRating'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
+            // Invite a player to become a member (admin): create the account + email.
+            register_rest_route('scs/v1', '/players/(?P<id>\d+)/invite', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$players, 'invite'],
                     'permission_callback' => $isAdmin,
                 ],
             ]);

@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use SCS\Entity\Enum\MemberStatus;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Request\CreatePlayerRequest;
+use SCS\Request\InviteMemberRequest;
 use SCS\Request\UpdatePlayerRequest;
+use SCS\Services\AuthService;
 use SCS\Services\KnsbNameNormalizer;
 use SCS\Services\KnsbRatingStore;
 use SCS\Services\SerializerService;
@@ -25,6 +28,7 @@ class PlayerController extends RestController
         private readonly MemberRepository $memberRepository,
         private readonly KnsbRatingStore $knsbRatingStore,
         private readonly KnsbNameNormalizer $knsbNameNormalizer,
+        private readonly AuthService $authService,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -164,6 +168,51 @@ class PlayerController extends RestController
                 $this->playerRepository->findById($player->id),
                 SerializerService::GROUP_ADMIN
             ));
+        });
+    }
+
+    /**
+     * Invite a player to become a member (admin action): create their member
+     * account and email an invite to set a password. Grants ROLE_MEMBER only —
+     * never admin. The player must not already have an account, and the email
+     * must be unused. On success the roster's Member column flips "—" → "invited".
+     */
+    public function invite(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
+
+            $input = InviteMemberRequest::fromRequest($request);
+            $this->validate($input);
+
+            // No account yet → create + invite. Invite pending → re-send with a
+            // fresh token. Already accepted (active) → nothing to (re)send.
+            $existing = $this->memberRepository->findByPlayerId($player->id);
+            try {
+                if ($existing === null) {
+                    $member  = $this->authService->inviteMember($player->id, $input->email);
+                    $created = true;
+                } elseif ($existing->status === MemberStatus::Invited) {
+                    $member  = $this->authService->resendInvite($existing, $input->email);
+                    $created = false;
+                } else {
+                    throw new ConflictException('This player already has an active member account.');
+                }
+            } catch (UniqueConstraintViolationException) {
+                throw new ConflictException('That email address is already in use.');
+            }
+
+            // Return the roster-shaped row (player + email + member_status). This
+            // is the admin players list, so GROUP_ADMIN = which fields are shown
+            // (adds email/created_at) — not a role. The member is ROLE_MEMBER.
+            $data                  = $this->serializer->serialize($player, SerializerService::GROUP_ADMIN);
+            $data['email']         = $member->email;
+            $data['member_status'] = $member->status->value;
+
+            return $created ? $this->created($data) : $this->ok($data);
         });
     }
 }
