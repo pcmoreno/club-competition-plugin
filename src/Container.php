@@ -108,6 +108,8 @@ class Container
         $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
             ->addArgument(SCS_PLUGIN_PATH . 'resources/KnsbRatings');
 
+        $container->register('knsb_name_normalizer', Services\KnsbNameNormalizer::class);
+
         $container->register('season_import_service', Services\SeasonImportService::class)
             ->setPublic(true)
             ->addArgument(new Reference('db_connection'))
@@ -140,6 +142,7 @@ class Container
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('knsb_rating_store'))
+            ->addArgument(new Reference('knsb_name_normalizer'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)

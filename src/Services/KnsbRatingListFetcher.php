@@ -24,7 +24,7 @@ class KnsbRatingListFetcher
     private const CSV_NAME = 'KLASSIEK.csv';
 
     /**
-     * @return array{list_date: ?string, ratings: array<string, array{rating: int, name: string}>}
+     * @return array{list_date: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}
      *
      * @throws \RuntimeException on a download, archive, or format failure
      */
@@ -78,7 +78,7 @@ class KnsbRatingListFetcher
     }
 
     /**
-     * @return array{list_date: ?string, ratings: array<string, array{rating: int, name: string}>}
+     * @return array{list_date: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}
      */
     private function parse(string $csv, ?string $listDate): array
     {
@@ -103,9 +103,13 @@ class KnsbRatingListFetcher
             if ($id === '' || $rating <= 0) {
                 continue;
             }
+            // Header: Relatienummer;Naam;Titel;FED;Rating;Nv;Geboren;S
+            // "Geboren" is a plain birth year (e.g. 1966); blank for some rows.
+            $birthYear = (int)trim((string)($cols[6] ?? ''));
             $ratings[$id] = [
-                'rating' => $rating,
-                'name'   => trim((string)($cols[1] ?? '')),
+                'rating'     => $rating,
+                'name'       => trim((string)($cols[1] ?? '')),
+                'birth_year' => $birthYear > 0 ? $birthYear : null,
             ];
         }
 

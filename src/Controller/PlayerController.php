@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -11,6 +12,7 @@ use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Request\CreatePlayerRequest;
 use SCS\Request\UpdatePlayerRequest;
+use SCS\Services\KnsbNameNormalizer;
 use SCS\Services\KnsbRatingStore;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -22,6 +24,7 @@ class PlayerController extends RestController
         private readonly PlayerRepository $playerRepository,
         private readonly MemberRepository $memberRepository,
         private readonly KnsbRatingStore $knsbRatingStore,
+        private readonly KnsbNameNormalizer $knsbNameNormalizer,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -75,11 +78,11 @@ class PlayerController extends RestController
             $this->validate($input);
 
             $player = $this->playerRepository->create(
-                name:          $input->name,
-                knsb_id:       $input->knsb_id,
-                knsb_elo:      $input->knsb_elo,
-                gender:        $input->gender,
-                date_of_birth: $input->date_of_birth,
+                name:       $input->name,
+                knsb_id:    $input->knsb_id,
+                knsb_elo:   $input->knsb_elo,
+                gender:     $input->gender,
+                birth_year: $input->birth_year,
             );
 
             return $this->created($this->serializer->serialize($player, SerializerService::GROUP_ADMIN));
@@ -109,8 +112,11 @@ class PlayerController extends RestController
     }
 
     /**
-     * Apply the player's rating from the last-fetched KNSB list (admin). Matches
-     * by knsb_id only; the list itself is refreshed by `wp scs fetch-knsb-ratings`.
+     * Apply the player's authoritative KNSB data (name, birth year, rating) from
+     * the last-fetched list (admin). Matches by knsb_id only; the list itself is
+     * refreshed by `wp scs fetch-knsb-ratings`. KNSB is the source of truth, so
+     * this overwrites the player's name (normalised to the club's "given-name
+     * first" convention) and birth year, correcting manual entry mistakes.
      */
     public function applyKnsbRating(\WP_REST_Request $request): \WP_REST_Response
     {
@@ -131,10 +137,29 @@ class PlayerController extends RestController
                 throw new NotFoundException('This KNSB id is not in the current rating list.');
             }
 
-            $this->playerRepository->markRatingSynced($player->id, (int)$row['rating'], current_time('mysql'));
+            $name = $this->knsbNameNormalizer->normalize((string)$row['name']);
+            if ($name === '') {
+                $name = $player->name;
+            }
 
-            // The client invalidates and refetches the roster, so the updated
-            // knsb_elo + knsb_synced_at on the player suffice here.
+            try {
+                $this->playerRepository->applyKnsbData(
+                    $player->id,
+                    $name,
+                    $row['birth_year'] ?? null,
+                    (int)$row['rating'],
+                    current_time('mysql'),
+                );
+            } catch (UniqueConstraintViolationException) {
+                throw new ConflictException(sprintf(
+                    'Another player is already named "%s"; resolve the duplicate before syncing.',
+                    $name,
+                ));
+            }
+
+            // The client invalidates and refetches the roster, so returning the
+            // updated player (name + birth_year + knsb_elo + knsb_synced_at)
+            // suffices here.
             return $this->ok($this->serializer->serialize(
                 $this->playerRepository->findById($player->id),
                 SerializerService::GROUP_ADMIN

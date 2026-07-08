@@ -22,7 +22,7 @@ class KnsbRatingStore
     }
 
     /**
-     * @param array{list_date: ?string, ratings: array<string, array{rating: int, name: string}>} $fetched
+     * @param array{list_date: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>} $fetched
      */
     public function write(array $fetched): void
     {
@@ -49,7 +49,7 @@ class KnsbRatingStore
     /**
      * The whole stored list, or null when nothing has been fetched yet.
      *
-     * @return array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string}>}|null
+     * @return array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}|null
      */
     public function read(): ?array
     {
@@ -62,14 +62,14 @@ class KnsbRatingStore
             return null;
         }
 
-        /** @var array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string}>} $data */
+        /** @var array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>} $data */
         return $data;
     }
 
     /**
      * One player's row by relatienummer, or null if not fetched / not listed.
      *
-     * @return array{rating: int, name: string}|null
+     * @return array{rating: int, name: string, birth_year: ?int}|null
      */
     public function findRating(string $knsbId): ?array
     {

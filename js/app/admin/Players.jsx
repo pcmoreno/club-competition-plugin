@@ -2,7 +2,8 @@ import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
-import { Notice, formatDate } from '../components/ui';
+import { EditPlayerDialog } from './EditPlayerDialog';
+import { Notice } from '../components/ui';
 
 function errorMessage( err ) {
 	if ( err instanceof ApiError ) {
@@ -16,8 +17,13 @@ function errorMessage( err ) {
 // name, sortable by name/Elo. The "Synced" column shows when the KNSB rating
 // sync last refreshed each player (NULL → "never"); anything not from the
 // current month is flagged red (the sync runs monthly), and a player with a
-// KNSB id can be (eventually) re-synced from there. Editing, member invites and
-// "new player" are a later pass.
+// KNSB id can be (eventually) re-synced from there.
+//
+// A pencil on the name cell opens EditPlayerDialog, which edits the four plain
+// Player fields (name, KNSB id, birth year, gender) via PATCH /players/{id}.
+// Email lives on the separate Member account, not the Player, so it is NOT
+// editable here — member creation + invites are their own later pass. Elo is
+// owned by the KNSB sync flow (SyncDialog), so it is not editable here either.
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
@@ -65,6 +71,7 @@ export function Players() {
 	const [ search, setSearch ] = useState( '' );
 	const [ sort, setSort ] = useState( { key: 'knsb_elo', dir: 'desc' } );
 	const [ syncTarget, setSyncTarget ] = useState( null );
+	const [ editTarget, setEditTarget ] = useState( null );
 
 	let content;
 	if ( isLoading ) {
@@ -101,6 +108,7 @@ export function Players() {
 					sort={ sort }
 					onSort={ setSort }
 					onSync={ setSyncTarget }
+					onEdit={ setEditTarget }
 				/>
 			);
 		}
@@ -125,6 +133,12 @@ export function Players() {
 				<SyncDialog
 					player={ syncTarget }
 					onClose={ () => setSyncTarget( null ) }
+				/>
+			) }
+			{ editTarget && (
+				<EditPlayerDialog
+					player={ editTarget }
+					onClose={ () => setEditTarget( null ) }
 				/>
 			) }
 		</>
@@ -156,7 +170,7 @@ function SortHeader( { label, col, sort, onSort, align = 'left', width } ) {
 	);
 }
 
-function RosterTable( { players, sort, onSort, onSync } ) {
+function RosterTable( { players, sort, onSort, onSync, onEdit } ) {
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<table className="w-full text-sm">
@@ -169,7 +183,7 @@ function RosterTable( { players, sort, onSort, onSync } ) {
 							onSort={ onSort }
 						/>
 						<th className="px-4 py-2 font-medium">Email</th>
-						<th className="px-4 py-2 font-medium">DOB</th>
+						<th className="px-4 py-2 font-medium">Year</th>
 						<th className="px-4 py-2 font-medium">Gender</th>
 						<th className="px-4 py-2 font-medium">KNSB ID</th>
 						<SortHeader
@@ -200,13 +214,24 @@ function RosterTable( { players, sort, onSort, onSync } ) {
 								].join( ' ' ) }
 							>
 								<td className="px-4 py-2.5 text-ink">
-									{ p.name }
+									<button
+										type="button"
+										onClick={ () => onEdit( p ) }
+										aria-label={ `Edit ${ p.name }` }
+										title="Edit player"
+										className="group inline-flex items-center gap-1.5 text-left text-inherit hover:text-accent"
+									>
+										<span className="underline-offset-2 group-hover:underline">
+											{ p.name }
+										</span>
+										<PencilIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+									</button>
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
 									{ p.email ?? '—' }
 								</td>
-								<td className="px-4 py-2.5 text-ink-3">
-									{ formatDate( p.date_of_birth ) ?? '—' }
+								<td className="num px-4 py-2.5 font-mono text-ink-3">
+									{ p.birth_year ?? '—' }
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
 									{ p.gender ?? '—' }
@@ -258,9 +283,40 @@ function RosterTable( { players, sort, onSort, onSync } ) {
 	);
 }
 
-// Confirm dialog that applies the player's rating from the last-fetched KNSB
-// list (POST /players/{id}/knsb-rating). On success it shows old → new and
-// refreshes the roster; errors (no list fetched, id not listed) surface inline.
+// One "before → after" row in the sync result. Unchanged values render muted
+// without an arrow; changed values highlight the new value in ink.
+function SyncChange( { label, before, after, mono = false } ) {
+	const fmt = ( v ) => ( v === null || v === undefined || v === '' ? '—' : v );
+	const changed = String( before ?? '' ) !== String( after ?? '' );
+	const numCls = mono ? 'num font-mono' : '';
+	return (
+		<div className="flex items-baseline justify-between gap-3">
+			<dt className="text-xs uppercase tracking-wide text-muted">
+				{ label }
+			</dt>
+			<dd className={ `text-right ${ numCls }` }>
+				{ changed ? (
+					<>
+						<span className="text-ink-3">{ fmt( before ) }</span>
+						<span className="text-ink-3"> → </span>
+						<span className="font-medium text-ink">
+							{ fmt( after ) }
+						</span>
+					</>
+				) : (
+					<span className="text-ink-3">{ fmt( after ) }</span>
+				) }
+			</dd>
+		</div>
+	);
+}
+
+// Confirm dialog that applies the player's authoritative KNSB data — name,
+// birth year, and rating — from the last-fetched list (POST
+// /players/{id}/knsb-rating). KNSB is the source of truth, so name (normalised
+// to "given-name first") and birth year overwrite manual entries, correcting
+// typos. On success it shows what changed and refreshes the roster; errors (no
+// list fetched, id not listed, name collision) surface inline.
 function SyncDialog( { player, onClose } ) {
 	const queryClient = useQueryClient();
 	const sync = useMutation( {
@@ -280,22 +336,33 @@ function SyncDialog( { player, onClose } ) {
 				onClick={ ( e ) => e.stopPropagation() }
 			>
 				<h2 className="font-serif text-2xl leading-tight">
-					Sync rating
+					Sync from KNSB
 				</h2>
 
 				{ updated ? (
 					<>
 						<p className="mt-2 text-sm text-ink-3">
-							Updated{ ' ' }
-							<strong className="text-ink">
-								{ player.name }
-							</strong>
-							:{ ' ' }
-							<span className="num font-mono text-ink">
-								{ player.knsb_elo ?? '—' } →{ ' ' }
-								{ updated.knsb_elo }
-							</span>
+							Synced from the KNSB list:
 						</p>
+						<dl className="mt-3 space-y-1.5 text-sm">
+							<SyncChange
+								label="Name"
+								before={ player.name }
+								after={ updated.name }
+							/>
+							<SyncChange
+								label="Birth year"
+								before={ player.birth_year }
+								after={ updated.birth_year }
+								mono
+							/>
+							<SyncChange
+								label="Rating"
+								before={ player.knsb_elo }
+								after={ updated.knsb_elo }
+								mono
+							/>
+						</dl>
 						<div className="mt-5 flex justify-end">
 							<button
 								type="button"
@@ -309,11 +376,12 @@ function SyncDialog( { player, onClose } ) {
 				) : (
 					<>
 						<p className="mt-2 text-sm text-ink-3">
-							Do you want to sync the rating for{ ' ' }
+							Sync{ ' ' }
 							<strong className="text-ink">
 								{ player.name }
 							</strong>{ ' ' }
-							from the latest KNSB list?
+							from the latest KNSB list? This overwrites their name,
+							birth year, and rating with the official KNSB values.
 						</p>
 						{ sync.isError && (
 							<p className="mt-3 text-sm text-loss">
@@ -342,5 +410,24 @@ function SyncDialog( { player, onClose } ) {
 				) }
 			</div>
 		</div>
+	);
+}
+
+function PencilIcon( { className } ) {
+	return (
+		<svg
+			className={ className }
+			width="14"
+			height="14"
+			viewBox="0 0 16 16"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.4"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5Z" />
+		</svg>
 	);
 }
