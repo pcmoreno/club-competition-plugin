@@ -73,6 +73,19 @@ class AuthController extends RestController
         });
     }
 
+    /**
+     * Report whether an invite token is still usable, without consuming it, so
+     * the accept-invite page can show a friendly landing on arrival.
+     */
+    public function inviteStatus(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $token = (string)$request->get_param('token');
+
+            return $this->ok($this->authService->inviteTokenStatus($token));
+        });
+    }
+
     public function forgotPassword(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {

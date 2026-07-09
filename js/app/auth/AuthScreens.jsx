@@ -1,4 +1,4 @@
-import { useState, useId, cloneElement } from '@wordpress/element';
+import { useState, useEffect, useId, cloneElement } from '@wordpress/element';
 import { useForm } from 'react-hook-form';
 import { useAuth } from './AuthContext';
 import { api, ApiError } from '../api/client';
@@ -207,8 +207,10 @@ export function ForgotPassword() {
 }
 
 // Shared password-set form for both reset-password and accept-invite — same
-// shape (token + new password), different endpoint and copy.
-function SetPasswordForm( { title, intro, endpoint, successText } ) {
+// shape (token + new password), different endpoint and copy. When `checkEndpoint`
+// is given, the token is verified on arrival so an invalid/expired link lands on
+// a friendly message instead of failing only after the user fills in a password.
+function SetPasswordForm( { title, intro, endpoint, successText, checkEndpoint } ) {
 	const token = getQueryParam( 'token' );
 	const {
 		register,
@@ -218,12 +220,64 @@ function SetPasswordForm( { title, intro, endpoint, successText } ) {
 	} = useForm();
 	const [ formError, setFormError ] = useState( null );
 	const [ done, setDone ] = useState( false );
+	// 'checking' | 'valid' | 'invalid' — only gated when checkEndpoint is set.
+	const [ linkState, setLinkState ] = useState(
+		checkEndpoint ? 'checking' : 'valid'
+	);
+	const [ invalidReason, setInvalidReason ] = useState( 'invalid' );
+
+	useEffect( () => {
+		if ( ! checkEndpoint || ! token ) {
+			return undefined;
+		}
+		let active = true;
+		api.get( checkEndpoint, { params: { token } } )
+			.then( ( res ) => {
+				if ( ! active ) {
+					return;
+				}
+				if ( res?.valid ) {
+					setLinkState( 'valid' );
+				} else {
+					setInvalidReason( res?.reason ?? 'invalid' );
+					setLinkState( 'invalid' );
+				}
+			} )
+			.catch( () => {
+				if ( active ) {
+					setInvalidReason( 'invalid' );
+					setLinkState( 'invalid' );
+				}
+			} );
+		return () => {
+			active = false;
+		};
+	}, [ checkEndpoint, token ] );
 
 	if ( ! token ) {
 		return (
 			<AuthCard
 				title={ title }
 				intro="This link is missing its token. Please use the link from your email."
+			>
+				<Link to="/login">← Back to sign in</Link>
+			</AuthCard>
+		);
+	}
+
+	if ( linkState === 'checking' ) {
+		return <AuthCard title={ title } intro="Checking your link…" />;
+	}
+
+	if ( linkState === 'invalid' ) {
+		return (
+			<AuthCard
+				title="This link is no longer valid"
+				intro={
+					invalidReason === 'expired'
+						? 'This invite link has expired. Ask an admin to send you a new one.'
+						: 'This invite link is invalid or has already been used. Ask an admin to send you a new one.'
+				}
 			>
 				<Link to="/login">← Back to sign in</Link>
 			</AuthCard>
@@ -318,6 +372,7 @@ export function AcceptInvite() {
 			title="Activate your account"
 			intro="Set a password to finish creating your member account."
 			endpoint="auth/accept-invite"
+			checkEndpoint="auth/invite-status"
 			successText="Account activated. You can now sign in."
 		/>
 	);

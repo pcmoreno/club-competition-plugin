@@ -7,6 +7,7 @@ namespace SCS\Services;
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Entity\Enum\MemberStatus;
 use SCS\Entity\Enum\Role;
+use SCS\Entity\Member;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
@@ -58,6 +59,72 @@ class AuthService
         }
 
         throw new UnauthorizedException('Invalid credentials.');
+    }
+
+    /**
+     * Create a member account for a player and email them an invite to set a
+     * password. The token is stored in plaintext (matching the reset flow) and
+     * expires in 7 days — the window stated in the invite email. Throws a
+     * UniqueConstraintViolationException if the email or the player already has
+     * a member row; the caller maps that to a conflict.
+     */
+    public function inviteMember(int $playerId, string $email): Member
+    {
+        $token     = bin2hex(random_bytes(32));
+        $expiresAt = new \DateTimeImmutable('+7 days');
+
+        $member = $this->memberRepository->create($playerId, $email, $token, $expiresAt);
+        $this->emailNotificationService->sendInvite($email, $token);
+
+        return $member;
+    }
+
+    /**
+     * Re-send an invite to a member who hasn't accepted yet: mint a fresh token
+     * (invalidating the old link), reset the expiry, and email it again. The
+     * email may be corrected in the same step. Throws a
+     * UniqueConstraintViolationException if the new email is already in use.
+     */
+    public function resendInvite(Member $member, string $email): Member
+    {
+        $token     = bin2hex(random_bytes(32));
+        $expiresAt = new \DateTimeImmutable('+7 days');
+
+        $this->memberRepository->update($member->id, [
+            'email'             => $email,
+            'invite_token'      => $token,
+            'invite_expires_at' => $expiresAt->format('Y-m-d H:i:s'),
+        ]);
+        $this->emailNotificationService->sendInvite($email, $token);
+
+        return $this->memberRepository->findById($member->id);
+    }
+
+    /**
+     * Check an invite token without consuming it, so the accept-invite page can
+     * show a friendly landing before asking for a password. Distinguishes a bad
+     * / already-used token ("invalid") from a still-recognised but lapsed one
+     * ("expired"). This endpoint is public (a signed-out invitee hits it), so it
+     * deliberately returns no member data — only the yes/no validity — to avoid
+     * disclosing the invitee's email to anyone holding the link.
+     *
+     * @return array{valid: bool, reason?: string}
+     */
+    public function inviteTokenStatus(string $token): array
+    {
+        if ($token === '') {
+            return ['valid' => false, 'reason' => 'invalid'];
+        }
+
+        $member = $this->memberRepository->findByInviteToken($token);
+        if ($member === null) {
+            return ['valid' => false, 'reason' => 'invalid'];
+        }
+        if ($member->invite_expires_at === null || $member->invite_expires_at < new \DateTimeImmutable()) {
+            return ['valid' => false, 'reason' => 'expired'];
+        }
+
+        return ['valid' => true];
     }
 
     public function acceptInvite(string $token, string $password): void
