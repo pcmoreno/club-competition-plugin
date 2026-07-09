@@ -39,6 +39,7 @@ class AuthController extends RestController
             return $this->ok([
                 'role'       => $result['role'],
                 'player_id'  => $result['player_id'] ?? null,
+                'email'      => $result['email'],
                 'csrf_token' => $csrfToken,
             ]);
         });

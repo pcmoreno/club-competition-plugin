@@ -23,7 +23,7 @@ class AuthService
     ) {
     }
 
-    /** @return array{token: string, role: string, player_id: int|null} */
+    /** @return array{token: string, role: string, player_id: int|null, email: string} */
     public function login(string $email, string $password): array
     {
         $member = $this->memberRepository->findByEmail($email);
@@ -39,6 +39,7 @@ class AuthService
                 'token'     => $this->jwtService->issue($member->id, Role::Member, $member->player_id),
                 'role'      => Role::Member->value,
                 'player_id' => $member->player_id,
+                'email'     => $member->email,
             ];
         }
 
@@ -55,6 +56,7 @@ class AuthService
                 'token'     => $this->jwtService->issue($admin->id, Role::Admin),
                 'role'      => Role::Admin->value,
                 'player_id' => null,
+                'email'     => $admin->email,
             ];
         }
 

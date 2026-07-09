@@ -21,6 +21,8 @@ export function AuthProvider( { children } ) {
 	// The logged-in member's player id (null for anonymous/admins), used to
 	// identify "you" in lists.
 	const [ playerId, setPlayerId ] = useState( bootstrap.playerId );
+	// The signed-in user's own email, shown in the top-bar account menu.
+	const [ email, setEmail ] = useState( bootstrap.email );
 
 	const isMember = role === 'ROLE_MEMBER' || role === 'ROLE_ADMIN';
 	const isAdmin = role === 'ROLE_ADMIN';
@@ -43,15 +45,17 @@ export function AuthProvider( { children } ) {
 		}
 	}, [ isMember, refreshCsrf ] );
 
-	const login = useCallback( async ( email, password ) => {
+	const login = useCallback( async ( emailInput, password ) => {
 		const {
 			role: nextRole,
 			player_id: nextPlayerId,
+			email: nextEmail,
 			csrf_token: csrfToken,
-		} = await api.post( 'auth/login', { email, password } );
+		} = await api.post( 'auth/login', { email: emailInput, password } );
 		setCsrfToken( csrfToken );
 		setRole( nextRole );
 		setPlayerId( nextPlayerId ?? null );
+		setEmail( nextEmail ?? emailInput );
 		return nextRole;
 	}, [] );
 
@@ -62,12 +66,14 @@ export function AuthProvider( { children } ) {
 			setCsrfToken( null );
 			setRole( null );
 			setPlayerId( null );
+			setEmail( null );
 		}
 	}, [] );
 
 	const value = {
 		role,
 		playerId,
+		email,
 		isMember,
 		isAdmin,
 		login,

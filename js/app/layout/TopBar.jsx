@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { useAuth } from '../auth/AuthContext';
 import { navigate } from '../router/router';
 import { TournamentSwitcher } from './TournamentSwitcher';
@@ -14,8 +15,97 @@ function BrandMark() {
 	);
 }
 
+// Signed-in account control: shows the user's own email as a plain text
+// button that opens a dropdown with Account Details + Sign out.
+// Account Details is a placeholder for now — it has no destination yet.
+function AccountMenu( { email, logout } ) {
+	const [ open, setOpen ] = useState( false );
+	const ref = useRef( null );
+
+	useEffect( () => {
+		if ( ! open ) {
+			return undefined;
+		}
+		const onClick = ( e ) => {
+			if ( ref.current && ! ref.current.contains( e.target ) ) {
+				setOpen( false );
+			}
+		};
+		const onKey = ( e ) => {
+			if ( e.key === 'Escape' ) {
+				setOpen( false );
+			}
+		};
+		document.addEventListener( 'mousedown', onClick );
+		document.addEventListener( 'keydown', onKey );
+		return () => {
+			document.removeEventListener( 'mousedown', onClick );
+			document.removeEventListener( 'keydown', onKey );
+		};
+	}, [ open ] );
+
+	const itemClass =
+		'block w-full px-3 py-2 text-left text-sm text-ink-2 hover:bg-rule/40 hover:text-ink focus:bg-rule/40 focus:text-ink focus:outline-none';
+
+	return (
+		<div className="relative" ref={ ref }>
+			<button
+				type="button"
+				className="block max-w-[14rem] truncate text-sm text-ink-3 hover:text-ink"
+				onClick={ () => setOpen( ( v ) => ! v ) }
+				aria-haspopup="menu"
+				aria-expanded={ open }
+			>
+				{ email || 'Account' }
+			</button>
+			{ open && (
+				<div
+					role="menu"
+					className="absolute right-0 z-20 mt-1.5 w-max min-w-full overflow-hidden rounded border border-rule bg-surface py-1 shadow-md"
+				>
+					<button
+						type="button"
+						role="menuitem"
+						className={ itemClass }
+						onClick={ () => {
+							// No destination yet — placeholder for a future
+							// account page.
+							setOpen( false );
+						} }
+					>
+						Account Details
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						className={ itemClass }
+						onClick={ () => {
+							// No destination yet — placeholder for a future
+							// player page.
+							setOpen( false );
+						} }
+					>
+						Player Details
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						className={ itemClass }
+						onClick={ () => {
+							setOpen( false );
+							logout();
+						} }
+					>
+						Sign out
+					</button>
+				</div>
+			) }
+		</div>
+	);
+}
+
 export function TopBar( { seasonId, onSeasonChange } ) {
-	const { isMember, logout } = useAuth();
+	const { isMember, email, logout } = useAuth();
 
 	return (
 		<header className="border-b border-rule bg-paper">
@@ -43,13 +133,7 @@ export function TopBar( { seasonId, onSeasonChange } ) {
 						onChange={ onSeasonChange }
 					/>
 					{ isMember ? (
-						<button
-							type="button"
-							className="text-sm text-ink-3 hover:text-ink"
-							onClick={ logout }
-						>
-							Sign out
-						</button>
+						<AccountMenu email={ email } logout={ logout } />
 					) : (
 						<button
 							type="button"

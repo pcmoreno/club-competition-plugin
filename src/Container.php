@@ -25,8 +25,10 @@ class Container
             $container = self::$instance;
             includes\RestApi::register($container);
             $jwtService = $container->get('jwt_service');
-            add_action('wp_enqueue_scripts', function () use ($jwtService) {
-                includes\Assets::enqueue_frontend($jwtService);
+            $memberRepository = $container->get('member_repository');
+            $adminRepository  = $container->get('admin_repository');
+            add_action('wp_enqueue_scripts', function () use ($jwtService, $memberRepository, $adminRepository) {
+                includes\Assets::enqueue_frontend($jwtService, $memberRepository, $adminRepository);
             });
             add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
 
@@ -71,10 +73,12 @@ class Container
             ->addArgument(new Reference('db_connection'));
 
         $container->register('member_repository', Repository\MemberRepository::class)
-            ->addArgument(new Reference('db_connection'));
+            ->addArgument(new Reference('db_connection'))
+            ->setPublic(true);
 
         $container->register('admin_repository', Repository\AdminRepository::class)
-            ->addArgument(new Reference('db_connection'));
+            ->addArgument(new Reference('db_connection'))
+            ->setPublic(true);
 
         // ── Services ──────────────────────────────────────────────────────────
         $container->register('jwt_service', Services\JwtService::class)
