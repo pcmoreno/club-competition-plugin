@@ -199,6 +199,9 @@ class PlayerController extends RestController
                     $member  = $this->authService->resendInvite($existing, $input->email);
                     $created = false;
                 } else {
+                    // TODO: when a revoke path is added, branch this message per
+                    // status — a Revoked member isn't "active" and could be
+                    // re-invited rather than rejected here.
                     throw new ConflictException('This player already has an active member account.');
                 }
             } catch (UniqueConstraintViolationException) {

@@ -104,9 +104,11 @@ class AuthService
      * Check an invite token without consuming it, so the accept-invite page can
      * show a friendly landing before asking for a password. Distinguishes a bad
      * / already-used token ("invalid") from a still-recognised but lapsed one
-     * ("expired"); returns the email on success to personalise the form.
+     * ("expired"). This endpoint is public (a signed-out invitee hits it), so it
+     * deliberately returns no member data — only the yes/no validity — to avoid
+     * disclosing the invitee's email to anyone holding the link.
      *
-     * @return array{valid: bool, reason?: string, email?: string}
+     * @return array{valid: bool, reason?: string}
      */
     public function inviteTokenStatus(string $token): array
     {
@@ -122,7 +124,7 @@ class AuthService
             return ['valid' => false, 'reason' => 'expired'];
         }
 
-        return ['valid' => true, 'email' => $member->email];
+        return ['valid' => true];
     }
 
     public function acceptInvite(string $token, string $password): void
