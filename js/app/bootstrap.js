@@ -18,6 +18,9 @@ export const bootstrap = {
 	// The logged-in member's player id (null for anonymous/admins), used to
 	// identify "you" in lists.
 	playerId: raw?.playerId ?? null,
+	// The signed-in user's own email (null for anonymous), shown in the
+	// top-bar account menu.
+	email: raw?.email ?? null,
 	// URL of the plugin's build/ dir, for any runtime asset references.
 	buildUrl: raw?.buildUrl ?? '',
 };
