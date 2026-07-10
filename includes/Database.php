@@ -47,6 +47,7 @@ class Database
                 );
             }
 
+            // @phpstan-ignore notIdentical.alwaysFalse (false positive: $migration($wpdb) mutates last_error via SQL side effects PHPStan can't model on this stub-typed object)
             if ($wpdb->last_error !== '') {
                 throw new \RuntimeException(
                     sprintf('Migration "%s" failed: %s', basename($path), $wpdb->last_error)

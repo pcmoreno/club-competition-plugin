@@ -1,0 +1,457 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method SCS\\includes\\Database\:\:getMigrationFiles\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: includes/Database.php
+
+		-
+			message: '#^Call to an undefined method object\:\:isTokenValid\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: includes/RestApi.php
+
+		-
+			message: '#^Call to an undefined method object\:\:parse\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: includes/RestApi.php
+
+		-
+			message: '#^Method SCS\\includes\\Shortcode\:\:boot\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: includes/Shortcode.php
+
+		-
+			message: '#^Method SCS\\includes\\Shortcode\:\:render\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: includes/Shortcode.php
+
+		-
+			message: '#^Method SCS\\includes\\Shortcode\:\:render\(\) has parameter \$atts with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: includes/Shortcode.php
+
+		-
+			message: '#^Method SCS\\Command\\CreateAdminCommand\:\:__invoke\(\) has parameter \$args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/CreateAdminCommand.php
+
+		-
+			message: '#^Method SCS\\Command\\CreateAdminCommand\:\:__invoke\(\) has parameter \$assoc_args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/CreateAdminCommand.php
+
+		-
+			message: '#^Method SCS\\Command\\FetchKnsbRatingsCommand\:\:__invoke\(\) has parameter \$args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/FetchKnsbRatingsCommand.php
+
+		-
+			message: '#^Method SCS\\Command\\FetchKnsbRatingsCommand\:\:__invoke\(\) has parameter \$assoc_args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/FetchKnsbRatingsCommand.php
+
+		-
+			message: '#^Method SCS\\Command\\MigrateCommand\:\:__invoke\(\) has parameter \$args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/MigrateCommand.php
+
+		-
+			message: '#^Method SCS\\Command\\MigrateCommand\:\:__invoke\(\) has parameter \$assoc_args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Command/MigrateCommand.php
+
+		-
+			message: '#^Parameter \#1 \$jwt of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Services\\JwtService, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Container.php
+
+		-
+			message: '#^Parameter \#2 \$members of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Repository\\MemberRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Container.php
+
+		-
+			message: '#^Parameter \#3 \$admins of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Repository\\AdminRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Container.php
+
+		-
+			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Player\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Controller/PlayerController.php
+
+		-
+			message: '#^Argument of an invalid type array\|null supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: src/Controller/RoundController.php
+
+		-
+			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Game\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/RoundController.php
+
+		-
+			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Round\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/RoundController.php
+
+		-
+			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Season\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/SeasonController.php
+
+		-
+			message: '#^Method SCS\\Entity\\Season\:\:__construct\(\) has parameter \$categories with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Entity/Season.php
+
+		-
+			message: '#^Method SCS\\Exception\\ValidationException\:\:__construct\(\) has parameter \$errors with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Exception/ValidationException.php
+
+		-
+			message: '#^Method SCS\\Exception\\ValidationException\:\:getErrors\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Exception/ValidationException.php
+
+		-
+			message: '#^Method SCS\\Repository\\AdminRepository\:\:create\(\) should return SCS\\Entity\\Admin but returns SCS\\Entity\\Admin\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/AdminRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\AdminRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/AdminRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\AdminRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/AdminRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\AttendanceRepository\:\:findByRound\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/AttendanceRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\AttendanceRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/AttendanceRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\GameRepository\:\:create\(\) should return SCS\\Entity\\Game but returns SCS\\Entity\\Game\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/GameRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\GameRepository\:\:findByRound\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/GameRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\GameRepository\:\:findBySeasonPlayer\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/GameRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\GameRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/GameRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\MemberRepository\:\:create\(\) should return SCS\\Entity\\Member but returns SCS\\Entity\\Member\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/MemberRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\MemberRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/MemberRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\MemberRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/MemberRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\PlayerRepository\:\:create\(\) should return SCS\\Entity\\Player but returns SCS\\Entity\\Player\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/PlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\PlayerRepository\:\:findActive\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/PlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\PlayerRepository\:\:findAll\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/PlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\PlayerRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/PlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\PlayerRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/PlayerRepository.php
+
+		-
+			message: '#^Anonymous function should return SCS\\Entity\\Round but returns SCS\\Entity\\Round\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/RoundRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\RoundRepository\:\:create\(\) should return SCS\\Entity\\Round but returns SCS\\Entity\\Round\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/RoundRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\RoundRepository\:\:findBySeason\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/RoundRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\RoundRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/RoundRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\RoundRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/RoundRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonPlayerRepository\:\:create\(\) should return SCS\\Entity\\SeasonPlayer but returns SCS\\Entity\\SeasonPlayer\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/SeasonPlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonPlayerRepository\:\:findBySeason\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonPlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonPlayerRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonPlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonPlayerRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonPlayerRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonRepository\:\:create\(\) has parameter \$categories with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonRepository\:\:create\(\) should return SCS\\Entity\\Season but returns SCS\\Entity\\Season\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Repository/SeasonRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonRepository\:\:findAll\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\SeasonRepository\:\:update\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/SeasonRepository.php
+
+		-
+			message: '#^Method SCS\\Repository\\StandingsSnapshotRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Repository/StandingsSnapshotRepository.php
+
+		-
+			message: '#^Property SCS\\Request\\SaveAttendanceRequest\:\:\$attendance type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Request/SaveAttendanceRequest.php
+
+		-
+			message: '#^Method SCS\\Services\\AuthService\:\:resendInvite\(\) should return SCS\\Entity\\Member but returns SCS\\Entity\\Member\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Services/AuthService.php
+
+		-
+			message: '#^Call to an undefined method Lcobucci\\JWT\\Token\:\:claims\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Services/JwtService.php
+
+		-
+			message: '#^Parameter \#1 \$contents of static method Lcobucci\\JWT\\Signer\\Key\\InMemory\:\:plainText\(\) expects non\-empty\-string, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Services/JwtService.php
+
+		-
+			message: '#^Parameter \#1 \$jwt of method Lcobucci\\JWT\\Parser\:\:parse\(\) expects non\-empty\-string, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Services/JwtService.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/KnsbRatingListFetcher.php
+
+		-
+			message: '#^Method SCS\\Services\\PlayerTournamentService\:\:detail\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/PlayerTournamentService.php
+
+		-
+			message: '#^Method SCS\\Services\\PlayerTournamentService\:\:detail\(\) should return array\{season\: array\{id\: int, name\: string, status\: string, categories\: array, field_size\: int\}, player\: array\{player_id\: int, season_player_id\: int, name\: string\|null, category\: string\|null, rating\: int, rank\: int\|null, category_rank\: int\|null, tpr\: int\|null\}, games\: list\<array\<string, mixed\>\>, positions\: list\<array\{round_number\: int, rank\: int\}\>\} but returns array\{season\: array\{id\: int, name\: string, status\: ''active''\|''completed''\|''preparation'', categories\: array, field_size\: int\<0, max\>\}, player\: array\{player_id\: int, season_player_id\: int, name\: string\|null, category\: string\|null, rating\: int, rank\: int\|null, category_rank\: int\|null, tpr\: int\|null\}, games\: list\<array\{round_number\: mixed, date\: mixed, color\: ''black''\|''white'', result\: string\|null, is_bye\: false, opponent\: array\{player_id\: int, name\: string\|null, category\: string\|null, rating\: int\}\|null\}\|array\{round_number\: mixed, date\: mixed, color\: null, result\: null, is_bye\: true, opponent\: null\}\>, positions\: array\<array\{round_number\: mixed, rank\: int\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Services/PlayerTournamentService.php
+
+		-
+			message: '#^Method SCS\\Services\\SeasonImportService\:\:apply\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SeasonImportService.php
+
+		-
+			message: '#^Method SCS\\Services\\SeasonImportService\:\:read\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SeasonImportService.php
+
+		-
+			message: '#^Method SCS\\Services\\SeasonImportService\:\:upsertSeason\(\) has parameter \$s with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SeasonImportService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:admin\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:attendance\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:game\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:member\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:player\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:round\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:season\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:seasonPlayer\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:serialize\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php
+
+		-
+			message: '#^Method SCS\\Services\\SerializerService\:\:serializeMany\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Services/SerializerService.php

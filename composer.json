@@ -25,7 +25,10 @@
     "phpunit/phpunit": "^11.5",
     "mockery/mockery": "^1.6",
     "phpstan/phpstan": "^2.2",
-    "friendsofphp/php-cs-fixer": "^3.95"
+    "friendsofphp/php-cs-fixer": "^3.95",
+    "php-stubs/wordpress-stubs": "^6.9",
+    "szepeviktor/phpstan-wordpress": "^2.0",
+    "php-stubs/wp-cli-stubs": "^2.12"
   },
   "config": {
     "platform": {
