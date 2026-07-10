@@ -15,6 +15,7 @@ class Admin
         public readonly string $password_hash,
         public readonly AdminStatus $status,
         public readonly \DateTimeImmutable $created_at,
+        public readonly ?\DateTimeImmutable $token_valid_after = null,
     ) {
     }
 }

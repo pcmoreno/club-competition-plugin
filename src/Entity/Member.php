@@ -19,6 +19,7 @@ class Member
         public readonly ?\DateTimeImmutable $reset_expires_at,
         public readonly MemberStatus $status,
         public readonly \DateTimeImmutable $created_at,
+        public readonly ?\DateTimeImmutable $token_valid_after = null,
     ) {
     }
 }

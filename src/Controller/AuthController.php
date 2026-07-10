@@ -8,6 +8,7 @@ use SCS\Request\AcceptInviteRequest;
 use SCS\Request\ForgotPasswordRequest;
 use SCS\Request\LoginRequest;
 use SCS\Request\ResetPasswordRequest;
+use SCS\Security\RequestContext;
 use SCS\Services\AuthService;
 use SCS\Services\JwtService;
 use Symfony\Component\Security\Csrf\CsrfTokenManager;
@@ -31,7 +32,7 @@ class AuthController extends RestController
             $input = LoginRequest::fromRequest($request);
             $this->validate($input);
 
-            $result    = $this->authService->login($input->email, $input->password);
+            $result    = $this->authService->login($input->email, $input->password, $this->clientIp());
             $csrfToken = $this->csrfTokenManager->refreshToken(self::CSRF_TOKEN_ID)->getValue();
 
             $this->setTokenCookie($result['token']);
@@ -93,7 +94,7 @@ class AuthController extends RestController
             $input = ForgotPasswordRequest::fromRequest($request);
             $this->validate($input);
 
-            $this->authService->initiatePasswordReset($input->email);
+            $this->authService->initiatePasswordReset($input->email, $this->clientIp());
 
             // Always return success to avoid email enumeration
             return $this->ok(['message' => 'If that email is registered, a reset link has been sent.']);
@@ -112,12 +113,22 @@ class AuthController extends RestController
         });
     }
 
+    /**
+     * REMOTE_ADDR only — X-Forwarded-For is attacker-controllable unless the
+     * immediate hop is a known, trusted proxy, which isn't configured here.
+     * Used solely as a rate-limit key, not for authorization decisions.
+     */
+    private function clientIp(): string
+    {
+        return (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    }
+
     private function setTokenCookie(string $token): void
     {
         setcookie('scs_token', $token, [
             'expires'  => time() + JwtService::TOKEN_TTL_SECONDS,
             'path'     => '/',
-            'secure'   => is_ssl(),
+            'secure'   => RequestContext::isSecure(),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -128,7 +139,7 @@ class AuthController extends RestController
         setcookie('scs_token', '', [
             'expires'  => time() - 3600,
             'path'     => '/',
-            'secure'   => is_ssl(),
+            'secure'   => RequestContext::isSecure(),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);

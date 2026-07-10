@@ -6,6 +6,7 @@ namespace SCS\Controller;
 
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
+use SCS\Exception\TooManyRequestsException;
 use SCS\Exception\UnauthorizedException;
 use SCS\Exception\ValidationException;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -41,8 +42,15 @@ abstract class RestController
             return $this->error($e->getMessage(), \WP_Http::UNAUTHORIZED);
         } catch (ConflictException $e) {
             return $this->error($e->getMessage(), \WP_Http::CONFLICT);
+        } catch (TooManyRequestsException $e) {
+            return $this->error($e->getMessage(), \WP_Http::TOO_MANY_REQUESTS);
         } catch (ValidationException $e) {
             return new \WP_REST_Response(['errors' => $e->getErrors()], \WP_Http::UNPROCESSABLE_ENTITY);
+        } catch (\Throwable $e) {
+            // Keeps internals (SQL, table names, file paths) out of the response even with WP_DEBUG_DISPLAY on.
+            error_log(sprintf('[SCS] Unhandled %s: %s', get_class($e), $e->getMessage()));
+
+            return $this->error('An unexpected error occurred.', \WP_Http::INTERNAL_SERVER_ERROR);
         }
     }
 

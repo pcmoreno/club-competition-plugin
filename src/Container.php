@@ -86,11 +86,20 @@ class Container
 
         $container->register('email_notification_service', Services\EmailNotificationService::class);
 
+        $container->register('rate_limiter_service', Services\RateLimiterService::class);
+
+        $container->register('auth_context_service', Services\AuthContextService::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('jwt_service'))
+            ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('admin_repository'));
+
         $container->register('auth_service', Services\AuthService::class)
             ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('jwt_service'))
-            ->addArgument(new Reference('email_notification_service'));
+            ->addArgument(new Reference('email_notification_service'))
+            ->addArgument(new Reference('rate_limiter_service'));
 
         $container->register('serializer_service', Services\SerializerService::class);
 

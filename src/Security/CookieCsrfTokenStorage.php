@@ -27,7 +27,7 @@ class CookieCsrfTokenStorage implements TokenStorageInterface
         setcookie(self::COOKIE_NAME, $value, [
             'expires'  => time() + JwtService::TOKEN_TTL_SECONDS,
             'path'     => '/',
-            'secure'   => is_ssl(),
+            'secure'   => RequestContext::isSecure(),
             'httponly' => true,
             'samesite' => 'Strict',
         ]);
@@ -42,7 +42,7 @@ class CookieCsrfTokenStorage implements TokenStorageInterface
         setcookie(self::COOKIE_NAME, '', [
             'expires'  => time() - 3600,
             'path'     => '/',
-            'secure'   => is_ssl(),
+            'secure'   => RequestContext::isSecure(),
             'httponly' => true,
             'samesite' => 'Strict',
         ]);
