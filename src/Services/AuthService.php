@@ -55,11 +55,22 @@ class AuthService
     }
 
     /**
+     * Record an auth-relevant failure/lockout to the PHP error log so a
+     * brute-force, enumeration, or credential-stuffing campaign leaves a
+     * detectable trace beyond the decaying rate-limit counters. Logs the
+     * account identifier and source IP — never the attempted password.
+     */
+    private function logAuthEvent(string $event, string $email, string $ip): void
+    {
+        error_log(sprintf('[SCS auth] %s: account=%s ip=%s', $event, $email, $ip));
+    }
+
+    /**
      * @return array{token: string, role: string, player_id: int|null, email: string}
      *
      * @throws TooManyRequestsException when either the account or the source
      * IP has exceeded the failed-attempt threshold within the decay window.
-     * A successful login clears both counters.
+     * A successful login clears only the per-account counter — see below.
      */
     public function login(string $email, string $password, string $ip): array
     {
@@ -68,6 +79,8 @@ class AuthService
 
         if ($this->rateLimiter->tooManyAttempts($ipKey, self::LOGIN_MAX_ATTEMPTS_PER_IP)
             || $this->rateLimiter->tooManyAttempts($emailKey, self::LOGIN_MAX_ATTEMPTS_PER_ACCOUNT)) {
+            $this->logAuthEvent('login blocked (rate limit)', $email, $ip);
+
             throw new TooManyRequestsException('Too many login attempts. Please try again later.');
         }
 
@@ -76,11 +89,17 @@ class AuthService
         } catch (UnauthorizedException $e) {
             $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
             $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
+            $this->logAuthEvent('login failed', $email, $ip);
 
             throw $e;
         }
 
-        $this->rateLimiter->clear($ipKey);
+        // Clear only the per-account counter: the account owner just proved they
+        // are who they claim, so their own failure budget resets. The per-IP
+        // counter is deliberately NOT cleared — otherwise anyone with a single
+        // valid credential (e.g. a throwaway account) on an IP could log in to
+        // zero the shared IP-wide failure budget and resume password-spraying.
+        // It decays on its own instead.
         $this->rateLimiter->clear($emailKey);
 
         return $result;
@@ -235,6 +254,8 @@ class AuthService
 
         if ($this->rateLimiter->tooManyAttempts($ipKey, self::RESET_MAX_ATTEMPTS_PER_IP)
             || $this->rateLimiter->tooManyAttempts($emailKey, self::RESET_MAX_ATTEMPTS_PER_ACCOUNT)) {
+            $this->logAuthEvent('password reset blocked (rate limit)', $email, $ip);
+
             throw new TooManyRequestsException('Too many password reset requests. Please try again later.');
         }
 

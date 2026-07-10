@@ -19,6 +19,9 @@ class RateLimiterService
         return $this->attempts($key) >= $maxAttempts;
     }
 
+    // Non-atomic read-modify-write: concurrent hits on one key can lose
+    // increments. Accepted — each attempt still costs bcrypt and the caps hold;
+    // an atomic wp_cache_incr() needs an object cache shared hosting may lack.
     public function hit(string $key, int $decaySeconds): void
     {
         set_transient($this->transientKey($key), $this->attempts($key) + 1, $decaySeconds);
