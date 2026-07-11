@@ -96,7 +96,7 @@ class JwtService
             ->toString();
     }
 
-    /** @return array{sub: int, role: string, pid: int|null}|null */
+    /** @return array{sub: int, role: string, pid: int|null, iat: int}|null */
     public function parse(string $tokenString): ?array
     {
         try {
@@ -114,6 +114,9 @@ class JwtService
                 'sub'  => (int)$claims->get('sub'),
                 'role' => (string)$claims->get('role'),
                 'pid'  => $claims->has('pid') ? (int)$claims->get('pid') : null,
+                // Registered claim, decoded by lcobucci as a DateTimeImmutable.
+                // Used to invalidate tokens issued before a password change.
+                'iat'  => $claims->get('iat')->getTimestamp(),
             ];
         } catch (\Throwable) {
             return null;

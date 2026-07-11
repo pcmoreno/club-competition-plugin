@@ -58,12 +58,13 @@ class AdminRepository
     private function hydrate(array $row): Admin
     {
         return new Admin(
-            id:            (int)$row['id'],
-            name:          $row['name'],
-            email:         $row['email'],
-            password_hash: $row['password_hash'],
-            status:        AdminStatus::from($row['status']),
-            created_at:    new \DateTimeImmutable($row['created_at']),
+            id:                (int)$row['id'],
+            name:              $row['name'],
+            email:             $row['email'],
+            password_hash:     $row['password_hash'],
+            status:            AdminStatus::from($row['status']),
+            created_at:        new \DateTimeImmutable($row['created_at']),
+            token_valid_after: $row['token_valid_after'] !== null ? new \DateTimeImmutable($row['token_valid_after']) : null,
         );
     }
 }

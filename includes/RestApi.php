@@ -14,7 +14,7 @@ class RestApi
     public static function register(ContainerBuilder $container): void
     {
         add_action('rest_api_init', function () use ($container) {
-            $jwtService      = $container->get('jwt_service');
+            $authContext     = $container->get('auth_context_service');
             $csrfManager     = $container->get('csrf_token_manager');
             $auth            = $container->get('auth_controller');
             $players         = $container->get('player_controller');
@@ -22,12 +22,12 @@ class RestApi
             $rounds          = $container->get('round_controller');
             $import          = $container->get('import_controller');
 
-            // Parse the auth cookie's JWT into its claims, or null when the
-            // cookie is absent/invalid. Single source for every role check below.
-            $claims = function () use ($jwtService) {
-                $token = $_COOKIE['scs_token'] ?? null;
-
-                return $token ? $jwtService->parse($token) : null;
+            // Parse the auth cookie's JWT and re-validate it against the DB
+            // (account still exists, still Active, not older than a password
+            // change), or null when absent/invalid/stale. Single source for
+            // every role check below.
+            $claims = function () use ($authContext) {
+                return $authContext->currentClaims();
             };
 
             // Build a permission callback that requires the signed-in user to
@@ -55,15 +55,11 @@ class RestApi
             // state and the frontend doesn't send the CSRF header on GETs.
             $isAdminRead = $requireRole([Role::Admin->value], 'Admin access required.');
 
-            // Admin write endpoints: the admin role gate plus a valid CSRF
-            // header. Reuses $isAdminRead for the role half so the cookie/role
-            // logic lives in exactly one place.
-            $isAdmin = function (\WP_REST_Request $request) use ($isAdminRead, $csrfManager) {
-                $allowed = $isAdminRead();
-                if ($allowed !== true) {
-                    return $allowed;
-                }
-
+            // CSRF header check alone, no role requirement — usable on routes
+            // an anonymous visitor can hit (login, logout). GET /auth/csrf-token
+            // is itself public, so the frontend can fetch a token before the
+            // user is signed in.
+            $requiresCsrf = function (\WP_REST_Request $request) use ($csrfManager) {
                 $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
                 if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
                     return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
@@ -72,17 +68,29 @@ class RestApi
                 return true;
             };
 
+            // Admin write endpoints: the admin role gate plus a valid CSRF
+            // header. Reuses $isAdminRead for the role half so the cookie/role
+            // logic lives in exactly one place.
+            $isAdmin = function (\WP_REST_Request $request) use ($isAdminRead, $requiresCsrf) {
+                $allowed = $isAdminRead();
+                if ($allowed !== true) {
+                    return $allowed;
+                }
+
+                return $requiresCsrf($request);
+            };
+
             // ── Auth ──────────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/auth/login', [
                 'methods'             => 'POST',
                 'callback'            => [$auth, 'login'],
-                'permission_callback' => '__return_true',
+                'permission_callback' => $requiresCsrf,
             ]);
 
             register_rest_route('scs/v1', '/auth/logout', [
                 'methods'             => 'POST',
                 'callback'            => [$auth, 'logout'],
-                'permission_callback' => '__return_true',
+                'permission_callback' => $requiresCsrf,
             ]);
 
             register_rest_route('scs/v1', '/auth/accept-invite', [
