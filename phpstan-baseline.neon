@@ -7,13 +7,13 @@ parameters:
 			path: includes/Database.php
 
 		-
-			message: '#^Call to an undefined method object\:\:isTokenValid\(\)\.$#'
+			message: '#^Call to an undefined method object\:\:currentClaims\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: includes/RestApi.php
 
 		-
-			message: '#^Call to an undefined method object\:\:parse\(\)\.$#'
+			message: '#^Call to an undefined method object\:\:isTokenValid\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: includes/RestApi.php

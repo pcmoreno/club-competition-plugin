@@ -61,36 +61,39 @@ class MemberRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function findByInviteToken(string $token): ?Member
+    /** invite_token stores a SHA-256 hash — pass the hash, not the raw token. */
+    public function findByInviteTokenHash(string $tokenHash): ?Member
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
             ->from(SCS_TABLE_PREFIX . 'members')
-            ->where('invite_token = :token')
-            ->setParameter('token', $token)
+            ->where('invite_token = :tokenHash')
+            ->setParameter('tokenHash', $tokenHash)
             ->fetchAssociative();
 
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function findByResetToken(string $token): ?Member
+    /** reset_token stores a SHA-256 hash — pass the hash, not the raw token. */
+    public function findByResetTokenHash(string $tokenHash): ?Member
     {
         $row = $this->connection->createQueryBuilder()
             ->select('*')
             ->from(SCS_TABLE_PREFIX . 'members')
-            ->where('reset_token = :token')
-            ->setParameter('token', $token)
+            ->where('reset_token = :tokenHash')
+            ->setParameter('tokenHash', $tokenHash)
             ->fetchAssociative();
 
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(int $player_id, string $email, string $invite_token, \DateTimeImmutable $invite_expires_at): Member
+    /** $invite_token_hash is a SHA-256 hash — caller emails the raw token, never persists it. */
+    public function create(int $player_id, string $email, string $invite_token_hash, \DateTimeImmutable $invite_expires_at): Member
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'members', [
             'player_id'         => $player_id,
             'email'             => $email,
-            'invite_token'      => $invite_token,
+            'invite_token'      => $invite_token_hash,
             'invite_expires_at' => $invite_expires_at->format('Y-m-d H:i:s'),
             'status'            => MemberStatus::Invited->value,
         ]);
@@ -116,6 +119,7 @@ class MemberRepository
             reset_expires_at:   $row['reset_expires_at'] !== null ? new \DateTimeImmutable($row['reset_expires_at']) : null,
             status:             MemberStatus::from($row['status']),
             created_at:         new \DateTimeImmutable($row['created_at']),
+            token_valid_after:  $row['token_valid_after'] !== null ? new \DateTimeImmutable($row['token_valid_after']) : null,
         );
     }
 }

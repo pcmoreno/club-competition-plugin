@@ -10,12 +10,13 @@ import { api, setCsrfToken } from '../api/client';
 
 const AuthContext = createContext( null );
 
-// Holds the session role and the CSRF token used for admin writes.
+// Holds the session role and the CSRF token used for writes (admin writes,
+// plus login/logout, which need it even when signed out).
 //
 // Role is seeded from the server bootstrap (decoded from the scs_token JWT at
 // render), so a logged-in user is recognised on first paint without a
-// round-trip. The CSRF token isn't known at render (it would mutate the cookie
-// on a GET), so it's fetched lazily once we know the session is authenticated.
+// round-trip. The CSRF token isn't known at render (it would mutate the
+// cookie on a GET), so it's fetched lazily on mount instead.
 export function AuthProvider( { children } ) {
 	const [ role, setRole ] = useState( bootstrap.role );
 	// The logged-in member's player id (null for anonymous/admins), used to
@@ -37,13 +38,12 @@ export function AuthProvider( { children } ) {
 		}
 	}, [] );
 
-	// Authenticated on load (returning visitor) → grab a CSRF token so the first
-	// write doesn't 403.
+	// Fetch a CSRF token on load regardless of auth state: GET /auth/csrf-token
+	// is public, and login/logout now require the header too (not just admin
+	// writes), so an anonymous visitor needs one before their first login POST.
 	useEffect( () => {
-		if ( isMember ) {
-			refreshCsrf();
-		}
-	}, [ isMember, refreshCsrf ] );
+		refreshCsrf();
+	}, [ refreshCsrf ] );
 
 	const login = useCallback( async ( emailInput, password ) => {
 		const {
@@ -63,12 +63,15 @@ export function AuthProvider( { children } ) {
 		try {
 			await api.post( 'auth/logout' );
 		} finally {
-			setCsrfToken( null );
 			setRole( null );
 			setPlayerId( null );
 			setEmail( null );
+			// The server cleared the CSRF cookie along with the session, so the
+			// old token is dead — fetch a fresh (anonymous-scoped) one so a
+			// same-page re-login doesn't 403.
+			refreshCsrf();
 		}
-	}, [] );
+	}, [ refreshCsrf ] );
 
 	const value = {
 		role,
