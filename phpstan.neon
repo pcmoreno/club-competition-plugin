@@ -1,3 +1,11 @@
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
+  # Pre-existing level-8 debt (mostly missing array value-type PHPDocs and
+  # runtime-guaranteed non-null values PHPStan can't model). Captured so new
+  # code is still checked strictly; pay these down separately, not by lowering
+  # the level or re-adding ignore patterns.
+  - phpstan-baseline.neon
+
 parameters:
   level: 8
   paths:
@@ -5,11 +13,12 @@ parameters:
     - includes
   excludePaths:
     - vendor
-  ignoreErrors:
-    # WordPress globals
-    - '#Call to undefined function (get_option|add_option|delete_option)#'
-    - '#Call to undefined function (add_action|add_filter|do_action)#'
-    - '#Call to undefined function (wp_enqueue_script|wp_enqueue_style)#'
-    - '#Call to undefined function (get_transient|set_transient|delete_transient)#'
-    - '#Undefined variable: \$wpdb#'
-    - '#Undefined constant: (ABSPATH|DB_HOST|DB_NAME|DB_USER|DB_PASSWORD)#'
+  # wordpress-stubs (pulled in by the extension above) doesn't cover WP-CLI —
+  # that's a separate stub package, scanned directly since it has no
+  # extension.neon of its own to include.
+  scanFiles:
+    - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+  # Our own constants (SCS_*) and wp-config.php's (DB_*) aren't declared by
+  # any stub package — see phpstan-bootstrap.php for why.
+  bootstrapFiles:
+    - phpstan-bootstrap.php

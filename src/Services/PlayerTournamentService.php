@@ -7,6 +7,7 @@ namespace SCS\Services;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\SeasonPlayer;
+use SCS\Entity\StandingsSnapshot;
 use SCS\Exception\NotFoundException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
