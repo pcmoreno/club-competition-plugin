@@ -147,7 +147,12 @@ class Container
             ->setPublic(true)
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('auth_service'))
-            ->addArgument(new Reference('csrf_token_manager'));
+            ->addArgument(new Reference('csrf_token_manager'))
+            ->addArgument(new Reference('auth_context_service'))
+            ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
         $container->register('player_controller', Controller\PlayerController::class)
             ->setPublic(true)

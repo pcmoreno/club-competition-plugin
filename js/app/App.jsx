@@ -11,6 +11,7 @@ import { Standings } from './routes/Standings';
 import { RoundHistory } from './routes/RoundHistory';
 import { Players } from './routes/Players';
 import { PlayerDetail } from './routes/PlayerDetail';
+import { Account } from './routes/Account';
 import { PlayerTournamentDetails } from './routes/PlayerTournamentDetails';
 import { AdminApp } from './admin/AdminApp';
 import {
@@ -96,6 +97,8 @@ function resolveView( path, ctx ) {
 				need: 'member',
 				node: <Players seasonId={ ctx.seasonId } />,
 			};
+		case '/account':
+			return { need: 'member', node: <Account /> };
 		default:
 			return null;
 	}

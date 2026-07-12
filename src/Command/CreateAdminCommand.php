@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Command;
 
 use SCS\Repository\AdminRepository;
+use SCS\Services\AuthService;
 
 class CreateAdminCommand
 {
@@ -39,7 +40,7 @@ class CreateAdminCommand
         $admin = $this->adminRepository->create(
             $name,
             $email,
-            password_hash($password, PASSWORD_BCRYPT),
+            AuthService::hashPassword($password),
         );
 
         \WP_CLI::success(sprintf('Admin created: %s <%s> (id %d).', $admin->name, $admin->email, $admin->id));

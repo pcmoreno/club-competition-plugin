@@ -80,6 +80,18 @@ class RestApi
                 return $requiresCsrf($request);
             };
 
+            // Member (or admin) write endpoints: any signed-in user plus a valid
+            // CSRF header. Same composition as $isAdmin but the wider role gate —
+            // used by self-service writes like changing your own password.
+            $isMemberWrite = function (\WP_REST_Request $request) use ($isMember, $requiresCsrf) {
+                $allowed = $isMember();
+                if ($allowed !== true) {
+                    return $allowed;
+                }
+
+                return $requiresCsrf($request);
+            };
+
             // ── Auth ──────────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/auth/login', [
                 'methods'             => 'POST',
@@ -121,6 +133,20 @@ class RestApi
                 'methods'             => 'GET',
                 'callback'            => [$auth, 'csrfToken'],
                 'permission_callback' => '__return_true',
+            ]);
+
+            // The signed-in user's own account data for the Account page.
+            register_rest_route('scs/v1', '/auth/me', [
+                'methods'             => 'GET',
+                'callback'            => [$auth, 'me'],
+                'permission_callback' => $isMember,
+            ]);
+
+            // Self-service password change (member or admin).
+            register_rest_route('scs/v1', '/auth/change-password', [
+                'methods'             => 'POST',
+                'callback'            => [$auth, 'changePassword'],
+                'permission_callback' => $isMemberWrite,
             ]);
 
             // ── Players ───────────────────────────────────────────────────────
