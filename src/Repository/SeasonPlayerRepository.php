@@ -26,6 +26,20 @@ class SeasonPlayerRepository
         return array_map($this->hydrate(...), $rows);
     }
 
+    /** @return SeasonPlayer[] */
+    public function findByPlayer(int $player_id): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'season_players')
+            ->where('player_id = :player_id')
+            ->setParameter('player_id', $player_id)
+            ->orderBy('enrolled_at', 'DESC')
+            ->fetchAllAssociative();
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
     public function findById(int $id): ?SeasonPlayer
     {
         $row = $this->connection->createQueryBuilder()
