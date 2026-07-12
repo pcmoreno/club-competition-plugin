@@ -100,21 +100,37 @@ class PlayerController extends RestController
                 $seasonsById[$season->id] = $season;
             }
 
-            $tournaments = [];
+            $seasons = [];
             foreach ($this->seasonPlayerRepository->findByPlayer($player->id) as $enrolment) {
                 $season = $seasonsById[$enrolment->season_id] ?? null;
                 if ($season === null) {
                     continue;
                 }
-
-                $tournaments[] = [
-                    'season_id'     => $season->id,
-                    'season_name'   => $season->name,
-                    'season_status' => $season->status->value,
-                    'elo_rating'    => $enrolment->elo_rating,
-                    'enrolled_at'   => $enrolment->enrolled_at->format('Y-m-d'),
-                ];
+                $seasons[] = [$season, $enrolment];
             }
+
+            // Newest season first. enrolled_at is unreliable here (the import set
+            // it inconsistently), so order by the season's own start date, and
+            // fall back to its name — which embeds the year — when a season has
+            // no start date.
+            usort($seasons, function (array $a, array $b): int {
+                [$sa] = $a;
+                [$sb] = $b;
+                if ($sa->start_date != $sb->start_date) {
+                    return ($sb->start_date?->getTimestamp() ?? PHP_INT_MIN)
+                        <=> ($sa->start_date?->getTimestamp() ?? PHP_INT_MIN);
+                }
+
+                return strcmp($sb->name, $sa->name);
+            });
+
+            $tournaments = array_map(fn (array $pair): array => [
+                'season_id'     => $pair[0]->id,
+                'season_name'   => $pair[0]->name,
+                'season_status' => $pair[0]->status->value,
+                'elo_rating'    => $pair[1]->elo_rating,
+                'enrolled_at'   => $pair[1]->enrolled_at->format('Y-m-d'),
+            ], $seasons);
 
             return $this->ok($tournaments);
         });
