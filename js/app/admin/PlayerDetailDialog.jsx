@@ -193,7 +193,7 @@ function TournamentsSection( { playerId } ) {
 		);
 	} else {
 		body = (
-			<ul className="divide-y divide-rule-soft rounded border border-rule bg-surface">
+			<ul className="max-h-52 divide-y divide-rule-soft overflow-y-auto rounded border border-rule bg-surface">
 				{ data.map( ( t ) => (
 					<li
 						key={ t.season_id }
