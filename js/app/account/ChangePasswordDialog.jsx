@@ -9,19 +9,13 @@ const primaryBtn =
 const ghostBtn =
 	'rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink';
 
-// Turns an ApiError into a user-facing string. A 422 carries per-field
-// validation messages under `errors`; surface the first one. Everything else
-// (e.g. 401 "Current password is incorrect.") already has a usable message.
+// User-facing text is authored here, keyed on status, rather than surfacing
+// the backend's message (which stays detailed for logging). A 401 from this
+// endpoint can only mean the current password didn't match — an invalid
+// session is rejected earlier by the permission callback (403).
 function errorMessage( err ) {
-	if ( err instanceof ApiError ) {
-		const fieldErrors = err.body?.errors;
-		if ( fieldErrors && typeof fieldErrors === 'object' ) {
-			const first = Object.values( fieldErrors )[ 0 ];
-			if ( first ) {
-				return String( first );
-			}
-		}
-		return err.message;
+	if ( err instanceof ApiError && err.status === 401 ) {
+		return 'Current password is incorrect.';
 	}
 	return 'Something went wrong. Please try again.';
 }
