@@ -25,14 +25,26 @@ class AuthService
     private const RESET_DECAY_SECONDS             = 3600; // 1 hour
 
     /**
-     * Bcrypt hash of a discarded 256-bit random value — never a real
+     * Argon2id hash of a discarded 256-bit random value — never a real
      * account's password, and its plaintext was never captured or stored
      * anywhere. Its match/no-match result must never be branched on (see
-     * attemptLogin()); it exists purely to give login() a bcrypt-shaped
+     * attemptLogin()); it exists purely to give login() an Argon2id-shaped
      * delay when there's no real hash to check, closing the timing gap that
-     * would otherwise let an attacker enumerate registered emails.
+     * would otherwise let an attacker enumerate registered emails. It uses
+     * the default Argon2id cost params (m=65536,t=4,p=1) so it burns the same
+     * time as a real verify against a freshly hashed password — keep it in
+     * sync if PASSWORD_HASH_ALGO's params ever change.
      */
-    private const DUMMY_PASSWORD_HASH = '$2y$10$2S8lLgH1hUxSSOVRpPmDD.OksUzW5AO3aCRyOTKaWCAh3W.xRxbPa';
+    private const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$N0JnR2NRZ3FPS3Mvc1I2Rg$tpTz9PwWMcSUfc3etcYI55lXFE0fvmTj9NQn6IbJOmY';
+
+    /**
+     * Algorithm for all new password hashes. Argon2id is memory-hard (unlike
+     * bcrypt) and has no 72-byte input truncation. password_verify() reads the
+     * algorithm from each stored hash, so any pre-existing bcrypt hashes would
+     * still verify — but there are none in production, so no migration path is
+     * needed here.
+     */
+    private const PASSWORD_HASH_ALGO = PASSWORD_ARGON2ID;
 
     public function __construct(
         private readonly MemberRepository $memberRepository,
@@ -52,6 +64,16 @@ class AuthService
     private static function hashToken(string $token): string
     {
         return hash('sha256', $token);
+    }
+
+    /**
+     * Hash a plaintext password for storage. Single choke point for the
+     * algorithm so invite/reset/change-password/create-admin all stay
+     * consistent.
+     */
+    public static function hashPassword(string $password): string
+    {
+        return password_hash($password, self::PASSWORD_HASH_ALGO);
     }
 
     /**
@@ -146,7 +168,7 @@ class AuthService
         }
 
         // No real password to check (unknown email, or a member that exists
-        // but hasn't set one yet): burn the same bcrypt-shaped time as a real
+        // but hasn't set one yet): burn the same Argon2id-shaped time as a real
         // check so the response isn't a timing tell, but the result is never
         // inspected — it can't be used to skip ahead, no matter what's passed.
         password_verify($password, self::DUMMY_PASSWORD_HASH);
@@ -233,7 +255,7 @@ class AuthService
         }
 
         $this->memberRepository->update($member->id, [
-            'password_hash'     => password_hash($password, PASSWORD_BCRYPT),
+            'password_hash'     => self::hashPassword($password),
             'invite_token'      => null,
             'invite_expires_at' => null,
             'status'            => MemberStatus::Active->value,
@@ -290,10 +312,64 @@ class AuthService
         }
 
         $this->memberRepository->update($member->id, [
-            'password_hash'     => password_hash($password, PASSWORD_BCRYPT),
+            'password_hash'     => self::hashPassword($password),
             'reset_token'       => null,
             'reset_expires_at'  => null,
             'token_valid_after' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Change the signed-in user's own password after re-verifying their current
+     * one. Works for both members and admins (dispatched on the token's role).
+     *
+     * Bumps `token_valid_after` to now, which invalidates every JWT issued
+     * before this moment — i.e. all *other* active sessions are logged out. A
+     * fresh token is then issued and returned so the caller can replace the
+     * current session's cookie and keep the user signed in here. (Issued after
+     * the bump, so its `iat` is >= the new floor and it stays valid.)
+     *
+     * @param array{sub: int, role: string, pid: int|null, iat: int} $claims
+     *
+     * @throws UnauthorizedException when the account no longer exists or the
+     * supplied current password doesn't match.
+     */
+    public function changePassword(array $claims, string $currentPassword, string $newPassword): string
+    {
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        if ($claims['role'] === Role::Admin->value) {
+            $admin = $this->adminRepository->findById($claims['sub']);
+            if ($admin === null) {
+                throw new UnauthorizedException('Account not found.');
+            }
+            if (!password_verify($currentPassword, $admin->password_hash)) {
+                throw new UnauthorizedException('Current password is incorrect.');
+            }
+
+            $this->adminRepository->update($admin->id, [
+                'password_hash'     => self::hashPassword($newPassword),
+                'token_valid_after' => $now,
+            ]);
+
+            return $this->jwtService->issue($admin->id, Role::Admin);
+        }
+
+        // password_hash === null excludes an invited member who hasn't set one
+        // yet — they have no current password to verify against.
+        $member = $this->memberRepository->findById($claims['sub']);
+        if ($member === null || $member->password_hash === null) {
+            throw new UnauthorizedException('Account not found.');
+        }
+        if (!password_verify($currentPassword, $member->password_hash)) {
+            throw new UnauthorizedException('Current password is incorrect.');
+        }
+
+        $this->memberRepository->update($member->id, [
+            'password_hash'     => self::hashPassword($newPassword),
+            'token_valid_after' => $now,
+        ]);
+
+        return $this->jwtService->issue($member->id, Role::Member, $member->player_id);
     }
 }

@@ -4,13 +4,21 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
+use SCS\Entity\Enum\Role;
+use SCS\Exception\UnauthorizedException;
+use SCS\Repository\AdminRepository;
+use SCS\Repository\MemberRepository;
+use SCS\Repository\PlayerRepository;
 use SCS\Request\AcceptInviteRequest;
+use SCS\Request\ChangePasswordRequest;
 use SCS\Request\ForgotPasswordRequest;
 use SCS\Request\LoginRequest;
 use SCS\Request\ResetPasswordRequest;
 use SCS\Security\RequestContext;
+use SCS\Services\AuthContextService;
 use SCS\Services\AuthService;
 use SCS\Services\JwtService;
+use SCS\Services\SerializerService;
 use Symfony\Component\Security\Csrf\CsrfTokenManager;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -22,6 +30,11 @@ class AuthController extends RestController
         ValidatorInterface $validator,
         private readonly AuthService $authService,
         private readonly CsrfTokenManager $csrfTokenManager,
+        private readonly AuthContextService $authContext,
+        private readonly MemberRepository $memberRepository,
+        private readonly AdminRepository $adminRepository,
+        private readonly PlayerRepository $playerRepository,
+        private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
     }
@@ -111,6 +124,90 @@ class AuthController extends RestController
 
             return $this->ok(['message' => 'Password updated. You can now log in.']);
         });
+    }
+
+    /**
+     * The signed-in user's own account data, for the Account page. Members get
+     * their linked player record too; admins have none. Hand-built payloads,
+     * so no secret-bearing column (password_hash, tokens) can leak.
+     */
+    public function me(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () {
+            $claims = $this->requireClaims();
+
+            if ($claims['role'] === Role::Admin->value) {
+                $admin = $this->adminRepository->findById($claims['sub']);
+                if ($admin === null) {
+                    throw new UnauthorizedException('Account not found.');
+                }
+
+                return $this->ok([
+                    'role'       => Role::Admin->value,
+                    'name'       => $admin->name,
+                    'email'      => $admin->email,
+                    'status'     => $admin->status->value,
+                    'created_at' => $admin->created_at->format('Y-m-d'),
+                ]);
+            }
+
+            $member = $this->memberRepository->findById($claims['sub']);
+            if ($member === null) {
+                throw new UnauthorizedException('Account not found.');
+            }
+            $player = $this->playerRepository->findById($member->player_id);
+
+            return $this->ok([
+                'role'       => Role::Member->value,
+                'email'      => $member->email,
+                'status'     => $member->status->value,
+                'created_at' => $member->created_at->format('Y-m-d'),
+                'player'     => $player !== null
+                    ? $this->serializer->serialize($player, SerializerService::GROUP_ADMIN)
+                    : null,
+            ]);
+        });
+    }
+
+    /**
+     * Change the signed-in user's password (current + new). On success the
+     * service invalidates other sessions and returns a fresh token, which we
+     * set as the new cookie so this session stays signed in.
+     */
+    public function changePassword(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $claims = $this->requireClaims();
+
+            $input = ChangePasswordRequest::fromRequest($request);
+            $this->validate($input);
+
+            $token = $this->authService->changePassword(
+                $claims,
+                $input->currentPassword,
+                $input->newPassword,
+            );
+            $this->setTokenCookie($token);
+
+            return $this->ok(['message' => 'Password updated.']);
+        });
+    }
+
+    /**
+     * Re-resolve the signed-in account from the cookie. The permission callback
+     * already gated the route, but the controller needs the claims themselves;
+     * treat an unexpected miss as unauthorized rather than 500.
+     *
+     * @return array{sub: int, role: string, pid: int|null, iat: int}
+     */
+    private function requireClaims(): array
+    {
+        $claims = $this->authContext->currentClaims();
+        if ($claims === null) {
+            throw new UnauthorizedException('Not authenticated.');
+        }
+
+        return $claims;
     }
 
     /**

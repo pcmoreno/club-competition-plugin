@@ -18,7 +18,9 @@ function BrandMark() {
 // Signed-in account control: shows the user's own email as a plain text
 // button that opens a dropdown with Account Details + Sign out.
 // Account Details is a placeholder for now — it has no destination yet.
-function AccountMenu( { email, logout } ) {
+// Player Details is member-only: admins have no player record, so it's
+// hidden for them.
+function AccountMenu( { email, logout, isAdmin } ) {
 	const [ open, setOpen ] = useState( false );
 	const ref = useRef( null );
 
@@ -68,25 +70,26 @@ function AccountMenu( { email, logout } ) {
 						role="menuitem"
 						className={ itemClass }
 						onClick={ () => {
-							// No destination yet — placeholder for a future
-							// account page.
 							setOpen( false );
+							navigate( '/account' );
 						} }
 					>
 						Account Details
 					</button>
-					<button
-						type="button"
-						role="menuitem"
-						className={ itemClass }
-						onClick={ () => {
-							// No destination yet — placeholder for a future
-							// player page.
-							setOpen( false );
-						} }
-					>
-						Player Details
-					</button>
+					{ ! isAdmin && (
+						<button
+							type="button"
+							role="menuitem"
+							className={ itemClass }
+							onClick={ () => {
+								// No destination yet — placeholder for a future
+								// player page.
+								setOpen( false );
+							} }
+						>
+							Player Details
+						</button>
+					) }
 					<button
 						type="button"
 						role="menuitem"
@@ -105,7 +108,7 @@ function AccountMenu( { email, logout } ) {
 }
 
 export function TopBar( { seasonId, onSeasonChange } ) {
-	const { isMember, email, logout } = useAuth();
+	const { isMember, isAdmin, email, logout } = useAuth();
 
 	return (
 		<header className="border-b border-rule bg-paper">
@@ -133,7 +136,11 @@ export function TopBar( { seasonId, onSeasonChange } ) {
 						onChange={ onSeasonChange }
 					/>
 					{ isMember ? (
-						<AccountMenu email={ email } logout={ logout } />
+						<AccountMenu
+							email={ email }
+							logout={ logout }
+							isAdmin={ isAdmin }
+						/>
 					) : (
 						<button
 							type="button"
