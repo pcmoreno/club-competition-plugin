@@ -95,6 +95,36 @@ class PlayerController extends RestController
         });
     }
 
+    /**
+     * Permanently delete a player and their member account (admin action). Only
+     * allowed when the player is enrolled in no season/tournament: enrolments
+     * carry games and standings, so a player with history can only be
+     * deactivated. Deletes the member login first (if any), then the player.
+     */
+    public function destroy(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
+
+            if ($this->playerTournamentService->isEnrolled($player->id)) {
+                throw new ConflictException(
+                    'This player is enrolled in one or more tournaments and can\'t be deleted. Deactivate them instead.'
+                );
+            }
+
+            $member = $this->memberRepository->findByPlayerId($player->id);
+            if ($member !== null) {
+                $this->memberRepository->delete($member->id);
+            }
+            $this->playerRepository->delete($player->id);
+
+            return $this->noContent();
+        });
+    }
+
     public function store(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {

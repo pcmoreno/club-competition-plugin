@@ -40,6 +40,16 @@ class PlayerTournamentService
     }
 
     /**
+     * Whether the player is enrolled in any season/tournament. Gates hard
+     * deletion: a player with enrolments has games and standings hanging off
+     * those enrolments, so they can only be deactivated, never deleted.
+     */
+    public function isEnrolled(int $playerId): bool
+    {
+        return $this->seasonPlayers->findByPlayer($playerId) !== [];
+    }
+
+    /**
      * The seasons a player is enrolled in, newest first. enrolled_at is
      * unreliable (the import set it inconsistently), so order by the season's
      * own start date, falling back to its name (which embeds the year) when a

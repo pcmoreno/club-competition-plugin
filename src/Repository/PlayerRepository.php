@@ -109,6 +109,11 @@ class PlayerRepository
         );
     }
 
+    public function delete(int $id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'players', [ 'id' => $id ]);
+    }
+
     private function hydrate(array $row): Player
     {
         return new Player(
