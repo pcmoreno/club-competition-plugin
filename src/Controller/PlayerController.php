@@ -17,6 +17,7 @@ use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\AuthService;
 use SCS\Services\KnsbNameNormalizer;
 use SCS\Services\KnsbRatingStore;
+use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -30,6 +31,7 @@ class PlayerController extends RestController
         private readonly KnsbNameNormalizer $knsbNameNormalizer,
         private readonly AuthService $authService,
         private readonly SerializerService $serializer,
+        private readonly PlayerTournamentService $playerTournamentService,
     ) {
         parent::__construct($validator);
     }
@@ -72,6 +74,24 @@ class PlayerController extends RestController
             }
 
             return $this->ok($this->serializer->serialize($player));
+        });
+    }
+
+    /**
+     * The seasons/tournaments a player is enrolled in (admin), newest first.
+     * Each row pairs the player's enrolment (the Elo they entered with) with the
+     * season it belongs to (name + status), so the admin player detail view can
+     * list a player's whole competition history at a glance.
+     */
+    public function tournaments(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
+
+            return $this->ok($this->playerTournamentService->enrollments($player->id));
         });
     }
 
@@ -188,20 +208,18 @@ class PlayerController extends RestController
             $input = InviteMemberRequest::fromRequest($request);
             $this->validate($input);
 
-            // No account yet → create + invite. Invite pending → re-send with a
-            // fresh token. Already accepted (active) → nothing to (re)send.
+            // No account yet → create + invite. Invite pending, or a previously
+            // revoked account → (re-)send a fresh token, which flips a revoked
+            // member back to Invited. Already accepted (active) → nothing to send.
             $existing = $this->memberRepository->findByPlayerId($player->id);
             try {
                 if ($existing === null) {
                     $member  = $this->authService->inviteMember($player->id, $input->email);
                     $created = true;
-                } elseif ($existing->status === MemberStatus::Invited) {
+                } elseif (in_array($existing->status, [MemberStatus::Invited, MemberStatus::Revoked], true)) {
                     $member  = $this->authService->resendInvite($existing, $input->email);
                     $created = false;
                 } else {
-                    // TODO: when a revoke path is added, branch this message per
-                    // status — a Revoked member isn't "active" and could be
-                    // re-invited rather than rejected here.
                     throw new ConflictException('This player already has an active member account.');
                 }
             } catch (UniqueConstraintViolationException) {
@@ -216,6 +234,43 @@ class PlayerController extends RestController
             $data['member_status'] = $member->status->value;
 
             return $created ? $this->created($data) : $this->ok($data);
+        });
+    }
+
+    /**
+     * Revoke a player's member account (admin action): flip it to Revoked and
+     * kill any live session immediately (AuthService bumps token_valid_after and
+     * clears pending invite/reset tokens). The player row is untouched — only
+     * their login is disabled. A revoked account can later be re-invited via
+     * invite(), which issues a fresh token and returns it to Invited. Returns the
+     * roster-shaped row so the client can refresh the Member column in place.
+     */
+    public function revoke(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->playerRepository->findById((int)$request->get_param('id'));
+            if ($player === null) {
+                throw new NotFoundException('Player not found.');
+            }
+
+            $member = $this->memberRepository->findByPlayerId($player->id);
+            if ($member === null) {
+                throw new NotFoundException('This player has no member account to revoke.');
+            }
+            if ($member->status === MemberStatus::Revoked) {
+                throw new ConflictException('This member account is already revoked.');
+            }
+
+            $this->authService->revokeMember($member);
+
+            // revoke leaves the email untouched and sets the status to Revoked,
+            // so the roster row can be rebuilt from what we already hold — no
+            // re-fetch needed.
+            $data                  = $this->serializer->serialize($player, SerializerService::GROUP_ADMIN);
+            $data['email']         = $member->email;
+            $data['member_status'] = MemberStatus::Revoked->value;
+
+            return $this->ok($data);
         });
     }
 }

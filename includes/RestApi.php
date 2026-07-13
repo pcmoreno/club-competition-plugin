@@ -185,11 +185,29 @@ class RestApi
                 ],
             ]);
 
+            // The seasons/tournaments a player is enrolled in (admin, PII-adjacent).
+            register_rest_route('scs/v1', '/players/(?P<id>\d+)/tournaments', [
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [$players, 'tournaments'],
+                    'permission_callback' => $isAdminRead,
+                ],
+            ]);
+
             // Invite a player to become a member (admin): create the account + email.
             register_rest_route('scs/v1', '/players/(?P<id>\d+)/invite', [
                 [
                     'methods'             => 'POST',
                     'callback'            => [$players, 'invite'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
+            // Revoke a player's member account (admin): disable login immediately.
+            register_rest_route('scs/v1', '/players/(?P<id>\d+)/revoke', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$players, 'revoke'],
                     'permission_callback' => $isAdmin,
                 ],
             ]);

@@ -209,6 +209,7 @@ class AuthService
 
         $this->memberRepository->update($member->id, [
             'email'             => $email,
+            'status'            => MemberStatus::Invited->value,
             'invite_token'      => self::hashToken($token),
             'invite_expires_at' => $expiresAt->format('Y-m-d H:i:s'),
         ]);
@@ -371,5 +372,25 @@ class AuthService
         ]);
 
         return $this->jwtService->issue($member->id, Role::Member, $member->player_id);
+    }
+
+    /**
+     * Revoke a member account (admin action). Flips the status to Revoked and
+     * bumps `token_valid_after` to now so every JWT already issued to them is
+     * rejected on its next request — the account is locked out immediately, not
+     * just at expiry. Pending invite/reset tokens are cleared so no in-flight
+     * link can resurrect access. The player row is left untouched; re-inviting
+     * later (resendInvite) issues a fresh token and returns them to Invited.
+     */
+    public function revokeMember(Member $member): void
+    {
+        $this->memberRepository->update($member->id, [
+            'status'            => MemberStatus::Revoked->value,
+            'token_valid_after' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'invite_token'      => null,
+            'invite_expires_at' => null,
+            'reset_token'       => null,
+            'reset_expires_at'  => null,
+        ]);
     }
 }

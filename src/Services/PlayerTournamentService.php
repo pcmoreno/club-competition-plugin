@@ -40,6 +40,52 @@ class PlayerTournamentService
     }
 
     /**
+     * The seasons a player is enrolled in, newest first. enrolled_at is
+     * unreliable (the import set it inconsistently), so order by the season's
+     * own start date, falling back to its name (which embeds the year) when a
+     * season has no start date.
+     *
+     * @return list<array{season_id: int, season_name: string, season_status: string, elo_rating: int|null, enrolled_at: string}>
+     */
+    public function enrollments(int $playerId): array
+    {
+        // season_id => Season, so each enrolment resolves its season in one
+        // pass instead of an N+1 of findById() calls.
+        $seasonsById = [];
+        foreach ($this->seasons->findAll() as $season) {
+            $seasonsById[$season->id] = $season;
+        }
+
+        $seasons = [];
+        foreach ($this->seasonPlayers->findByPlayer($playerId) as $enrolment) {
+            $season = $seasonsById[$enrolment->season_id] ?? null;
+            if ($season === null) {
+                continue;
+            }
+            $seasons[] = [$season, $enrolment];
+        }
+
+        usort($seasons, function (array $a, array $b): int {
+            [$sa] = $a;
+            [$sb] = $b;
+            if ($sa->start_date != $sb->start_date) {
+                return ($sb->start_date?->getTimestamp() ?? PHP_INT_MIN)
+                    <=> ($sa->start_date?->getTimestamp() ?? PHP_INT_MIN);
+            }
+
+            return strcmp($sb->name, $sa->name);
+        });
+
+        return array_map(fn (array $pair): array => [
+            'season_id'     => $pair[0]->id,
+            'season_name'   => $pair[0]->name,
+            'season_status' => $pair[0]->status->value,
+            'elo_rating'    => $pair[1]->elo_rating,
+            'enrolled_at'   => $pair[1]->enrolled_at->format('Y-m-d'),
+        ], $seasons);
+    }
+
+    /**
      * @return array{
      *   season: array{id: int, name: string, status: string, categories: array, field_size: int},
      *   player: array{player_id: int, season_player_id: int, name: ?string, category: ?string, rating: int, rank: ?int, category_rank: ?int, tpr: ?int},

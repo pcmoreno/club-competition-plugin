@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { EditPlayerDialog } from './EditPlayerDialog';
+import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { Notice } from '../components/ui';
 
@@ -20,11 +21,13 @@ function errorMessage( err ) {
 // current month is flagged red (the sync runs monthly), and a player with a
 // KNSB id can be (eventually) re-synced from there.
 //
-// A pencil on the name cell opens EditPlayerDialog, which edits the four plain
-// Player fields (name, KNSB id, birth year, gender) via PATCH /players/{id}.
-// Email lives on the separate Member account, not the Player, so it is NOT
-// editable here — member creation + invites are their own later pass. Elo is
-// owned by the KNSB sync flow (SyncDialog), so it is not editable here either.
+// Clicking the name cell opens PlayerDetailDialog — a read-first overview with
+// three sections (Player details + activate/deactivate, Tournaments, Member
+// account + invite/revoke). Editing is deliberate from there: the four plain
+// Player fields (name, KNSB id, birth year, gender) go through EditPlayerDialog
+// via PATCH /players/{id}. Email lives on the separate Member account, not the
+// Player, so it is NOT editable here. Elo is owned by the KNSB sync flow
+// (SyncDialog), so it is not editable here either.
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
@@ -72,6 +75,7 @@ export function Players() {
 	const [ search, setSearch ] = useState( '' );
 	const [ sort, setSort ] = useState( { key: 'knsb_elo', dir: 'desc' } );
 	const [ syncTarget, setSyncTarget ] = useState( null );
+	const [ detailTarget, setDetailTarget ] = useState( null );
 	const [ editTarget, setEditTarget ] = useState( null );
 	const [ inviteTarget, setInviteTarget ] = useState( null );
 
@@ -110,7 +114,7 @@ export function Players() {
 					sort={ sort }
 					onSort={ setSort }
 					onSync={ setSyncTarget }
-					onEdit={ setEditTarget }
+					onOpen={ setDetailTarget }
 					onInvite={ setInviteTarget }
 				/>
 			);
@@ -136,6 +140,14 @@ export function Players() {
 				<SyncDialog
 					player={ syncTarget }
 					onClose={ () => setSyncTarget( null ) }
+				/>
+			) }
+			{ detailTarget && (
+				<PlayerDetailDialog
+					playerId={ detailTarget.id }
+					onClose={ () => setDetailTarget( null ) }
+					onEdit={ setEditTarget }
+					onInvite={ setInviteTarget }
 				/>
 			) }
 			{ editTarget && (
@@ -179,7 +191,7 @@ function SortHeader( { label, col, sort, onSort, align = 'left', width } ) {
 	);
 }
 
-function RosterTable( { players, sort, onSort, onSync, onEdit, onInvite } ) {
+function RosterTable( { players, sort, onSort, onSync, onOpen, onInvite } ) {
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
 			<table className="w-full text-sm">
@@ -225,15 +237,15 @@ function RosterTable( { players, sort, onSort, onSync, onEdit, onInvite } ) {
 								<td className="px-4 py-2.5 text-ink">
 									<button
 										type="button"
-										onClick={ () => onEdit( p ) }
-										aria-label={ `Edit ${ p.name }` }
-										title="Edit player"
+										onClick={ () => onOpen( p ) }
+										aria-label={ `Open ${ p.name }` }
+										title="Player details"
 										className="group inline-flex items-center gap-1.5 text-left text-inherit hover:text-accent"
 									>
 										<span className="underline-offset-2 group-hover:underline">
 											{ p.name }
 										</span>
-										<PencilIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+										<ChevronIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
 									</button>
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
@@ -443,7 +455,7 @@ function SyncDialog( { player, onClose } ) {
 	);
 }
 
-function PencilIcon( { className } ) {
+function ChevronIcon( { className } ) {
 	return (
 		<svg
 			className={ className }
@@ -457,7 +469,7 @@ function PencilIcon( { className } ) {
 			strokeLinejoin="round"
 			aria-hidden="true"
 		>
-			<path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5Z" />
+			<path d="m6 4 4 4-4 4" />
 		</svg>
 	);
 }
