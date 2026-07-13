@@ -306,7 +306,13 @@ function ConfirmOverlay( { children, onClose } ) {
 	return (
 		<div
 			className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+			onClick={ ( e ) => {
+				// Stop the click from bubbling to the detail modal's backdrop
+				// below, which would close the whole modal — dismiss only the
+				// confirmation.
+				e.stopPropagation();
+				onClose();
+			} }
 		>
 			<div
 				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"

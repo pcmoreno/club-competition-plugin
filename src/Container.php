@@ -163,8 +163,7 @@ class Container
             ->addArgument(new Reference('knsb_name_normalizer'))
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('season_repository'))
-            ->addArgument(new Reference('season_player_repository'));
+            ->addArgument(new Reference('player_tournament_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
             ->setPublic(true)

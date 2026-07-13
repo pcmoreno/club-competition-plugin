@@ -20,12 +20,15 @@ const fieldInput =
 // Invite a player to become a member, or re-send a pending invite. Posts to
 // POST /players/{id}/invite, which creates a member account (ROLE_MEMBER, not
 // admin) and emails a one-time link to set a password — or, when the player is
-// already "invited", mints a fresh token and emails it again. Resend mode is
-// derived from the player's member_status; the email is prefilled so the admin
-// can also correct a typo.
+// already "invited", mints a fresh token and emails it again. Three modes,
+// derived from the player's member_status: a first-time invite, a resend for a
+// still-pending invite, and a re-invite for a previously revoked account (the
+// backend routes all three through the same endpoint). The email is prefilled
+// so the admin can also correct a typo.
 export function InviteMemberDialog( { player, onClose } ) {
 	const queryClient = useQueryClient();
 	const isResend = player.member_status === 'invited';
+	const isReinvite = player.member_status === 'revoked';
 	const [ email, setEmail ] = useState( player.email ?? '' );
 
 	const invite = useMutation( {
@@ -58,7 +61,11 @@ export function InviteMemberDialog( { player, onClose } ) {
 				onSubmit={ submit }
 			>
 				<h2 className="font-serif text-2xl leading-tight">
-					{ isResend ? 'Resend invite' : 'Invite member' }
+					{ isResend
+						? 'Resend invite'
+						: isReinvite
+						? 'Re-invite member'
+						: 'Invite member' }
 				</h2>
 
 				<p className="mt-2 text-sm text-ink-3">
@@ -69,6 +76,15 @@ export function InviteMemberDialog( { player, onClose } ) {
 							</strong>{ ' ' }
 							hasn’t accepted yet. A new email with a fresh link
 							will be sent, and the previous link will stop working.
+						</>
+					) : isReinvite ? (
+						<>
+							<strong className="text-ink">
+								{ player.name }
+							</strong>
+							’s member account was revoked. Re-inviting sends a
+							fresh link so they can set a password and sign in
+							again.
 						</>
 					) : (
 						<>
@@ -122,6 +138,8 @@ export function InviteMemberDialog( { player, onClose } ) {
 							? 'Sending…'
 							: isResend
 							? 'Resend invite'
+							: isReinvite
+							? 'Re-invite'
 							: 'Send invite' }
 					</button>
 				</div>

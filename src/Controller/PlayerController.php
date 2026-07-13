@@ -11,14 +11,13 @@ use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
-use SCS\Repository\SeasonPlayerRepository;
-use SCS\Repository\SeasonRepository;
 use SCS\Request\CreatePlayerRequest;
 use SCS\Request\InviteMemberRequest;
 use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\AuthService;
 use SCS\Services\KnsbNameNormalizer;
 use SCS\Services\KnsbRatingStore;
+use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -32,8 +31,7 @@ class PlayerController extends RestController
         private readonly KnsbNameNormalizer $knsbNameNormalizer,
         private readonly AuthService $authService,
         private readonly SerializerService $serializer,
-        private readonly SeasonRepository $seasonRepository,
-        private readonly SeasonPlayerRepository $seasonPlayerRepository,
+        private readonly PlayerTournamentService $playerTournamentService,
     ) {
         parent::__construct($validator);
     }
@@ -93,46 +91,7 @@ class PlayerController extends RestController
                 throw new NotFoundException('Player not found.');
             }
 
-            // season_id => Season, so each enrolment resolves its season in one
-            // pass instead of an N+1 of findById() calls.
-            $seasonsById = [];
-            foreach ($this->seasonRepository->findAll() as $season) {
-                $seasonsById[$season->id] = $season;
-            }
-
-            $seasons = [];
-            foreach ($this->seasonPlayerRepository->findByPlayer($player->id) as $enrolment) {
-                $season = $seasonsById[$enrolment->season_id] ?? null;
-                if ($season === null) {
-                    continue;
-                }
-                $seasons[] = [$season, $enrolment];
-            }
-
-            // Newest season first. enrolled_at is unreliable here (the import set
-            // it inconsistently), so order by the season's own start date, and
-            // fall back to its name — which embeds the year — when a season has
-            // no start date.
-            usort($seasons, function (array $a, array $b): int {
-                [$sa] = $a;
-                [$sb] = $b;
-                if ($sa->start_date != $sb->start_date) {
-                    return ($sb->start_date?->getTimestamp() ?? PHP_INT_MIN)
-                        <=> ($sa->start_date?->getTimestamp() ?? PHP_INT_MIN);
-                }
-
-                return strcmp($sb->name, $sa->name);
-            });
-
-            $tournaments = array_map(fn (array $pair): array => [
-                'season_id'     => $pair[0]->id,
-                'season_name'   => $pair[0]->name,
-                'season_status' => $pair[0]->status->value,
-                'elo_rating'    => $pair[1]->elo_rating,
-                'enrolled_at'   => $pair[1]->enrolled_at->format('Y-m-d'),
-            ], $seasons);
-
-            return $this->ok($tournaments);
+            return $this->ok($this->playerTournamentService->enrollments($player->id));
         });
     }
 
