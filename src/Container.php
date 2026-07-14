@@ -116,6 +116,13 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('player_display_service'));
 
+        $container->register('player_merge_service', Services\PlayerMergeService::class)
+            ->addArgument(new Reference('db_connection'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('member_repository'));
+
         $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
 
         $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
@@ -163,7 +170,8 @@ class Container
             ->addArgument(new Reference('knsb_name_normalizer'))
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('player_tournament_service'));
+            ->addArgument(new Reference('player_tournament_service'))
+            ->addArgument(new Reference('player_merge_service'));
 
         $container->register('season_controller', Controller\SeasonController::class)
             ->setPublic(true)

@@ -181,6 +181,16 @@ class RestApi
                 ],
             ]);
 
+            // Merge one player into another (admin): the source player's history
+            // moves to {id} and the source is deleted. Body: { source_id }.
+            register_rest_route('scs/v1', '/players/(?P<id>\d+)/merge', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$players, 'merge'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             // Apply the player's rating from the last-fetched KNSB list (admin).
             register_rest_route('scs/v1', '/players/(?P<id>\d+)/knsb-rating', [
                 [
