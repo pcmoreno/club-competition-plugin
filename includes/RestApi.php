@@ -174,6 +174,11 @@ class RestApi
                     'callback'            => [$players, 'update'],
                     'permission_callback' => $isAdmin,
                 ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$players, 'destroy'],
+                    'permission_callback' => $isAdmin,
+                ],
             ]);
 
             // Apply the player's rating from the last-fetched KNSB list (admin).

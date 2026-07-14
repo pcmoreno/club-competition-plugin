@@ -122,6 +122,15 @@ function Shell() {
 	// The admin sub-app supplies its own sidebar, so hide the page-tab SubNav.
 	const isAdminMode = isAdminPath( path );
 
+	// The tournament switcher scopes the season-wide list/standings views, so it
+	// only belongs on those. Hide it in admin mode (the admin app picks its own
+	// season) and on the per-player detail pages, where a single player — not a
+	// season — is already the subject.
+	const isPlayerDetail =
+		matchPath( '/players/:id', path ) !== null ||
+		matchPath( '/seasons/:seasonId/players/:id', path ) !== null;
+	const showTournamentSwitcher = ! isAdminMode && ! isPlayerDetail;
+
 	let body;
 	if ( AuthView ) {
 		// Auth screens render without the page tabs.
@@ -152,7 +161,11 @@ function Shell() {
 	// auth screen and a normal view.
 	return (
 		<div className="min-h-screen">
-			<TopBar seasonId={ seasonId } onSeasonChange={ setSeasonId } />
+			<TopBar
+				seasonId={ seasonId }
+				onSeasonChange={ setSeasonId }
+				showTournamentSwitcher={ showTournamentSwitcher }
+			/>
 			{ ! AuthView && ! isAdminMode && <SubNav activePath={ path } /> }
 			{ body }
 		</div>

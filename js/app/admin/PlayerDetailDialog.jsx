@@ -52,7 +52,18 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 		? roster.find( ( p ) => p.id === playerId )
 		: null;
 
-	// 'active' | 'revoke' | null — which confirmation is showing on top.
+	// Lifted here (not only in TournamentsSection) because the delete affordance
+	// is gated on it: a player can be deleted only when enrolled in nothing.
+	const tournamentsQuery = useQuery( {
+		queryKey: [ 'player-tournaments', playerId ],
+		queryFn: () => api.get( `players/${ playerId }/tournaments` ),
+	} );
+	const canDelete =
+		tournamentsQuery.isSuccess &&
+		Array.isArray( tournamentsQuery.data ) &&
+		tournamentsQuery.data.length === 0;
+
+	// 'active' | 'revoke' | 'delete' | null — which confirmation is showing on top.
 	const [ confirm, setConfirm ] = useState( null );
 
 	if ( ! player ) {
@@ -72,11 +83,24 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 					<h2 className="font-serif text-2xl leading-tight">
 						{ player.name }
 					</h2>
-					{ ! player.active && (
-						<span className="mt-1 rounded bg-loss/10 px-2 py-0.5 text-xs font-medium text-loss">
-							Inactive
-						</span>
-					) }
+					<div className="flex shrink-0 items-center gap-2">
+						{ ! player.active && (
+							<span className="mt-1 rounded bg-loss/10 px-2 py-0.5 text-xs font-medium text-loss">
+								Inactive
+							</span>
+						) }
+						{ canDelete && (
+							<button
+								type="button"
+								className="rounded p-1.5 text-loss hover:bg-loss/10"
+								onClick={ () => setConfirm( 'delete' ) }
+								aria-label={ `Delete ${ player.name }` }
+								title="Delete player"
+							>
+								<TrashIcon className="h-6 w-6" />
+							</button>
+						) }
+					</div>
 				</div>
 
 				<PlayerSection
@@ -84,7 +108,7 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 					onEdit={ () => onEdit( player ) }
 					onToggleActive={ () => setConfirm( 'active' ) }
 				/>
-				<TournamentsSection playerId={ player.id } />
+				<TournamentsSection query={ tournamentsQuery } playerId={ player.id } />
 				<MemberSection
 					player={ player }
 					onInvite={ () => onInvite( player ) }
@@ -112,6 +136,13 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 				<RevokeConfirm
 					player={ player }
 					onClose={ () => setConfirm( null ) }
+				/>
+			) }
+			{ confirm === 'delete' && (
+				<DeleteConfirm
+					player={ player }
+					onClose={ () => setConfirm( null ) }
+					onDeleted={ onClose }
 				/>
 			) }
 		</div>
@@ -174,11 +205,8 @@ function PlayerSection( { player, onEdit, onToggleActive } ) {
 	);
 }
 
-function TournamentsSection( { playerId } ) {
-	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'player-tournaments', playerId ],
-		queryFn: () => api.get( `players/${ playerId }/tournaments` ),
-	} );
+function TournamentsSection( { query, playerId } ) {
+	const { data, isLoading, isError } = query;
 
 	let body;
 	if ( isLoading ) {
@@ -433,5 +461,74 @@ function RevokeConfirm( { player, onClose } ) {
 				</button>
 			</div>
 		</ConfirmOverlay>
+	);
+}
+
+// Permanent, irreversible delete — only reachable when the player has no
+// tournaments (the trash affordance is hidden otherwise, and the backend
+// re-checks). On success the player is gone from the roster, so close the whole
+// detail modal via onDeleted before refreshing it.
+function DeleteConfirm( { player, onClose, onDeleted } ) {
+	const queryClient = useQueryClient();
+	const del = useMutation( {
+		mutationFn: () => api.del( `players/${ player.id }` ),
+		onSuccess: () => {
+			onDeleted();
+			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+		},
+	} );
+
+	return (
+		<ConfirmOverlay onClose={ onClose }>
+			<h2 className="font-serif text-2xl leading-tight">Delete player</h2>
+			<p className="mt-2 text-sm text-ink-3">
+				Permanently delete{ ' ' }
+				<strong className="text-ink">{ player.name }</strong>? This also
+				removes their member account and login. This can’t be undone.
+			</p>
+			{ del.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( del.error ) }
+				</p>
+			) }
+			<div className="mt-5 flex justify-end gap-2">
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+					disabled={ del.isPending }
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					className={ dangerBtn }
+					onClick={ () => del.mutate() }
+					disabled={ del.isPending }
+				>
+					{ del.isPending ? 'Deleting…' : 'Delete' }
+				</button>
+			</div>
+		</ConfirmOverlay>
+	);
+}
+
+function TrashIcon( { className } ) {
+	return (
+		<svg
+			className={ className }
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.6"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<path d="M4 7h16" />
+			<path d="M10 11v6M14 11v6" />
+			<path d="M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13" />
+			<path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+		</svg>
 	);
 }

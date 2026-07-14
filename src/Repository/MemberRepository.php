@@ -106,6 +106,11 @@ class MemberRepository
         $this->connection->update(SCS_TABLE_PREFIX . 'members', $data, [ 'id' => $id ]);
     }
 
+    public function delete(int $id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'members', [ 'id' => $id ]);
+    }
+
     private function hydrate(array $row): Member
     {
         return new Member(

@@ -107,7 +107,7 @@ function AccountMenu( { email, logout, isAdmin } ) {
 	);
 }
 
-export function TopBar( { seasonId, onSeasonChange } ) {
+export function TopBar( { seasonId, onSeasonChange, showTournamentSwitcher } ) {
 	const { isMember, isAdmin, email, logout } = useAuth();
 
 	return (
@@ -131,10 +131,12 @@ export function TopBar( { seasonId, onSeasonChange } ) {
 				</button>
 
 				<div className="flex items-center gap-4">
-					<TournamentSwitcher
-						value={ seasonId }
-						onChange={ onSeasonChange }
-					/>
+					{ showTournamentSwitcher && (
+						<TournamentSwitcher
+							value={ seasonId }
+							onChange={ onSeasonChange }
+						/>
+					) }
 					{ isMember ? (
 						<AccountMenu
 							email={ email }
