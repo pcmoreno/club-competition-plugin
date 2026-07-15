@@ -21,6 +21,7 @@ class RestApi
             $seasons         = $container->get('season_controller');
             $rounds          = $container->get('round_controller');
             $import          = $container->get('import_controller');
+            $knsb            = $container->get('knsb_controller');
 
             // Parse the auth cookie's JWT and re-validate it against the DB
             // (account still exists, still Active, not older than a password
@@ -350,6 +351,22 @@ class RestApi
             register_rest_route('scs/v1', '/fixtures/load', [
                 'methods'             => 'POST',
                 'callback'            => [$import, 'load'],
+                'permission_callback' => $isAdmin,
+            ]);
+
+            // ── KNSB rating list ──────────────────────────────────────────────
+            // The stored list's provenance (read), and a server-side refetch
+            // from schaakbond.nl (write — side-effecting, so $isAdmin with CSRF).
+            // Per-player application of the list is on /players/{id}/knsb-rating.
+            register_rest_route('scs/v1', '/knsb/status', [
+                'methods'             => 'GET',
+                'callback'            => [$knsb, 'status'],
+                'permission_callback' => $isAdminRead,
+            ]);
+
+            register_rest_route('scs/v1', '/knsb/fetch', [
+                'methods'             => 'POST',
+                'callback'            => [$knsb, 'fetch'],
                 'permission_callback' => $isAdmin,
             ]);
         });
