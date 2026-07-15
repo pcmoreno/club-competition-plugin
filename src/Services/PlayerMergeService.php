@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use Doctrine\DBAL\Connection;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -40,7 +39,7 @@ use SCS\Repository\SeasonRepository;
 class PlayerMergeService
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly TransactionManager $transactions,
         private readonly PlayerRepository $players,
         private readonly SeasonRepository $seasons,
         private readonly SeasonPlayerRepository $seasonPlayers,
@@ -71,7 +70,7 @@ class PlayerMergeService
             ));
         }
 
-        $this->connection->transactional(function () use ($keep, $remove): void {
+        $this->transactions->transactional(function () use ($keep, $remove): void {
             $this->seasonPlayers->reassignPlayer($remove->id, $keep->id);
 
             $this->mergeMemberAccount($keep->id, $remove->id);

@@ -116,8 +116,11 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('player_display_service'));
 
+        $container->register('transaction_manager', Services\TransactionManager::class)
+            ->addArgument(new Reference('db_connection'));
+
         $container->register('player_merge_service', Services\PlayerMergeService::class)
-            ->addArgument(new Reference('db_connection'))
+            ->addArgument(new Reference('transaction_manager'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
@@ -132,7 +135,7 @@ class Container
 
         $container->register('season_import_service', Services\SeasonImportService::class)
             ->setPublic(true)
-            ->addArgument(new Reference('db_connection'))
+            ->addArgument(new Reference('transaction_manager'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
