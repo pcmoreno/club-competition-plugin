@@ -22,8 +22,14 @@ const MEMBER_BADGE = {
 };
 
 function errorMessage( err ) {
-	if ( err instanceof ApiError ) {
-		return err.message;
+	// The same-season merge is blocked client-side (Merge disabled + banner),
+	// but the backend re-checks it as a race backstop and answers 409 with a
+	// curated, user-safe message in `body.error` naming the shared season(s).
+	// The shared ApiError layer only reads `body.message`, so surface that
+	// server text here for the 409 — otherwise the admin would see a bare
+	// "Request failed (409)" with no idea why.
+	if ( err instanceof ApiError && err.status === 409 && err.body?.error ) {
+		return err.body.error;
 	}
 	return 'Something went wrong. Please try again.';
 }
