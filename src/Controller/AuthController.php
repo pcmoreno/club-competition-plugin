@@ -10,6 +10,7 @@ use SCS\Repository\AdminRepository;
 use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Request\AcceptInviteRequest;
+use SCS\Request\BootstrapAdminRequest;
 use SCS\Request\ChangePasswordRequest;
 use SCS\Request\ForgotPasswordRequest;
 use SCS\Request\LoginRequest;
@@ -73,6 +74,35 @@ class AuthController extends RestController
             $csrfToken = $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue();
 
             return $this->ok(['csrf_token' => $csrfToken]);
+        });
+    }
+
+    /**
+     * Whether the public first-admin bootstrap is still open (admins table
+     * empty). Lets the UI show/hide its "New admin" button.
+     */
+    public function bootstrapStatus(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () {
+            return $this->ok(['available' => $this->authService->adminBootstrapAvailable()]);
+        });
+    }
+
+    /**
+     * Break-glass creation of the first admin from the public UI when WP-CLI
+     * isn't reachable. Unauthenticated by necessity (no admin exists yet); the
+     * zero-admins invariant is enforced in the service, so this is inert once
+     * any admin exists. The password-confirm field is a client-side check only.
+     */
+    public function bootstrapAdmin(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $input = BootstrapAdminRequest::fromRequest($request);
+            $this->validate($input);
+
+            $this->authService->bootstrapFirstAdmin('First Admin', $input->email, $input->password);
+
+            return $this->noContent();
         });
     }
 

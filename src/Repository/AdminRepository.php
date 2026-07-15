@@ -38,6 +38,14 @@ class AdminRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function countAll(): int
+    {
+        return (int)$this->connection->createQueryBuilder()
+            ->select('COUNT(*)')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->fetchOne();
+    }
+
     public function create(string $name, string $email, string $password_hash): Admin
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'admins', [
