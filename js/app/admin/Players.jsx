@@ -6,11 +6,16 @@ import { EditPlayerDialog } from './EditPlayerDialog';
 import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
+import { FetchKnsbDialog } from './FetchKnsbDialog';
 import { Notice } from '../components/ui';
 
 function errorMessage( err ) {
-	if ( err instanceof ApiError ) {
-		return err.message;
+	// Our typed exceptions (404/403/409/429) return a curated, user-safe message
+	// in body.error — e.g. the KNSB sync's "No KNSB rating list has been fetched
+	// yet." The shared ApiError layer only reads body.message, so read body.error
+	// here so the real reason reaches the admin instead of "Request failed (409)".
+	if ( err instanceof ApiError && err.body?.error ) {
+		return err.body.error;
 	}
 	return 'Something went wrong. Please try again.';
 }
@@ -80,6 +85,7 @@ export function Players() {
 	const [ editTarget, setEditTarget ] = useState( null );
 	const [ inviteTarget, setInviteTarget ] = useState( null );
 	const [ mergeOpen, setMergeOpen ] = useState( false );
+	const [ fetchKnsbOpen, setFetchKnsbOpen ] = useState( false );
 
 	// The merge picker needs at least two players to choose between.
 	const canMerge = Array.isArray( data ) && data.length >= 2;
@@ -135,6 +141,7 @@ export function Players() {
 						<ActionsMenu
 							canMerge={ canMerge }
 							onMerge={ () => setMergeOpen( true ) }
+							onFetchKnsb={ () => setFetchKnsbOpen( true ) }
 						/>
 						<input
 							type="search"
@@ -179,6 +186,9 @@ export function Players() {
 					onClose={ () => setMergeOpen( false ) }
 				/>
 			) }
+			{ fetchKnsbOpen && (
+				<FetchKnsbDialog onClose={ () => setFetchKnsbOpen( false ) } />
+			) }
 		</>
 	);
 }
@@ -186,7 +196,7 @@ export function Players() {
 // Roster-level actions dropdown, sitting left of the search box. Grows a menu
 // of bulk/roster tools; for now its one item is Merge players. Closes on
 // outside-click or Escape, matching the account menu in the top bar.
-function ActionsMenu( { canMerge, onMerge } ) {
+function ActionsMenu( { canMerge, onMerge, onFetchKnsb } ) {
 	const [ open, setOpen ] = useState( false );
 	const ref = useRef( null );
 
@@ -240,6 +250,17 @@ function ActionsMenu( { canMerge, onMerge } ) {
 						} }
 					>
 						Merge players
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						className="block w-full px-3 py-2 text-left text-sm text-ink-2 hover:bg-rule/40 hover:text-ink focus:bg-rule/40 focus:text-ink focus:outline-none"
+						onClick={ () => {
+							setOpen( false );
+							onFetchKnsb();
+						} }
+					>
+						Fetch KNSB ratings
 					</button>
 				</div>
 			) }

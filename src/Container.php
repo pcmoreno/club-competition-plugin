@@ -203,6 +203,12 @@ class Container
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('season_import_service'));
 
+        $container->register('knsb_controller', Controller\KnsbController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('knsb_rating_list_fetcher'))
+            ->addArgument(new Reference('knsb_rating_store'));
+
         $container->register('create_admin_command', Command\CreateAdminCommand::class)
             ->setPublic(true)
             ->addArgument(new Reference('admin_repository'));
