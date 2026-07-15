@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from '@wordpress/element';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
+import { api } from '../api/client';
 import { navigate } from '../router/router';
+import { BootstrapAdminDialog } from '../auth/BootstrapAdminDialog';
 import { TournamentSwitcher } from './TournamentSwitcher';
 
 /** Brand mark: a tiny 2×2 chessboard, matching the hi-fi `.brand-mark`. */
@@ -109,51 +112,77 @@ function AccountMenu( { email, logout, isAdmin } ) {
 
 export function TopBar( { seasonId, onSeasonChange, showTournamentSwitcher } ) {
 	const { isMember, isAdmin, email, logout } = useAuth();
+	const [ newAdminOpen, setNewAdminOpen ] = useState( false );
+
+	// Break-glass "New admin" entry, shown only while the site has no admin yet.
+	// The server re-checks this invariant, so the button is just UX gating.
+	const { data: bootstrapStatus } = useQuery( {
+		queryKey: [ 'admin-bootstrap-status' ],
+		queryFn: () => api.get( 'auth/bootstrap-status' ),
+		staleTime: Infinity,
+	} );
+	const canBootstrap = bootstrapStatus?.available === true;
 
 	return (
-		<header className="border-b border-rule bg-paper">
-			<div className="mx-auto flex max-w-page items-center justify-between gap-6 px-7 py-3.5">
-				<button
-					type="button"
-					onClick={ () => navigate( '/pairings' ) }
-					aria-label="Go to home"
-					className="flex items-center gap-3 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-				>
-					<BrandMark />
-					<div className="leading-tight">
-						<div className="font-serif text-[19px] font-medium tracking-[-0.01em] text-ink">
-							Clubcompetitie
+		<>
+			<header className="border-b border-rule bg-paper">
+				<div className="mx-auto flex max-w-page items-center justify-between gap-6 px-7 py-3.5">
+					<button
+						type="button"
+						onClick={ () => navigate( '/pairings' ) }
+						aria-label="Go to home"
+						className="flex items-center gap-3 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+					>
+						<BrandMark />
+						<div className="leading-tight">
+							<div className="font-serif text-[19px] font-medium tracking-[-0.01em] text-ink">
+								Clubcompetitie
+							</div>
+							<div className="text-xs uppercase tracking-[0.08em] text-muted">
+								Schaakclub Santpoort
+							</div>
 						</div>
-						<div className="text-xs uppercase tracking-[0.08em] text-muted">
-							Schaakclub Santpoort
-						</div>
-					</div>
-				</button>
+					</button>
 
-				<div className="flex items-center gap-4">
-					{ showTournamentSwitcher && (
-						<TournamentSwitcher
-							value={ seasonId }
-							onChange={ onSeasonChange }
-						/>
-					) }
-					{ isMember ? (
-						<AccountMenu
-							email={ email }
-							logout={ logout }
-							isAdmin={ isAdmin }
-						/>
-					) : (
-						<button
-							type="button"
-							className="text-sm text-ink-3 hover:text-ink"
-							onClick={ () => navigate( '/login' ) }
-						>
-							Sign in
-						</button>
-					) }
+					<div className="flex items-center gap-4">
+						{ showTournamentSwitcher && (
+							<TournamentSwitcher
+								value={ seasonId }
+								onChange={ onSeasonChange }
+							/>
+						) }
+						{ canBootstrap && (
+							<button
+								type="button"
+								className="rounded border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent hover:text-paper"
+								onClick={ () => setNewAdminOpen( true ) }
+							>
+								New admin
+							</button>
+						) }
+						{ isMember ? (
+							<AccountMenu
+								email={ email }
+								logout={ logout }
+								isAdmin={ isAdmin }
+							/>
+						) : (
+							<button
+								type="button"
+								className="text-sm text-ink-3 hover:text-ink"
+								onClick={ () => navigate( '/login' ) }
+							>
+								Sign in
+							</button>
+						) }
+					</div>
 				</div>
-			</div>
-		</header>
+			</header>
+			{ newAdminOpen && (
+				<BootstrapAdminDialog
+					onClose={ () => setNewAdminOpen( false ) }
+				/>
+			) }
+		</>
 	);
 }

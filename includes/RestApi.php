@@ -135,6 +135,23 @@ class RestApi
                 'permission_callback' => '__return_true',
             ]);
 
+            // First-admin bootstrap: public by necessity (there's no admin yet
+            // to authenticate the request). NOT an $isAdmin write route — the
+            // controller enforces the zero-admins invariant instead, so both
+            // endpoints go inert the moment any admin exists. Break-glass path
+            // for hosts where WP-CLI's `wp scs create-admin` isn't reachable.
+            register_rest_route('scs/v1', '/auth/bootstrap-status', [
+                'methods'             => 'GET',
+                'callback'            => [$auth, 'bootstrapStatus'],
+                'permission_callback' => '__return_true',
+            ]);
+
+            register_rest_route('scs/v1', '/auth/bootstrap-admin', [
+                'methods'             => 'POST',
+                'callback'            => [$auth, 'bootstrapAdmin'],
+                'permission_callback' => '__return_true',
+            ]);
+
             // The signed-in user's own account data for the Account page.
             register_rest_route('scs/v1', '/auth/me', [
                 'methods'             => 'GET',

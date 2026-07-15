@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
+use SCS\Entity\Admin;
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Entity\Enum\MemberStatus;
 use SCS\Entity\Enum\Role;
 use SCS\Entity\Member;
+use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\TooManyRequestsException;
 use SCS\Exception\UnauthorizedException;
@@ -74,6 +76,36 @@ class AuthService
     public static function hashPassword(string $password): string
     {
         return password_hash($password, self::PASSWORD_HASH_ALGO);
+    }
+
+    /**
+     * Whether the public "create the first admin" bootstrap is still open —
+     * true only while the admins table is empty. Drives both the UI's button
+     * visibility and the guard on bootstrapFirstAdmin() below.
+     */
+    public function adminBootstrapAvailable(): bool
+    {
+        return $this->adminRepository->countAll() === 0;
+    }
+
+    /**
+     * Break-glass creation of the very first admin from the public UI, for when
+     * WP-CLI (the normal `wp scs create-admin` path) isn't reachable on the
+     * host. Deliberately unauthenticated — there is no admin yet to authorise
+     * it — so the zero-admins invariant IS the authorisation: this is re-checked
+     * here, not just hidden in the UI, and the method turns inert the instant
+     * any admin row exists.
+     */
+    public function bootstrapFirstAdmin(string $name, string $email, string $password): Admin
+    {
+        if ($this->adminRepository->countAll() > 0) {
+            throw new ConflictException('Admin setup is already complete.');
+        }
+        if ($this->adminRepository->findByEmail($email) !== null) {
+            throw new ConflictException(sprintf('An admin with email "%s" already exists.', $email));
+        }
+
+        return $this->adminRepository->create($name, $email, self::hashPassword($password));
     }
 
     /**
