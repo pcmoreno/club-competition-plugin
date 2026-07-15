@@ -2,25 +2,33 @@
 // Pairings and Round history views (and later Player detail).
 
 // Chess-piece glyph by standings rank within a field of `total` players:
-// ♔ #1 → ♕ → ♖ → ♗ (top half) → ♘ (mid) → ♙. Shared by the standings table and
-// the player-detail header so a player's piece is the same in both.
+// ♔ #1 → ♕ #2–3 → then ♖ ♗ ♘ split the rest of the TOP half → and the whole
+// BOTTOM half is ♙ (a chess set is half pawns). Shared by the standings table
+// and the player-detail header so a player's piece is the same in both.
 export function pieceForRank( rank, total ) {
 	if ( rank === 1 ) {
 		return '♔';
 	}
-	if ( rank === 2 ) {
+	if ( rank <= 3 ) {
 		return '♕';
 	}
-	if ( rank === 3 ) {
+
+	const topHalf = total / 2;
+	if ( rank > topHalf ) {
+		return '♙';
+	}
+
+	// Ranks 4…topHalf go to Rook → Bishop → Knight in three equal bands,
+	// front-loaded (ceil) so the better ranks get the stronger piece and a lone
+	// leftover slot in a small field lands on the Rook rather than the Knight.
+	const band = Math.ceil( ( topHalf - 3 ) / 3 );
+	if ( rank <= 3 + band ) {
 		return '♖';
 	}
-	if ( rank <= total / 2 ) {
+	if ( rank <= 3 + 2 * band ) {
 		return '♗';
 	}
-	if ( rank <= total * 0.75 ) {
-		return '♘';
-	}
-	return '♙';
+	return '♘';
 }
 
 // Small chess-square swatch matching the hi-fi design system.
