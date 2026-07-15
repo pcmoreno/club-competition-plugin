@@ -88,6 +88,21 @@ class SeasonPlayerRepository
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'id' => $id ]);
     }
 
+    /**
+     * Repoint every one of a player's enrolments onto another player — the
+     * mechanical core of a player merge. The caller must have ruled out a shared
+     * season first: the (season_id, player_id) unique key would otherwise reject
+     * moving an enrolment into a season the target already occupies.
+     */
+    public function reassignPlayer(int $from_player_id, int $to_player_id): void
+    {
+        $this->connection->update(
+            SCS_TABLE_PREFIX . 'season_players',
+            [ 'player_id' => $to_player_id ],
+            [ 'player_id' => $from_player_id ]
+        );
+    }
+
     public function deleteBySeason(int $season_id): void
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'season_id' => $season_id ]);

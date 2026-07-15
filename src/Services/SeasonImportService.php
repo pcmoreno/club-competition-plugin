@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use Doctrine\DBAL\Connection;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
@@ -40,7 +39,7 @@ use SCS\Repository\StandingsSnapshotRepository;
 class SeasonImportService
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly TransactionManager $transactions,
         private readonly PlayerRepository $players,
         private readonly SeasonRepository $seasons,
         private readonly SeasonPlayerRepository $seasonPlayers,
@@ -96,7 +95,7 @@ class SeasonImportService
     {
         $data = $this->read($name);
 
-        return $this->connection->transactional(fn (): array => $this->apply($data));
+        return $this->transactions->transactional(fn (): array => $this->apply($data));
     }
 
     /** @return array<string, int> */

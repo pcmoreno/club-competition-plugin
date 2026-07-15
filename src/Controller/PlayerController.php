@@ -17,6 +17,7 @@ use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\AuthService;
 use SCS\Services\KnsbNameNormalizer;
 use SCS\Services\KnsbRatingStore;
+use SCS\Services\PlayerMergeService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -32,6 +33,7 @@ class PlayerController extends RestController
         private readonly AuthService $authService,
         private readonly SerializerService $serializer,
         private readonly PlayerTournamentService $playerTournamentService,
+        private readonly PlayerMergeService $playerMergeService,
     ) {
         parent::__construct($validator);
     }
@@ -120,6 +122,27 @@ class PlayerController extends RestController
                 $this->memberRepository->delete($member->id);
             }
             $this->playerRepository->delete($player->id);
+
+            return $this->noContent();
+        });
+    }
+
+    /**
+     * Merge one player into another (admin action): the "source" player's whole
+     * competition history moves to the player at {id} and the source row (plus
+     * its member account, if any) is deleted. Refused when both share a season —
+     * their two runs can't be fused. See PlayerMergeService for the full
+     * contract.
+     */
+    public function merge(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $sourceId = (int)$request->get_param('source_id');
+            if ($sourceId <= 0) {
+                throw new ValidationException(['source_id' => 'A player to remove is required.']);
+            }
+
+            $this->playerMergeService->merge((int)$request->get_param('id'), $sourceId);
 
             return $this->noContent();
         });
