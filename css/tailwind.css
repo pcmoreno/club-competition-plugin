@@ -183,3 +183,39 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
+
+/* Print: isolate #scs-app from the host page. App chrome opts out with print:hidden. */
+@media print {
+  @page {
+    margin: 0 12mm 12mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #scs-app,
+  #scs-app * {
+    visibility: visible;
+  }
+  /* Re-base #scs-app's absolute origin on the page, not a positioned host wrapper. */
+  :has(#scs-app) {
+    position: static !important;
+  }
+  #scs-app {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  /* Collapse the min-h-screen shell (100vh) so it doesn't spill a blank page. */
+  #scs-app .min-h-screen {
+    min-height: 0 !important;
+  }
+  /* Top gap lives here, not in @page — survives the "Minimum" margins setting. */
+  #scs-app main {
+    padding-top: 10mm !important;
+    padding-bottom: 0 !important;
+  }
+  #scs-app .shadow-sm {
+    box-shadow: none !important;
+  }
+}

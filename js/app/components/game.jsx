@@ -36,7 +36,7 @@ export function Square( { color } ) {
 	return (
 		<span
 			className={ [
-				'inline-block h-3 w-3 rounded-[2px] border border-rule align-middle',
+				'inline-block h-3 w-3 rounded-[2px] border border-rule align-middle print:hidden',
 				color === 'white' ? 'bg-white-sq' : 'bg-black-sq',
 			].join( ' ' ) }
 		/>
