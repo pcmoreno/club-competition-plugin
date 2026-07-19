@@ -136,7 +136,7 @@ export function RoundHistory( { seasonId } ) {
 						/>
 					) }
 				</div>
-				<div>
+				<div className="print:hidden">
 					<StandingsAfter
 						round={ selected }
 						seasonId={ seasonId }
@@ -158,7 +158,7 @@ function Shell( { children, nav } ) {
 				<button
 					type="button"
 					onClick={ () => window.print() }
-					className="text-sm text-ink-3 hover:text-ink"
+					className="text-sm text-ink-3 hover:text-ink print:hidden"
 				>
 					Print
 				</button>
@@ -181,7 +181,7 @@ function RoundNavigator( {
 	const btn =
 		'rounded border border-rule px-2.5 py-1 text-sm disabled:opacity-40';
 	return (
-		<div className="flex items-center gap-2">
+		<div className="flex items-center gap-2 print:hidden">
 			<button
 				type="button"
 				className={ btn }
@@ -197,7 +197,7 @@ function RoundNavigator( {
 						type="button"
 						onClick={ () => onSelect( r.id ) }
 						className={ [
-							'num h-7 w-7 rounded text-sm',
+							'num inline-flex h-7 w-7 items-center justify-center rounded text-sm',
 							r.id === selectedId
 								? 'bg-ink text-paper'
 								: 'text-ink-3 hover:bg-surface-2',

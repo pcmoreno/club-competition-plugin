@@ -29,7 +29,7 @@ export function SubNav( { activePath } ) {
 	} );
 
 	return (
-		<nav className="border-b border-rule bg-surface">
+		<nav className="border-b border-rule bg-surface print:hidden">
 			<div className="mx-auto flex max-w-page items-center gap-1 overflow-x-auto overflow-y-hidden px-4.5">
 				{ visible.map( ( t ) => {
 					const active =

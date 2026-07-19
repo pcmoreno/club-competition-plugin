@@ -106,7 +106,7 @@ export function Pairings( { seasonId } ) {
 					<button
 						type="button"
 						onClick={ () => window.print() }
-						className="text-sm text-ink-3 hover:text-ink"
+						className="text-sm text-ink-3 hover:text-ink print:hidden"
 					>
 						Print
 					</button>
@@ -129,7 +129,7 @@ function RoundTable( { round, data, seasonId } ) {
 				</h2>
 				<div className="flex items-center gap-3 text-sm text-ink-3">
 					{ dateLabel && <span>{ dateLabel }</span> }
-					<span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-ink-2">
+					<span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-ink-2 print:hidden">
 						{ STATUS_LABEL[ round.status ] ?? round.status }
 					</span>
 				</div>
@@ -144,7 +144,7 @@ function RoundTable( { round, data, seasonId } ) {
 							Result
 						</th>
 						<th className="px-4 py-2 font-medium">Black</th>
-						<th className="w-24 px-4 py-2 font-medium">Cat</th>
+						<th className="w-24 px-4 py-2 font-medium print:hidden">Cat</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -170,7 +170,7 @@ function RoundTable( { round, data, seasonId } ) {
 									seasonId={ seasonId }
 								/>
 							</td>
-							<td className="px-4 py-2.5 text-ink-3">
+							<td className="px-4 py-2.5 text-ink-3 print:hidden">
 								{ categoryLabel( g.white, g.black ) }
 							</td>
 						</tr>

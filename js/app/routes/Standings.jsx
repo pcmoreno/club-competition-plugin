@@ -292,25 +292,34 @@ function Wrap( { children, rounds, categories, category, onCategory } ) {
 				<h1 className="font-serif text-[38px] leading-[1.1]">
 					{ title }
 				</h1>
-				{ categories && categories.length > 2 && (
-					<div className="flex flex-wrap gap-1">
-						{ categories.map( ( c ) => (
-							<button
-								key={ c }
-								type="button"
-								onClick={ () => onCategory( c ) }
-								className={ [
-									'rounded-full border px-3 py-1 text-sm',
-									c === category
-										? 'border-accent bg-accent-soft text-accent-2'
-										: 'border-rule text-ink-3 hover:text-ink',
-								].join( ' ' ) }
-							>
-								{ c }
-							</button>
-						) ) }
-					</div>
-				) }
+				<div className="flex flex-wrap items-center gap-3">
+					{ categories && categories.length > 2 && (
+						<div className="flex flex-wrap gap-1 print:hidden">
+							{ categories.map( ( c ) => (
+								<button
+									key={ c }
+									type="button"
+									onClick={ () => onCategory( c ) }
+									className={ [
+										'rounded-full border px-3 py-1 text-sm',
+										c === category
+											? 'border-accent bg-accent-soft text-accent-2'
+											: 'border-rule text-ink-3 hover:text-ink',
+									].join( ' ' ) }
+								>
+									{ c }
+								</button>
+							) ) }
+						</div>
+					) }
+					<button
+						type="button"
+						onClick={ () => window.print() }
+						className="text-sm text-ink-3 hover:text-ink print:hidden"
+					>
+						Print
+					</button>
+				</div>
 			</div>
 			{ children }
 		</Page>

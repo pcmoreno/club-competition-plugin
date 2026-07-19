@@ -125,7 +125,7 @@ export function TopBar( { seasonId, onSeasonChange, showTournamentSwitcher } ) {
 
 	return (
 		<>
-			<header className="border-b border-rule bg-paper">
+			<header className="border-b border-rule bg-paper print:hidden">
 				<div className="mx-auto flex max-w-page items-center justify-between gap-6 px-7 py-3.5">
 					<button
 						type="button"
