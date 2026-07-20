@@ -28,6 +28,8 @@ class StandingsSnapshot
         public readonly int $byes,
         public readonly int $color_balance,
         public readonly ?int $tpr,
+        // Open map of every computed metric (metric value => score); display picks a subset.
+        public readonly array $scores = [],
     ) {
     }
 }

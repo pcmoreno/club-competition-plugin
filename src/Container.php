@@ -152,6 +152,39 @@ class Container
             ->setPublic(true)
             ->setFactory([self::class, 'createCsrfTokenManager']);
 
+        // ── Engine (scoring) ──────────────────────────────────────────────────
+        $container->register('points_calculator', Engine\Scoring\Metric\PointsCalculator::class);
+        $container->register('wins_calculator', Engine\Scoring\Metric\WinsCalculator::class);
+        $container->register('sonneborn_berger_calculator', Engine\Scoring\Metric\SonnebornBergerCalculator::class);
+        $container->register('buchholz_calculator', Engine\Scoring\Metric\BuchholzCalculator::class);
+        $container->register('performance_rating_calculator', Engine\Scoring\Metric\PerformanceRatingCalculator::class);
+
+        $container->register('player_score_calculator', Engine\Scoring\PlayerScoreCalculator::class)
+            ->addArgument([
+                new Reference('points_calculator'),
+                new Reference('wins_calculator'),
+                new Reference('sonneborn_berger_calculator'),
+                new Reference('buchholz_calculator'),
+                new Reference('performance_rating_calculator'),
+            ]);
+
+        $container->register('standings_calculator', Engine\Scoring\StandingsCalculator::class);
+
+        $container->register('scoring_strategy_resolver', Engine\ScoringStrategyResolver::class)
+            ->addArgument(new Reference('player_score_calculator'))
+            ->addArgument(new Reference('standings_calculator'));
+
+        $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class);
+
+        $container->register('round_service', Services\RoundService::class)
+            ->addArgument(new Reference('scoring_strategy_resolver'))
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('standings_snapshot_repository'));
+
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
             ->setPublic(true)
@@ -196,7 +229,8 @@ class Container
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
-            ->addArgument(new Reference('serializer_service'));
+            ->addArgument(new Reference('serializer_service'))
+            ->addArgument(new Reference('round_service'));
 
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)

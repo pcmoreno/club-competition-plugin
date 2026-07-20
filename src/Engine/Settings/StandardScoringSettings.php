@@ -63,6 +63,21 @@ final class StandardScoringSettings implements TournamentScoringSettings
         return 0.0;
     }
 
+    public function directEncounterMaxGroup(): int
+    {
+        return (int)($this->tiebreakConfig['direct_encounter']['maxGroup'] ?? 2);
+    }
+
+    public function buchholzMethod(): BuchholzMethod
+    {
+        return BuchholzMethod::tryFrom((string)($this->tiebreakConfig['buchholz']['method'] ?? '')) ?? BuchholzMethod::Baku2023;
+    }
+
+    public function tprMethod(): TprMethod
+    {
+        return TprMethod::tryFrom((string)($this->tiebreakConfig['performance_rating']['method'] ?? '')) ?? TprMethod::FideDp;
+    }
+
     public function getSettings(): array
     {
         return [

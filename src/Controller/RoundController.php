@@ -18,6 +18,7 @@ use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
+use SCS\Services\RoundService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -31,6 +32,7 @@ class RoundController extends RestController
         private readonly SeasonRepository $seasonRepository,
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
+        private readonly RoundService $roundService,
     ) {
         parent::__construct($validator);
     }
@@ -126,7 +128,13 @@ class RoundController extends RestController
             $input = UpdateRoundStatusRequest::fromRequest($request);
             $this->validate($input);
 
-            $this->roundRepository->updateStatus($round->id, RoundStatus::from($input->status));
+            $newStatus = RoundStatus::from($input->status);
+            $this->roundRepository->updateStatus($round->id, $newStatus);
+
+            // Completing a round freezes its standings snapshot.
+            if ($newStatus === RoundStatus::Complete) {
+                $this->roundService->completeRound($round);
+            }
 
             return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id), SerializerService::GROUP_ADMIN));
         });

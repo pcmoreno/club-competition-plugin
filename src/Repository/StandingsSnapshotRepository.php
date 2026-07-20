@@ -148,6 +148,7 @@ class StandingsSnapshotRepository
         int $byes,
         int $color_balance,
         ?int $tpr,
+        array $scores = [],
     ): void {
         $this->connection->insert(SCS_TABLE_PREFIX . 'standings_snapshots', [
             'season_id'        => $season_id,
@@ -163,6 +164,7 @@ class StandingsSnapshotRepository
             'byes'             => $byes,
             'color_balance'    => $color_balance,
             'tpr'              => $tpr,
+            'scores'           => json_encode($scores),
         ]);
     }
 
@@ -193,6 +195,18 @@ class StandingsSnapshotRepository
             byes:             (int)$row['byes'],
             color_balance:    (int)$row['color_balance'],
             tpr:              $row['tpr'] !== null ? (int)$row['tpr'] : null,
+            scores:           $this->decodeScores($row['scores'] ?? null),
         );
+    }
+
+    private function decodeScores(?string $json): array
+    {
+        if ($json === null || $json === '') {
+            return [];
+        }
+
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 }
