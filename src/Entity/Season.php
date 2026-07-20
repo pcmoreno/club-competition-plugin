@@ -19,6 +19,9 @@ class Season
         public readonly SeasonStatus $status,
         public readonly array $categories,
         public readonly \DateTimeImmutable $created_at,
+        public readonly ?array $pairing_settings = null,
+        public readonly ?array $scoring_settings = null,
+        public readonly ?array $display_settings = null,
     ) {
     }
 }

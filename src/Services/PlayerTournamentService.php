@@ -156,7 +156,7 @@ class PlayerTournamentService
         // game. Absences where they were paired but didn't show already appear
         // above as a game with a null result, so only unpaired byes are added.
         foreach ($this->attendance->findBySeasonPlayer($seasonPlayer->id) as $roundId => $attendance) {
-            if ($attendance->bye_type !== ByeType::ParingBye || isset($playedRoundIds[$roundId])) {
+            if ($attendance->bye_type !== ByeType::PairingBye || isset($playedRoundIds[$roundId])) {
                 continue;
             }
             $round    = $roundsById[$roundId] ?? ['number' => 0, 'date' => null];

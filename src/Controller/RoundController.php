@@ -84,7 +84,7 @@ class RoundController extends RestController
                     'category'         => $display[$a->season_player_id]['category'] ?? null,
                     'bye_type'         => $a->bye_type?->value,
                 ],
-                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::ParingBye)
+                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::PairingBye)
             ));
 
             return $this->ok([
