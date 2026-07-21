@@ -47,6 +47,15 @@ final class StandardScoringSettings implements TournamentScoringSettings
     ) {
     }
 
+    /** @return list<string> keys the engine assigns itself, so they can never be dropped */
+    public static function reservedByeKeys(): array
+    {
+        return array_column(
+            array_filter(self::DEFAULT_BYE_TYPES, static fn (array $bye) => ($bye['reserved'] ?? false) === true),
+            'key'
+        );
+    }
+
     public function pointsFor(ScoringOutcome $outcome): float
     {
         return (float)($this->gameOutcomes[$outcome->value] ?? 0.0);
@@ -106,7 +115,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
             [
                 'group'        => ScoringSettingsGroup::ByeTypes->value,
                 'type'         => FieldType::KeyedNumberList->value,
-                'reservedKeys' => ['pairing_bye'],
+                'reservedKeys' => self::reservedByeKeys(),
                 'default'      => self::DEFAULT_BYE_TYPES,
             ],
             [

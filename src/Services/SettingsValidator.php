@@ -39,6 +39,15 @@ final class SettingsValidator
             }
         }
 
+        // The engine assigns the reserved bye types itself, so they must survive any client payload.
+        if (isset($input['byeTypes']) && is_array($input['byeTypes'])) {
+            $keys    = array_column(array_filter($input['byeTypes'], 'is_array'), 'key');
+            $missing = array_diff(StandardScoringSettings::reservedByeKeys(), $keys);
+            if ($missing !== []) {
+                $errors['byeTypes'] = sprintf('Reserved bye type(s) cannot be removed: %s.', implode(', ', $missing));
+            }
+        }
+
         if (isset($input['rankBy']) && StandingsMetric::tryFrom((string)$input['rankBy']) === null) {
             $errors['rankBy'] = 'Unknown ranking metric.';
         }

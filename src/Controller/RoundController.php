@@ -8,9 +8,7 @@ use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
-use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
-use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\RoundRepository;
@@ -194,16 +192,15 @@ class RoundController extends RestController
     public function createGame(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
-            $round = $this->assertRoundEditable($this->roundRepository->findById((int)$request->get_param('id')));
-
             $input = CreatePairingRequest::fromRequest($request);
             $this->validate($input);
 
-            $display = $this->playerDisplay->mapForSeason($round->season_id);
-            $this->assertPairingValid($round, $input->white_season_player_id, $input->black_season_player_id, $display, null);
-
-            $board = $input->board ?? $this->nextBoard($round->id);
-            $game  = $this->gameRepository->create($round->id, $input->white_season_player_id, $input->black_season_player_id, $board);
+            $game = $this->roundService->addPairing(
+                (int)$request->get_param('id'),
+                $input->white_season_player_id,
+                $input->black_season_player_id,
+                $input->board,
+            );
 
             return $this->created($this->serializer->serialize($game));
         });
@@ -212,95 +209,26 @@ class RoundController extends RestController
     public function updateGame(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
-            $game = $this->gameRepository->findById((int)$request->get_param('id'));
-            if ($game === null) {
-                throw new NotFoundException('Game not found.');
-            }
-            $round = $this->assertRoundEditable($this->roundRepository->findById($game->round_id));
-
             $input = UpdatePairingRequest::fromRequest($request);
             $this->validate($input);
 
-            $white = $input->white_season_player_id ?? $game->white_season_player_id;
-            $black = $input->black_season_player_id ?? $game->black_season_player_id;
+            $game = $this->roundService->updatePairing(
+                (int)$request->get_param('id'),
+                $input->white_season_player_id,
+                $input->black_season_player_id,
+                $input->board,
+            );
 
-            $display = $this->playerDisplay->mapForSeason($round->season_id);
-            $this->assertPairingValid($round, $white, $black, $display, $game->id);
-
-            $data = [
-                'white_season_player_id' => $white,
-                'black_season_player_id' => $black,
-            ];
-            if ($input->board !== null) {
-                $data['board'] = $input->board;
-            }
-            $this->gameRepository->update($game->id, $data);
-
-            $updated = $this->gameRepository->findById($game->id);
-            if ($updated === null) {
-                throw new NotFoundException('Game not found.');
-            }
-
-            return $this->ok($this->serializer->serialize($updated));
+            return $this->ok($this->serializer->serialize($game));
         });
     }
 
     public function deleteGame(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
-            $game = $this->gameRepository->findById((int)$request->get_param('id'));
-            if ($game === null) {
-                throw new NotFoundException('Game not found.');
-            }
-            $this->assertRoundEditable($this->roundRepository->findById($game->round_id));
-
-            $this->gameRepository->delete($game->id);
+            $this->roundService->removePairing((int)$request->get_param('id'));
 
             return $this->ok(['deleted' => true]);
         });
-    }
-
-    // Pairings are editable while draft/published; finalised and complete are locked.
-    private function assertRoundEditable(?\SCS\Entity\Round $round): \SCS\Entity\Round
-    {
-        if ($round === null) {
-            throw new NotFoundException('Round not found.');
-        }
-        if ($round->status === RoundStatus::Finalised || $round->status === RoundStatus::Complete) {
-            throw new ConflictException('Pairings are locked once the round is finalised.');
-        }
-
-        return $round;
-    }
-
-    /** @param array<int,mixed> $display season_player_id => display info for the season roster */
-    private function assertPairingValid(\SCS\Entity\Round $round, int $white, int $black, array $display, ?int $excludeGameId): void
-    {
-        if ($white === $black) {
-            throw new ValidationException(['players' => 'A player cannot be paired against themselves.']);
-        }
-        if (!isset($display[$white]) || !isset($display[$black])) {
-            throw new ValidationException(['players' => 'Both players must be enrolled in this season.']);
-        }
-
-        foreach ($this->gameRepository->findByRound($round->id) as $existing) {
-            if ($existing->id === $excludeGameId) {
-                continue;
-            }
-            $paired = [$existing->white_season_player_id, $existing->black_season_player_id];
-            if (in_array($white, $paired, true) || in_array($black, $paired, true)) {
-                throw new ConflictException('A player is already paired in this round.');
-            }
-        }
-    }
-
-    private function nextBoard(int $roundId): int
-    {
-        $max = 0;
-        foreach ($this->gameRepository->findByRound($roundId) as $game) {
-            $max = max($max, $game->board ?? 0);
-        }
-
-        return $max + 1;
     }
 }

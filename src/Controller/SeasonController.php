@@ -234,33 +234,42 @@ class SeasonController extends RestController
 
     /**
      * Validate + normalise the three settings blobs into the update payload.
-     * Changing the pairing system resets pairing/scoring to the new defaults
-     * (the frontend confirms via a modal); scoring settings lock after the
-     * first completed round; display settings are always editable.
+     * Changing the pairing system resets pairing settings to the new defaults
+     * (the frontend confirms via a modal), and resets scoring only when the new
+     * system scores differently; scoring settings lock after the first completed
+     * round; display settings are always editable.
      *
      * @param array<string,mixed> $data
      */
     private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): void
     {
-        $systemChanged = $input->pairing_system !== null
-            && $input->pairing_system !== $season->pairing_system->value;
+        $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
+        $systemChanged = $newSystem !== $season->pairing_system;
+        $scoringLocked = $this->roundRepository->countCompletedBySeason($season->id) > 0;
 
         if ($systemChanged) {
+            // Pairing settings are system-specific, so they never survive a switch.
             $data['pairing_settings'] = null;
-            $data['scoring_settings'] = null;
-        } else {
-            if ($input->pairing_settings !== null) {
-                $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($input->pairing_settings));
-            }
-            if ($input->scoring_settings !== null) {
-                if ($this->roundRepository->countCompletedBySeason($season->id) > 0) {
-                    throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
+
+            // Wiping scoring is itself a scoring change, so it obeys the same lock.
+            if ($newSystem->scoringSystem() !== $season->pairing_system->scoringSystem()) {
+                if ($scoringLocked) {
+                    throw new ValidationException(['pairing_system' => 'This pairing system scores differently and cannot be selected after the first completed round.']);
                 }
-                if ($season->pairing_system->scoringSystem() !== ScoringSystem::Standard) {
-                    throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
-                }
-                $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
+                $data['scoring_settings'] = null;
             }
+        } elseif ($input->pairing_settings !== null) {
+            $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($input->pairing_settings));
+        }
+
+        if ($input->scoring_settings !== null) {
+            if ($scoringLocked) {
+                throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
+            }
+            if ($newSystem->scoringSystem() !== ScoringSystem::Standard) {
+                throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
+            }
+            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
         }
 
         if ($input->display_settings !== null) {
