@@ -8,7 +8,6 @@ use SCS\Engine\Scoring\ScoringContext;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\StandingsMetric;
-use SCS\Entity\Enum\TprMethod;
 
 // FIDE performance rating: average opponent rating + dp(p), p = game score / games played.
 final class PerformanceRatingCalculator implements MetricCalculatorInterface
@@ -29,7 +28,7 @@ final class PerformanceRatingCalculator implements MetricCalculatorInterface
 
     public function isImplemented(StandardScoringSettings $settings): bool
     {
-        return $settings->tprMethod() === TprMethod::FideDp;
+        return $settings->tprMethod()->isImplemented();
     }
 
     public function calculate(ScoringContext $context): array

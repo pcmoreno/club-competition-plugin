@@ -35,10 +35,13 @@ final class RoundService
             throw new NotFoundException('Season not found for round.');
         }
 
+        /** @var list<\SCS\Entity\SeasonPlayer> $roster */
         $roster = $this->seasonPlayers->findBySeason($season->id);
 
         // Standard scoring is cumulative over all completed games/attendance up to this round.
-        $games      = [];
+        /** @var list<\SCS\Entity\Game> $games */
+        $games = [];
+        /** @var list<\SCS\Entity\Attendance> $attendance */
         $attendance = [];
         foreach ($this->rounds->findBySeason($season->id) as $r) {
             if ($r->round_number > $round->round_number) {

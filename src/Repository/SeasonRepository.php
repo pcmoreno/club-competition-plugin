@@ -113,6 +113,7 @@ class SeasonRepository
     }
 
     // Null (or an empty column) means "no config yet" — the strategy uses its defaults.
+    /** @return array<string,mixed>|null */
     private function decodeSettings(?string $json): ?array
     {
         if ($json === null || $json === '') {

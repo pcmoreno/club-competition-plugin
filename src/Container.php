@@ -103,6 +103,8 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
+        $container->register('settings_validator', Services\SettingsValidator::class);
+
         $container->register('player_display_service', Services\PlayerDisplayService::class)
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('player_repository'));
@@ -219,7 +221,8 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('player_tournament_service'))
-            ->addArgument(new Reference('serializer_service'));
+            ->addArgument(new Reference('serializer_service'))
+            ->addArgument(new Reference('settings_validator'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)

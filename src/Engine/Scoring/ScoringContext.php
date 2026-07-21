@@ -60,6 +60,7 @@ final class ScoringContext
         return new self($playerIds, $ratings, $settings, $gamesByPlayer, $byesByPlayer);
     }
 
+    /** @param array<int,float> $points */
     public function withPoints(array $points): self
     {
         return new self($this->playerIds, $this->ratings, $this->settings, $this->gamesByPlayer, $this->byesByPlayer, $points);

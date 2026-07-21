@@ -49,7 +49,7 @@ final class StandingsCalculator
     private function resolve(array $players, array $criteria, ScoringContext $context): array
     {
         if (count($players) <= 1 || $criteria === []) {
-            return array_values($players);
+            return $players;
         }
 
         $head = $criteria[0];

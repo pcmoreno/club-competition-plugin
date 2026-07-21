@@ -134,6 +134,7 @@ class StandingsSnapshotRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /** @param array<string,mixed> $scores */
     public function create(
         int $season_id,
         int $round_id,
@@ -199,6 +200,7 @@ class StandingsSnapshotRepository
         );
     }
 
+    /** @return array<string,mixed> */
     private function decodeScores(?string $json): array
     {
         if ($json === null || $json === '') {

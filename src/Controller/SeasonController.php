@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\ScoringSystem;
+use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -19,6 +21,7 @@ use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
+use SCS\Services\SettingsValidator;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class SeasonController extends RestController
@@ -33,6 +36,7 @@ class SeasonController extends RestController
         private readonly RoundRepository $roundRepository,
         private readonly PlayerTournamentService $playerTournament,
         private readonly SerializerService $serializer,
+        private readonly SettingsValidator $settingsValidator,
     ) {
         parent::__construct($validator);
     }
@@ -177,6 +181,7 @@ class SeasonController extends RestController
             $this->validate($input);
 
             $data = $input->toUpdateData();
+            $this->applySettings($input, $season, $data);
             if (empty($data)) {
                 throw new ValidationException(['fields' => 'No fields to update.']);
             }
@@ -185,6 +190,42 @@ class SeasonController extends RestController
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
+    }
+
+    /**
+     * Validate + normalise the three settings blobs into the update payload.
+     * Changing the pairing system resets pairing/scoring to the new defaults
+     * (the frontend confirms via a modal); scoring settings lock after the
+     * first completed round; display settings are always editable.
+     *
+     * @param array<string,mixed> $data
+     */
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): void
+    {
+        $systemChanged = $input->pairing_system !== null
+            && $input->pairing_system !== $season->pairing_system->value;
+
+        if ($systemChanged) {
+            $data['pairing_settings'] = null;
+            $data['scoring_settings'] = null;
+        } else {
+            if ($input->pairing_settings !== null) {
+                $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($input->pairing_settings));
+            }
+            if ($input->scoring_settings !== null) {
+                if ($this->roundRepository->countCompletedBySeason($season->id) > 0) {
+                    throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
+                }
+                if ($season->pairing_system->scoringSystem() !== ScoringSystem::Standard) {
+                    throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
+                }
+                $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
+            }
+        }
+
+        if ($input->display_settings !== null) {
+            $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
+        }
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response

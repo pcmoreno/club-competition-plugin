@@ -11,6 +11,7 @@ namespace SCS\Entity;
  */
 class StandingsSnapshot
 {
+    /** @param array<string,mixed> $scores */
     public function __construct(
         public readonly int $id,
         public readonly int $season_id,

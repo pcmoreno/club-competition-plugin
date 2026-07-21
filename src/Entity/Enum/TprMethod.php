@@ -18,6 +18,7 @@ enum TprMethod: string
 
     public function isImplemented(): bool
     {
-        return $this === self::FideDp;
+        // FIDE dp is the only method so far, and it's implemented.
+        return true;
     }
 }

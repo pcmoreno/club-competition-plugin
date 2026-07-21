@@ -157,12 +157,6 @@ parameters:
 			path: src/Repository/AdminRepository.php
 
 		-
-			message: '#^Method SCS\\Repository\\AttendanceRepository\:\:findByRound\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Repository/AttendanceRepository.php
-
-		-
 			message: '#^Method SCS\\Repository\\AttendanceRepository\:\:hydrate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -171,12 +165,6 @@ parameters:
 		-
 			message: '#^Method SCS\\Repository\\GameRepository\:\:create\(\) should return SCS\\Entity\\Game but returns SCS\\Entity\\Game\|null\.$#'
 			identifier: return.type
-			count: 1
-			path: src/Repository/GameRepository.php
-
-		-
-			message: '#^Method SCS\\Repository\\GameRepository\:\:findByRound\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
 			count: 1
 			path: src/Repository/GameRepository.php
 

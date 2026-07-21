@@ -20,11 +20,13 @@ final class StandingsDisplaySettings implements TournamentStandingsDisplaySettin
     ) {
     }
 
+    /** @return array<string,mixed> */
     public function getSettings(): array
     {
         return ['columns' => $this->columns];
     }
 
+    /** @return list<array<string,mixed>> */
     public function getSettingsFields(): array
     {
         return [
@@ -40,6 +42,7 @@ final class StandingsDisplaySettings implements TournamentStandingsDisplaySettin
         ];
     }
 
+    /** @param array<string,mixed> $values */
     public static function fromArray(array $values): static
     {
         $columns = isset($values['columns']) && is_array($values['columns'])

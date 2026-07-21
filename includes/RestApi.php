@@ -332,10 +332,29 @@ class RestApi
             ]);
 
             // ── Games ─────────────────────────────────────────────────────────
+            register_rest_route('scs/v1', '/rounds/(?P<id>\d+)/games', [
+                'methods'             => 'POST',
+                'callback'            => [$rounds, 'createGame'],
+                'permission_callback' => $isAdmin,
+            ]);
+
             register_rest_route('scs/v1', '/games/(?P<id>\d+)/result', [
                 'methods'             => 'PATCH',
                 'callback'            => [$rounds, 'updateGameResult'],
                 'permission_callback' => $isAdmin,
+            ]);
+
+            register_rest_route('scs/v1', '/games/(?P<id>\d+)', [
+                [
+                    'methods'             => 'PUT',
+                    'callback'            => [$rounds, 'updateGame'],
+                    'permission_callback' => $isAdmin,
+                ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$rounds, 'deleteGame'],
+                    'permission_callback' => $isAdmin,
+                ],
             ]);
 
             // ── Fixtures / import ─────────────────────────────────────────────

@@ -30,7 +30,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
 
     /**
      * @param array<string,float>              $gameOutcomes  ScoringOutcome value => points
-     * @param list<array{key:string,label:string,points:float,reserved?:bool}> $byeTypes
+     * @param list<array<string,mixed>>        $byeTypes      each {key,label,points,reserved?}
      * @param list<StandingsMetric>            $tiebreakers   ordered
      * @param array<string,array<string,mixed>> $tiebreakConfig per-metric params
      */
@@ -78,6 +78,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
         return TprMethod::tryFrom((string)($this->tiebreakConfig['performance_rating']['method'] ?? '')) ?? TprMethod::FideDp;
     }
 
+    /** @return array<string,mixed> */
     public function getSettings(): array
     {
         return [
@@ -89,6 +90,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
         ];
     }
 
+    /** @return list<array<string,mixed>> */
     public function getSettingsFields(): array
     {
         return [
@@ -123,6 +125,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
         ];
     }
 
+    /** @param array<string,mixed> $values */
     public static function fromArray(array $values): static
     {
         $defaults = new self();
@@ -147,6 +150,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
         );
     }
 
+    /** @return list<array<string,string>> */
     private static function metricOptions(): array
     {
         return array_map(
@@ -156,6 +160,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
     }
 
     // Parametric tiebreakers expose sub-fields, revealed only when the metric is selected.
+    /** @return array<string,list<array<string,mixed>>> */
     private static function tiebreakConfigSchema(): array
     {
         return [

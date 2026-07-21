@@ -15,6 +15,7 @@ class AttendanceRepository
     {
     }
 
+    /** @return list<Attendance> */
     public function findByRound(int $round_id): array
     {
         $rows = $this->connection->createQueryBuilder()
@@ -24,7 +25,7 @@ class AttendanceRepository
             ->setParameter('round_id', $round_id)
             ->fetchAllAssociative();
 
-        return array_map($this->hydrate(...), $rows);
+        return array_values(array_map($this->hydrate(...), $rows));
     }
 
     public function findByRoundAndSeasonPlayer(int $round_id, int $season_player_id): ?Attendance

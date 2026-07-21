@@ -19,7 +19,7 @@ final class BuchholzCalculator implements MetricCalculatorInterface
 
     public function isImplemented(StandardScoringSettings $settings): bool
     {
-        return $settings->buchholzMethod() === BuchholzMethod::Classic;
+        return $settings->buchholzMethod()->isImplemented();
     }
 
     public function calculate(ScoringContext $context): array
