@@ -278,6 +278,13 @@ class RestApi
                 'permission_callback' => '__return_true',
             ]);
 
+            // Engine settings + their field schema, for the admin settings form.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/settings', [
+                'methods'             => 'GET',
+                'callback'            => [$seasons, 'settings'],
+                'permission_callback' => $isAdminRead,
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players', [
                 [
                     'methods'             => 'POST',

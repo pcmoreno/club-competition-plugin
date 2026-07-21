@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
+import { TournamentSettingsDialog } from './TournamentSettingsDialog';
 import { Notice, formatDate } from '../components/ui';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
@@ -10,6 +11,7 @@ import { Notice, formatDate } from '../components/ui';
 // "New tournament" flow are a later pass — see dev/page-inventory.md.
 
 const PAIRING_LABELS = {
+	manual: 'Manual',
 	keizer: 'Keizer',
 	swiss: 'Swiss',
 	'round-robin-full': 'Round-robin',
@@ -25,6 +27,7 @@ const GROUPS = [
 
 export function Tournaments() {
 	const [ importing, setImporting ] = useState( false );
+	const [ settingsFor, setSettingsFor ] = useState( null );
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'seasons' ],
 		queryFn: () => api.get( 'seasons' ),
@@ -50,6 +53,7 @@ export function Tournaments() {
 							key={ g.status }
 							label={ g.label }
 							rows={ rows }
+							onSettings={ setSettingsFor }
 						/>
 					);
 				} ) }
@@ -75,11 +79,17 @@ export function Tournaments() {
 			{ importing && (
 				<ImportSeasonDialog onClose={ () => setImporting( false ) } />
 			) }
+			{ settingsFor && (
+				<TournamentSettingsDialog
+					season={ settingsFor }
+					onClose={ () => setSettingsFor( null ) }
+				/>
+			) }
 		</>
 	);
 }
 
-function TournamentGroup( { label, rows } ) {
+function TournamentGroup( { label, rows, onSettings } ) {
 	return (
 		<section>
 			<h2 className="mb-2 text-xs font-medium uppercase tracking-[0.08em] text-muted">
@@ -92,6 +102,9 @@ function TournamentGroup( { label, rows } ) {
 							<th className="px-4 py-2 font-medium">Name</th>
 							<th className="px-4 py-2 font-medium">Pairing</th>
 							<th className="px-4 py-2 font-medium">Dates</th>
+							<th className="px-4 py-2 font-medium">
+								<span className="sr-only">Actions</span>
+							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -112,6 +125,15 @@ function TournamentGroup( { label, rows } ) {
 									{ s.end_date
 										? ` – ${ formatDate( s.end_date ) }`
 										: '' }
+								</td>
+								<td className="px-4 py-2.5 text-right">
+									<button
+										type="button"
+										className="text-sm text-ink-3 hover:text-ink"
+										onClick={ () => onSettings( s ) }
+									>
+										Settings
+									</button>
 								</td>
 							</tr>
 						) ) }

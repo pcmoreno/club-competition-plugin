@@ -178,6 +178,8 @@ class Container
 
         $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class);
 
+        $container->register('settings_resolver', Engine\SettingsResolver::class);
+
         $container->register('round_service', Services\RoundService::class)
             ->addArgument(new Reference('scoring_strategy_resolver'))
             ->addArgument(new Reference('season_repository'))
@@ -222,7 +224,8 @@ class Container
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('player_tournament_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('settings_validator'));
+            ->addArgument(new Reference('settings_validator'))
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)
