@@ -48,8 +48,9 @@ class KnsbRatingListFetcher
         }
 
         // ZipArchive needs a file path, so the body goes to a temp file we own.
-        $tmp = wp_tempnam('scs-knsb');
-        if ($tmp === '') {
+        // Not wp_tempnam(): that lives in wp-admin and isn't loaded on REST requests.
+        $tmp = tempnam(get_temp_dir(), 'scs-knsb');
+        if ($tmp === false) {
             throw new \RuntimeException('Could not create a temp file for the KNSB archive.');
         }
 
