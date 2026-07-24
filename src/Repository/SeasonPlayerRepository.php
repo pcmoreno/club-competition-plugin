@@ -40,6 +40,24 @@ class SeasonPlayerRepository
         return array_map($this->hydrate(...), $rows);
     }
 
+    // Enrolled-player count per season, keyed by season_id — one query for the list.
+    /** @return array<int,int> */
+    public function countBySeason(): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('season_id', 'COUNT(*) AS total')
+            ->from(SCS_TABLE_PREFIX . 'season_players')
+            ->groupBy('season_id')
+            ->fetchAllAssociative();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(int)$row['season_id']] = (int)$row['total'];
+        }
+
+        return $counts;
+    }
+
     public function findById(int $id): ?SeasonPlayer
     {
         $row = $this->connection->createQueryBuilder()

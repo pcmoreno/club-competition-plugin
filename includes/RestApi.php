@@ -270,6 +270,11 @@ class RestApi
                     'callback'            => [$seasons, 'update'],
                     'permission_callback' => $isAdmin,
                 ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$seasons, 'destroy'],
+                    'permission_callback' => $isAdmin,
+                ],
             ]);
 
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/standings', [

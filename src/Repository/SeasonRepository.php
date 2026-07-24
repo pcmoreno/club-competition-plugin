@@ -94,6 +94,12 @@ class SeasonRepository
         $this->connection->update(SCS_TABLE_PREFIX . 'seasons', [ 'status' => $status->value ], [ 'id' => $id ]);
     }
 
+    // Only the season row; child rows (rounds/games/etc.) are cleared by the caller.
+    public function delete(int $id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'seasons', [ 'id' => $id ]);
+    }
+
     private function hydrate(array $row): Season
     {
         return new Season(
