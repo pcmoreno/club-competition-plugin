@@ -28,6 +28,14 @@ class UpdateSeasonRequest
     /** @var list<string>|null */
     public ?array $categories = null;
 
+    // Raw settings blobs — validated + normalised by SettingsValidator in the controller, not here.
+    /** @var array<string,mixed>|null */
+    public ?array $pairing_settings = null;
+    /** @var array<string,mixed>|null */
+    public ?array $scoring_settings = null;
+    /** @var array<string,mixed>|null */
+    public ?array $display_settings = null;
+
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
@@ -64,6 +72,15 @@ class UpdateSeasonRequest
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));
+        }
+        if ($request->get_param('pairing_settings') !== null) {
+            $dto->pairing_settings = (array)$request->get_param('pairing_settings');
+        }
+        if ($request->get_param('scoring_settings') !== null) {
+            $dto->scoring_settings = (array)$request->get_param('scoring_settings');
+        }
+        if ($request->get_param('display_settings') !== null) {
+            $dto->display_settings = (array)$request->get_param('display_settings');
         }
 
         return $dto;

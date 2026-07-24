@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
+use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\ScoringSystem;
+use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -19,6 +22,7 @@ use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
+use SCS\Services\SettingsValidator;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class SeasonController extends RestController
@@ -33,6 +37,8 @@ class SeasonController extends RestController
         private readonly RoundRepository $roundRepository,
         private readonly PlayerTournamentService $playerTournament,
         private readonly SerializerService $serializer,
+        private readonly SettingsValidator $settingsValidator,
+        private readonly SettingsResolver $settingsResolver,
     ) {
         parent::__construct($validator);
     }
@@ -177,6 +183,7 @@ class SeasonController extends RestController
             $this->validate($input);
 
             $data = $input->toUpdateData();
+            $this->applySettings($input, $season, $data);
             if (empty($data)) {
                 throw new ValidationException(['fields' => 'No fields to update.']);
             }
@@ -185,6 +192,89 @@ class SeasonController extends RestController
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
+    }
+
+    /**
+     * Admin read: the season's three settings blobs, each as stored values plus
+     * the field schema the form renders from. `fields` is null when that axis
+     * isn't configurable for this system yet.
+     */
+    public function settings(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $pairing = $this->settingsResolver->pairing($season);
+            $scoring = $this->settingsResolver->scoring($season);
+            $display = $this->settingsResolver->display($season);
+
+            return $this->ok([
+                'pairing_system' => $season->pairing_system->value,
+                'scoring_system' => $season->pairing_system->scoringSystem()->value,
+                // Scoring is frozen once a round has completed, so the form can disable it.
+                'scoring_locked' => $this->roundRepository->countCompletedBySeason($season->id) > 0,
+                'pairing' => [
+                    'values' => $pairing?->getSettings(),
+                    'fields' => $pairing?->getSettingsFields(),
+                ],
+                'scoring' => [
+                    'values' => $scoring?->getSettings(),
+                    'fields' => $scoring?->getSettingsFields(),
+                ],
+                'display' => [
+                    'values' => $display->getSettings(),
+                    'fields' => $display->getSettingsFields(),
+                ],
+            ]);
+        });
+    }
+
+    /**
+     * Validate + normalise the three settings blobs into the update payload.
+     * Changing the pairing system resets pairing settings to the new defaults
+     * (the frontend confirms via a modal), and resets scoring only when the new
+     * system scores differently; scoring settings lock after the first completed
+     * round; display settings are always editable.
+     *
+     * @param array<string,mixed> $data
+     */
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): void
+    {
+        $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
+        $systemChanged = $newSystem !== $season->pairing_system;
+        $scoringLocked = $this->roundRepository->countCompletedBySeason($season->id) > 0;
+
+        if ($systemChanged) {
+            // Pairing settings are system-specific, so they never survive a switch.
+            $data['pairing_settings'] = null;
+
+            // Wiping scoring is itself a scoring change, so it obeys the same lock.
+            if ($newSystem->scoringSystem() !== $season->pairing_system->scoringSystem()) {
+                if ($scoringLocked) {
+                    throw new ValidationException(['pairing_system' => 'This pairing system scores differently and cannot be selected after the first completed round.']);
+                }
+                $data['scoring_settings'] = null;
+            }
+        } elseif ($input->pairing_settings !== null) {
+            $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($input->pairing_settings));
+        }
+
+        if ($input->scoring_settings !== null) {
+            if ($scoringLocked) {
+                throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
+            }
+            if ($newSystem->scoringSystem() !== ScoringSystem::Standard) {
+                throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
+            }
+            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
+        }
+
+        if ($input->display_settings !== null) {
+            $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
+        }
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response

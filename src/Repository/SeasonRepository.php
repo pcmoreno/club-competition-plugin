@@ -106,6 +106,22 @@ class SeasonRepository
             status:         SeasonStatus::from($row['status']),
             categories:     json_decode($row['categories'] ?? '[]', true),
             created_at:     new \DateTimeImmutable($row['created_at']),
+            pairing_settings: $this->decodeSettings($row['pairing_settings'] ?? null),
+            scoring_settings: $this->decodeSettings($row['scoring_settings'] ?? null),
+            display_settings: $this->decodeSettings($row['display_settings'] ?? null),
         );
+    }
+
+    // Null (or an empty column) means "no config yet" — the strategy uses its defaults.
+    /** @return array<string,mixed>|null */
+    private function decodeSettings(?string $json): ?array
+    {
+        if ($json === null || $json === '') {
+            return null;
+        }
+
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

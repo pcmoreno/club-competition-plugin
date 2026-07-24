@@ -13,11 +13,14 @@ use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonRepository;
+use SCS\Request\CreatePairingRequest;
 use SCS\Request\CreateRoundRequest;
 use SCS\Request\SaveAttendanceRequest;
+use SCS\Request\UpdatePairingRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
+use SCS\Services\RoundService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -31,6 +34,7 @@ class RoundController extends RestController
         private readonly SeasonRepository $seasonRepository,
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
+        private readonly RoundService $roundService,
     ) {
         parent::__construct($validator);
     }
@@ -84,7 +88,7 @@ class RoundController extends RestController
                     'category'         => $display[$a->season_player_id]['category'] ?? null,
                     'bye_type'         => $a->bye_type?->value,
                 ],
-                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::ParingBye)
+                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::PairingBye)
             ));
 
             return $this->ok([
@@ -126,7 +130,13 @@ class RoundController extends RestController
             $input = UpdateRoundStatusRequest::fromRequest($request);
             $this->validate($input);
 
-            $this->roundRepository->updateStatus($round->id, RoundStatus::from($input->status));
+            $newStatus = RoundStatus::from($input->status);
+            $this->roundRepository->updateStatus($round->id, $newStatus);
+
+            // Completing a round freezes its standings snapshot.
+            if ($newStatus === RoundStatus::Complete) {
+                $this->roundService->completeRound($round);
+            }
 
             return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id), SerializerService::GROUP_ADMIN));
         });
@@ -176,6 +186,49 @@ class RoundController extends RestController
             $this->gameRepository->updateResult($game->id, $result);
 
             return $this->ok($this->serializer->serialize($this->gameRepository->findById($game->id)));
+        });
+    }
+
+    public function createGame(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $input = CreatePairingRequest::fromRequest($request);
+            $this->validate($input);
+
+            $game = $this->roundService->addPairing(
+                (int)$request->get_param('id'),
+                $input->white_season_player_id,
+                $input->black_season_player_id,
+                $input->board,
+            );
+
+            return $this->created($this->serializer->serialize($game));
+        });
+    }
+
+    public function updateGame(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $input = UpdatePairingRequest::fromRequest($request);
+            $this->validate($input);
+
+            $game = $this->roundService->updatePairing(
+                (int)$request->get_param('id'),
+                $input->white_season_player_id,
+                $input->black_season_player_id,
+                $input->board,
+            );
+
+            return $this->ok($this->serializer->serialize($game));
+        });
+    }
+
+    public function deleteGame(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $this->roundService->removePairing((int)$request->get_param('id'));
+
+            return $this->ok(['deleted' => true]);
         });
     }
 }

@@ -3,13 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
-import { Notice, formatDate } from '../components/ui';
+import { TournamentSettingsDialog } from './TournamentSettingsDialog';
+import {
+	Notice,
+	formatDate,
+	ActionsMenu,
+	SearchInput,
+} from '../components/ui';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
 // Completed, from GET /seasons. Row counts (#players, rounds-played) and the
 // "New tournament" flow are a later pass — see dev/page-inventory.md.
 
 const PAIRING_LABELS = {
+	manual: 'Manual',
 	keizer: 'Keizer',
 	swiss: 'Swiss',
 	'round-robin-full': 'Round-robin',
@@ -25,6 +32,8 @@ const GROUPS = [
 
 export function Tournaments() {
 	const [ importing, setImporting ] = useState( false );
+	const [ settingsFor, setSettingsFor ] = useState( null );
+	const [ search, setSearch ] = useState( '' );
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'seasons' ],
 		queryFn: () => api.get( 'seasons' ),
@@ -38,23 +47,34 @@ export function Tournaments() {
 	} else if ( data.length === 0 ) {
 		content = <Notice>No tournaments yet.</Notice>;
 	} else {
-		content = (
-			<div className="flex flex-col gap-8">
-				{ GROUPS.map( ( g ) => {
-					const rows = data.filter( ( s ) => s.status === g.status );
-					if ( rows.length === 0 ) {
-						return null;
-					}
-					return (
-						<TournamentGroup
-							key={ g.status }
-							label={ g.label }
-							rows={ rows }
-						/>
-					);
-				} ) }
-			</div>
+		const q = search.trim().toLowerCase();
+		const filtered = data.filter(
+			( s ) => ! q || ( s.name ?? '' ).toLowerCase().includes( q )
 		);
+		if ( filtered.length === 0 ) {
+			content = <Notice>No tournaments match your search.</Notice>;
+		} else {
+			content = (
+				<div className="flex flex-col gap-8">
+					{ GROUPS.map( ( g ) => {
+						const rows = filtered.filter(
+							( s ) => s.status === g.status
+						);
+						if ( rows.length === 0 ) {
+							return null;
+						}
+						return (
+							<TournamentGroup
+								key={ g.status }
+								label={ g.label }
+								rows={ rows }
+								onSettings={ setSettingsFor }
+							/>
+						);
+					} ) }
+				</div>
+			);
+		}
 	}
 
 	return (
@@ -62,24 +82,48 @@ export function Tournaments() {
 			<AdminHeader
 				title="Tournaments"
 				action={
-					<button
-						type="button"
-						className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2"
-						onClick={ () => setImporting( true ) }
-					>
-						Import season
-					</button>
+					<div className="flex items-center gap-2">
+						<ActionsMenu
+							items={ [
+								{
+									label: 'Import season',
+									onClick: () => setImporting( true ),
+								},
+							] }
+						/>
+						<SearchInput
+							value={ search }
+							onChange={ setSearch }
+							placeholder="Search name…"
+						/>
+					</div>
 				}
 			/>
 			{ content }
 			{ importing && (
 				<ImportSeasonDialog onClose={ () => setImporting( false ) } />
 			) }
+			{ settingsFor && (
+				<TournamentSettingsDialog
+					season={ settingsFor }
+					onClose={ () => setSettingsFor( null ) }
+				/>
+			) }
 		</>
 	);
 }
 
-function TournamentGroup( { label, rows } ) {
+// Tournaments without an end date come first (still open-ended), then the rest
+// newest end date first.
+function byEndDate( a, b ) {
+	if ( ! a.end_date || ! b.end_date ) {
+		return ( a.end_date ? 1 : 0 ) - ( b.end_date ? 1 : 0 );
+	}
+	return b.end_date.localeCompare( a.end_date );
+}
+
+function TournamentGroup( { label, rows, onSettings } ) {
+	const sorted = [ ...rows ].sort( byEndDate );
 	return (
 		<section>
 			<h2 className="mb-2 text-xs font-medium uppercase tracking-[0.08em] text-muted">
@@ -92,10 +136,13 @@ function TournamentGroup( { label, rows } ) {
 							<th className="px-4 py-2 font-medium">Name</th>
 							<th className="px-4 py-2 font-medium">Pairing</th>
 							<th className="px-4 py-2 font-medium">Dates</th>
+							<th className="px-4 py-2 font-medium">
+								<span className="sr-only">Actions</span>
+							</th>
 						</tr>
 					</thead>
 					<tbody>
-						{ rows.map( ( s ) => (
+						{ sorted.map( ( s ) => (
 							<tr
 								key={ s.id }
 								className="border-b border-rule-soft"
@@ -112,6 +159,15 @@ function TournamentGroup( { label, rows } ) {
 									{ s.end_date
 										? ` – ${ formatDate( s.end_date ) }`
 										: '' }
+								</td>
+								<td className="px-4 py-2.5 text-right">
+									<button
+										type="button"
+										className="text-sm text-ink-3 hover:text-ink"
+										onClick={ () => onSettings( s ) }
+									>
+										Settings
+									</button>
 								</td>
 							</tr>
 						) ) }

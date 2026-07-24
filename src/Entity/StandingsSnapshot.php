@@ -11,6 +11,7 @@ namespace SCS\Entity;
  */
 class StandingsSnapshot
 {
+    /** @param array<string,mixed> $scores */
     public function __construct(
         public readonly int $id,
         public readonly int $season_id,
@@ -28,6 +29,8 @@ class StandingsSnapshot
         public readonly int $byes,
         public readonly int $color_balance,
         public readonly ?int $tpr,
+        // Open map of every computed metric (metric value => score); display picks a subset.
+        public readonly array $scores = [],
     ) {
     }
 }

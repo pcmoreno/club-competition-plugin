@@ -1,3 +1,104 @@
+import { useState, useEffect, useRef } from '@wordpress/element';
+
+// Page-level "Actions" dropdown, sitting left of a search box in admin list
+// headers. items: [{ label, onClick, disabled? }]. Closes on outside-click or
+// Escape, matching the account menu in the top bar.
+export function ActionsMenu( { items, label = 'Actions' } ) {
+	const [ open, setOpen ] = useState( false );
+	const ref = useRef( null );
+
+	useEffect( () => {
+		if ( ! open ) {
+			return undefined;
+		}
+		const onClick = ( e ) => {
+			if ( ref.current && ! ref.current.contains( e.target ) ) {
+				setOpen( false );
+			}
+		};
+		const onKey = ( e ) => {
+			if ( e.key === 'Escape' ) {
+				setOpen( false );
+			}
+		};
+		document.addEventListener( 'mousedown', onClick );
+		document.addEventListener( 'keydown', onKey );
+		return () => {
+			document.removeEventListener( 'mousedown', onClick );
+			document.removeEventListener( 'keydown', onKey );
+		};
+	}, [ open ] );
+
+	return (
+		<div className="relative" ref={ ref }>
+			<button
+				type="button"
+				className="inline-flex items-center gap-1.5 rounded border border-rule bg-surface px-3 py-1.5 text-sm font-medium text-ink-3 hover:text-ink"
+				onClick={ () => setOpen( ( v ) => ! v ) }
+				aria-haspopup="menu"
+				aria-expanded={ open }
+			>
+				{ label }
+				<ChevronIcon className="rotate-90" />
+			</button>
+			{ open && (
+				<div
+					role="menu"
+					className="absolute left-0 z-20 mt-1.5 w-max min-w-full overflow-hidden rounded border border-rule bg-surface py-1 shadow-md"
+				>
+					{ items.map( ( item ) => (
+						<button
+							key={ item.label }
+							type="button"
+							role="menuitem"
+							className="block w-full px-3 py-2 text-left text-sm text-ink-2 hover:bg-rule/40 hover:text-ink focus:bg-rule/40 focus:text-ink focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
+							disabled={ item.disabled }
+							onClick={ () => {
+								setOpen( false );
+								item.onClick();
+							} }
+						>
+							{ item.label }
+						</button>
+					) ) }
+				</div>
+			) }
+		</div>
+	);
+}
+
+// Search input for admin list headers, matching the Actions dropdown height.
+export function SearchInput( { value, onChange, placeholder = 'Search…' } ) {
+	return (
+		<input
+			type="search"
+			value={ value }
+			onChange={ ( e ) => onChange( e.target.value ) }
+			placeholder={ placeholder }
+			className="w-56 rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+		/>
+	);
+}
+
+function ChevronIcon( { className } ) {
+	return (
+		<svg
+			className={ className }
+			width="14"
+			height="14"
+			viewBox="0 0 16 16"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.4"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<path d="m6 4 4 4-4 4" />
+		</svg>
+	);
+}
+
 // Dashed-border card for loading / error / empty / "coming later" states.
 export function Notice( { children } ) {
 	return (

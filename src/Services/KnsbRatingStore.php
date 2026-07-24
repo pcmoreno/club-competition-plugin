@@ -41,8 +41,18 @@ class KnsbRatingStore
             throw new \RuntimeException('Could not encode the KNSB rating list.');
         }
 
-        if (file_put_contents($this->path(), $json) === false) {
+        // Write beside the target and swap: readers never see a half-written list,
+        // and replacing only needs a writable dir (the old file may be another user's).
+        $tmp = tempnam($this->ratingsDir, 'klassiek');
+        if ($tmp === false || file_put_contents($tmp, $json) === false) {
             throw new \RuntimeException('Could not write the KNSB rating list.');
+        }
+
+        @chmod($tmp, 0664);
+
+        if (!rename($tmp, $this->path())) {
+            @unlink($tmp);
+            throw new \RuntimeException('Could not replace the KNSB rating list.');
         }
     }
 

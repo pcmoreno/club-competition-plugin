@@ -9,6 +9,11 @@ use SCS\Entity\Enum\SeasonStatus;
 
 class Season
 {
+    /**
+     * @param array<string,mixed>|null $pairing_settings
+     * @param array<string,mixed>|null $scoring_settings
+     * @param array<string,mixed>|null $display_settings
+     */
     public function __construct(
         public readonly int $id,
         public readonly string $name,
@@ -19,6 +24,9 @@ class Season
         public readonly SeasonStatus $status,
         public readonly array $categories,
         public readonly \DateTimeImmutable $created_at,
+        public readonly ?array $pairing_settings = null,
+        public readonly ?array $scoring_settings = null,
+        public readonly ?array $display_settings = null,
     ) {
     }
 }

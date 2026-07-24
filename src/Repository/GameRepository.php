@@ -14,6 +14,7 @@ class GameRepository
     {
     }
 
+    /** @return list<Game> */
     public function findByRound(int $round_id): array
     {
         $rows = $this->connection->createQueryBuilder()
@@ -25,7 +26,7 @@ class GameRepository
             ->addOrderBy('id', 'ASC')
             ->fetchAllAssociative();
 
-        return array_map($this->hydrate(...), $rows);
+        return array_values(array_map($this->hydrate(...), $rows));
     }
 
     public function findById(int $id): ?Game
@@ -73,6 +74,17 @@ class GameRepository
         $this->connection->update(SCS_TABLE_PREFIX . 'games', [
             'result' => $result?->value,
         ], [ 'id' => $id ]);
+    }
+
+    /** @param array<string,mixed> $data */
+    public function update(int $id, array $data): void
+    {
+        $this->connection->update(SCS_TABLE_PREFIX . 'games', $data, [ 'id' => $id ]);
+    }
+
+    public function delete(int $id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'games', [ 'id' => $id ]);
     }
 
     public function deleteByRound(int $round_id): void

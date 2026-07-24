@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from '@wordpress/element';
+import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
@@ -7,7 +7,7 @@ import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
 import { FetchKnsbDialog } from './FetchKnsbDialog';
-import { Notice } from '../components/ui';
+import { Notice, ActionsMenu, SearchInput } from '../components/ui';
 
 function errorMessage( err ) {
 	// Our typed exceptions (404/403/409/429) return a curated, user-safe message
@@ -139,16 +139,22 @@ export function Players() {
 				action={
 					<div className="flex items-center gap-2">
 						<ActionsMenu
-							canMerge={ canMerge }
-							onMerge={ () => setMergeOpen( true ) }
-							onFetchKnsb={ () => setFetchKnsbOpen( true ) }
+							items={ [
+								{
+									label: 'Merge players',
+									onClick: () => setMergeOpen( true ),
+									disabled: ! canMerge,
+								},
+								{
+									label: 'Fetch KNSB ratings',
+									onClick: () => setFetchKnsbOpen( true ),
+								},
+							] }
 						/>
-						<input
-							type="search"
+						<SearchInput
 							value={ search }
-							onChange={ ( e ) => setSearch( e.target.value ) }
+							onChange={ setSearch }
 							placeholder="Search name…"
-							className="w-56 rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
 						/>
 					</div>
 				}
@@ -190,81 +196,6 @@ export function Players() {
 				<FetchKnsbDialog onClose={ () => setFetchKnsbOpen( false ) } />
 			) }
 		</>
-	);
-}
-
-// Roster-level actions dropdown, sitting left of the search box. Grows a menu
-// of bulk/roster tools; for now its one item is Merge players. Closes on
-// outside-click or Escape, matching the account menu in the top bar.
-function ActionsMenu( { canMerge, onMerge, onFetchKnsb } ) {
-	const [ open, setOpen ] = useState( false );
-	const ref = useRef( null );
-
-	useEffect( () => {
-		if ( ! open ) {
-			return undefined;
-		}
-		const onClick = ( e ) => {
-			if ( ref.current && ! ref.current.contains( e.target ) ) {
-				setOpen( false );
-			}
-		};
-		const onKey = ( e ) => {
-			if ( e.key === 'Escape' ) {
-				setOpen( false );
-			}
-		};
-		document.addEventListener( 'mousedown', onClick );
-		document.addEventListener( 'keydown', onKey );
-		return () => {
-			document.removeEventListener( 'mousedown', onClick );
-			document.removeEventListener( 'keydown', onKey );
-		};
-	}, [ open ] );
-
-	return (
-		<div className="relative" ref={ ref }>
-			<button
-				type="button"
-				className="inline-flex items-center gap-1.5 rounded border border-rule bg-surface px-3 py-1.5 text-sm font-medium text-ink-3 hover:text-ink"
-				onClick={ () => setOpen( ( v ) => ! v ) }
-				aria-haspopup="menu"
-				aria-expanded={ open }
-			>
-				Actions
-				<ChevronIcon className="rotate-90" />
-			</button>
-			{ open && (
-				<div
-					role="menu"
-					className="absolute left-0 z-20 mt-1.5 w-max min-w-full overflow-hidden rounded border border-rule bg-surface py-1 shadow-md"
-				>
-					<button
-						type="button"
-						role="menuitem"
-						className="block w-full px-3 py-2 text-left text-sm text-ink-2 hover:bg-rule/40 hover:text-ink focus:bg-rule/40 focus:text-ink focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
-						disabled={ ! canMerge }
-						onClick={ () => {
-							setOpen( false );
-							onMerge();
-						} }
-					>
-						Merge players
-					</button>
-					<button
-						type="button"
-						role="menuitem"
-						className="block w-full px-3 py-2 text-left text-sm text-ink-2 hover:bg-rule/40 hover:text-ink focus:bg-rule/40 focus:text-ink focus:outline-none"
-						onClick={ () => {
-							setOpen( false );
-							onFetchKnsb();
-						} }
-					>
-						Fetch KNSB ratings
-					</button>
-				</div>
-			) }
-		</div>
 	);
 }
 
