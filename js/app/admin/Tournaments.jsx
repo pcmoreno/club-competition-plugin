@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
+import { CreateTournamentDialog } from './CreateTournamentDialog';
 import { TournamentSettingsDialog } from './TournamentSettingsDialog';
 import {
 	Notice,
@@ -30,8 +31,15 @@ const GROUPS = [
 	{ status: 'completed', label: 'Completed' },
 ];
 
+const STATUS_LABELS = {
+	preparation: 'Preparation',
+	active: 'Active',
+	completed: 'Completed',
+};
+
 export function Tournaments() {
 	const [ importing, setImporting ] = useState( false );
+	const [ creating, setCreating ] = useState( false );
 	const [ settingsFor, setSettingsFor ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
 	const { data, isLoading, isError } = useQuery( {
@@ -86,6 +94,10 @@ export function Tournaments() {
 						<ActionsMenu
 							items={ [
 								{
+									label: 'Create tournament',
+									onClick: () => setCreating( true ),
+								},
+								{
 									label: 'Import season',
 									onClick: () => setImporting( true ),
 								},
@@ -100,6 +112,11 @@ export function Tournaments() {
 				}
 			/>
 			{ content }
+			{ creating && (
+				<CreateTournamentDialog
+					onClose={ () => setCreating( false ) }
+				/>
+			) }
 			{ importing && (
 				<ImportSeasonDialog onClose={ () => setImporting( false ) } />
 			) }
@@ -134,8 +151,10 @@ function TournamentGroup( { label, rows, onSettings } ) {
 					<thead>
 						<tr className="border-b border-rule text-left text-xs uppercase tracking-wide text-muted">
 							<th className="px-4 py-2 font-medium">Name</th>
+							<th className="px-4 py-2 font-medium">Players</th>
 							<th className="px-4 py-2 font-medium">Pairing</th>
 							<th className="px-4 py-2 font-medium">Dates</th>
+							<th className="px-4 py-2 font-medium">Status</th>
 							<th className="px-4 py-2 font-medium">
 								<span className="sr-only">Actions</span>
 							</th>
@@ -150,6 +169,9 @@ function TournamentGroup( { label, rows, onSettings } ) {
 								<td className="px-4 py-2.5 text-ink">
 									{ s.name }
 								</td>
+								<td className="num px-4 py-2.5 font-mono text-ink-3">
+									{ s.player_count ?? 0 }
+								</td>
 								<td className="px-4 py-2.5 text-ink-3">
 									{ PAIRING_LABELS[ s.pairing_system ] ??
 										s.pairing_system }
@@ -159,6 +181,9 @@ function TournamentGroup( { label, rows, onSettings } ) {
 									{ s.end_date
 										? ` – ${ formatDate( s.end_date ) }`
 										: '' }
+								</td>
+								<td className="px-4 py-2.5 text-ink-3">
+									{ STATUS_LABELS[ s.status ] ?? s.status }
 								</td>
 								<td className="px-4 py-2.5 text-right">
 									<button
