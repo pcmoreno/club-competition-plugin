@@ -225,7 +225,9 @@ class Container
             ->addArgument(new Reference('player_tournament_service'))
             ->addArgument(new Reference('serializer_service'))
             ->addArgument(new Reference('settings_validator'))
-            ->addArgument(new Reference('settings_resolver'));
+            ->addArgument(new Reference('settings_resolver'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)

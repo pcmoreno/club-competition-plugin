@@ -41,9 +41,12 @@ function SectionTitle( { children, hint } ) {
 }
 
 // Ordered pick-list: the selected column on the right of Sevilla's dual pane,
-// reduced to a single list with add / reorder / remove.
+// reduced to a single list with add / reorder / remove. Rows reorder by drag
+// (native HTML5 DnD) as well as the up/down arrows.
 function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 	const selected = Array.isArray( value ) ? value : [];
+	const [ dragIndex, setDragIndex ] = useState( null );
+	const [ overIndex, setOverIndex ] = useState( null );
 	const labelOf = ( v ) =>
 		options.find( ( o ) => o.value === v )?.label ?? v;
 	const available = options.filter(
@@ -51,13 +54,27 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 	);
 
 	const move = ( index, delta ) => {
-		const next = [ ...selected ];
 		const target = index + delta;
-		if ( target < 0 || target >= next.length ) {
+		reorder( index, target );
+	};
+
+	// Pull the item out of `from` and drop it in at `to`.
+	const reorder = ( from, to ) => {
+		if ( to < 0 || to >= selected.length || from === to ) {
 			return;
 		}
-		[ next[ index ], next[ target ] ] = [ next[ target ], next[ index ] ];
+		const next = [ ...selected ];
+		const [ moved ] = next.splice( from, 1 );
+		next.splice( to, 0, moved );
 		onChange( next );
+	};
+
+	const onDrop = ( to ) => {
+		if ( dragIndex !== null ) {
+			reorder( dragIndex, to );
+		}
+		setDragIndex( null );
+		setOverIndex( null );
 	};
 
 	return (
@@ -69,8 +86,35 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 				{ selected.map( ( v, i ) => (
 					<li
 						key={ v }
-						className="flex items-center gap-2 rounded border border-rule bg-surface px-2 py-1"
+						draggable={ ! disabled }
+						onDragStart={ () => setDragIndex( i ) }
+						onDragOver={ ( e ) => {
+							e.preventDefault();
+							setOverIndex( i );
+						} }
+						onDrop={ () => onDrop( i ) }
+						onDragEnd={ () => {
+							setDragIndex( null );
+							setOverIndex( null );
+						} }
+						className={ [
+							'flex items-center gap-2 rounded border bg-surface px-2 py-1',
+							overIndex === i && dragIndex !== null
+								? 'border-accent'
+								: 'border-rule',
+							dragIndex === i ? 'opacity-50' : '',
+						].join( ' ' ) }
 					>
+						<span
+							className={
+								'select-none text-muted ' +
+								( disabled ? '' : 'cursor-grab' )
+							}
+							aria-hidden="true"
+							title="Drag to reorder"
+						>
+							⠿
+						</span>
 						<span className="num w-5 text-xs text-muted">
 							{ i + 1 }
 						</span>
@@ -110,7 +154,7 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 				) ) }
 			</ul>
 			<select
-				className={ inputCls }
+				className={ inputCls + ' pr-8' }
 				disabled={ disabled || available.length === 0 }
 				value=""
 				onChange={ ( e ) => {
@@ -217,7 +261,14 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 
 // Sub-fields for a parametric tiebreak (Buchholz method, direct-encounter
 // group size, …), shown only while that metric is actually selected.
-function TiebreakConfig( { config, selected, values, onChange, disabled } ) {
+function TiebreakConfig( {
+	config,
+	options,
+	selected,
+	values,
+	onChange,
+	disabled,
+} ) {
 	const entries = Object.entries( config || {} ).filter( ( [ metric ] ) =>
 		selected.includes( metric )
 	);
@@ -225,10 +276,16 @@ function TiebreakConfig( { config, selected, values, onChange, disabled } ) {
 		return null;
 	}
 
+	const labelFor = ( metric ) =>
+		options?.find( ( o ) => o.value === metric )?.label ?? metric;
+
 	return (
 		<div className="mt-3 flex flex-col gap-3 border-l-2 border-rule pl-3">
 			{ entries.map( ( [ metric, fields ] ) => (
 				<div key={ metric }>
+					<h4 className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-muted">
+						{ labelFor( metric ) }
+					</h4>
 					{ fields.map( ( f ) => {
 						const current =
 							values?.[ metric ]?.[ f.key ] ?? f.default;
@@ -243,12 +300,12 @@ function TiebreakConfig( { config, selected, values, onChange, disabled } ) {
 						return (
 							<label
 								key={ f.key }
-								className="flex items-center gap-2 text-sm text-ink-3"
+								className="flex items-center justify-between gap-3 text-sm text-ink-3"
 							>
-								<span className="min-w-[16rem]">{ f.label }</span>
+								<span className="flex-1">{ f.label }</span>
 								{ f.type === 'select' ? (
 									<select
-										className={ inputCls }
+										className={ inputCls + ' w-56 pr-8' }
 										value={ current }
 										disabled={ disabled }
 										onChange={ ( e ) => set( e.target.value ) }
@@ -272,7 +329,7 @@ function TiebreakConfig( { config, selected, values, onChange, disabled } ) {
 									<input
 										type="number"
 										step={ f.step ?? 1 }
-										className={ inputCls + ' num w-24' }
+										className={ inputCls + ' num w-56 text-right' }
 										value={ current }
 										disabled={ disabled }
 										onChange={ ( e ) =>
@@ -351,7 +408,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 			<section>
 				<SectionTitle>Rank by</SectionTitle>
 				<select
-					className={ inputCls }
+					className={ inputCls + ' pr-8' }
 					value={ values.rankBy ?? group.default }
 					disabled={ disabled }
 					onChange={ ( e ) =>
@@ -389,6 +446,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 				/>
 				<TiebreakConfig
 					config={ group.config }
+					options={ group.options }
 					selected={ selected }
 					values={ values.tiebreakConfig }
 					disabled={ disabled }
@@ -408,6 +466,18 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	const [ scoring, setScoring ] = useState( null );
 	const [ display, setDisplay ] = useState( null );
 	const [ saved, setSaved ] = useState( false );
+	const [ confirmingDelete, setConfirmingDelete ] = useState( false );
+
+	// Only a tournament in preparation can be deleted (backend enforces this too).
+	const canDelete = season.status === 'preparation';
+
+	const remove = useMutation( {
+		mutationFn: () => api.del( `seasons/${ season.id }` ),
+		onSuccess: () => {
+			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			onClose();
+		},
+	} );
 
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'season-settings', season.id ],
@@ -501,6 +571,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	}
 
 	return (
+		<>
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
 			onClick={ onClose }
@@ -520,10 +591,17 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 					</div>
 					<button
 						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
+						className="rounded p-2 text-loss hover:bg-loss/10 disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
+						onClick={ () => setConfirmingDelete( true ) }
+						disabled={ ! canDelete }
+						title={
+							canDelete
+								? 'Delete tournament'
+								: 'Only a tournament in preparation can be deleted.'
+						}
+						aria-label="Delete tournament"
 					>
-						Close
+						<TrashIcon />
 					</button>
 				</div>
 
@@ -546,7 +624,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 							disabled={ save.isPending }
 							onClick={ onClose }
 						>
-							Cancel
+							Close
 						</button>
 						<button
 							type="button"
@@ -560,5 +638,80 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 				) }
 			</div>
 		</div>
+
+		{ confirmingDelete && (
+			<DeleteConfirm
+				season={ season }
+				pending={ remove.isPending }
+				error={ remove.isError ? errorMessage( remove.error ) : null }
+				onCancel={ () => setConfirmingDelete( false ) }
+				onConfirm={ () => remove.mutate() }
+			/>
+		) }
+		</>
+	);
+}
+
+// Confirmation overlay for deleting a tournament, sitting above the settings
+// dialog. Deletion removes the tournament and all its data, so it's irreversible.
+function DeleteConfirm( { season, pending, error, onCancel, onConfirm } ) {
+	return (
+		<div
+			className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4"
+			onClick={ onCancel }
+		>
+			<div
+				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
+				onClick={ ( e ) => e.stopPropagation() }
+			>
+				<h2 className="font-serif text-2xl leading-tight">
+					Delete tournament
+				</h2>
+				<p className="mt-2 text-sm text-ink-3">
+					Permanently delete{ ' ' }
+					<strong className="text-ink">{ season.name }</strong> and all
+					its data (enrolled players, rounds, results)? This can’t be
+					undone.
+				</p>
+				{ error && <p className="mt-3 text-sm text-loss">{ error }</p> }
+				<div className="mt-5 flex justify-end gap-2">
+					<button
+						type="button"
+						className={ ghostBtn }
+						disabled={ pending }
+						onClick={ onCancel }
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="rounded bg-loss px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-60"
+						disabled={ pending }
+						onClick={ onConfirm }
+					>
+						{ pending ? 'Deleting…' : 'Delete tournament' }
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function TrashIcon( { className } ) {
+	return (
+		<svg
+			className={ className }
+			width="16"
+			height="16"
+			viewBox="0 0 16 16"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.4"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<path d="M2.5 4h11M6 4V2.5h4V4M5 4l.5 9h5l.5-9M6.5 6.5v4M9.5 6.5v4" />
+		</svg>
 	);
 }

@@ -11,6 +11,9 @@ use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
+use SCS\Entity\Enum\SeasonStatus;
+use SCS\Repository\AttendanceRepository;
+use SCS\Repository\GameRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\RoundRepository;
@@ -39,6 +42,8 @@ class SeasonController extends RestController
         private readonly SerializerService $serializer,
         private readonly SettingsValidator $settingsValidator,
         private readonly SettingsResolver $settingsResolver,
+        private readonly GameRepository $gameRepository,
+        private readonly AttendanceRepository $attendanceRepository,
     ) {
         parent::__construct($validator);
     }
@@ -47,8 +52,12 @@ class SeasonController extends RestController
     {
         return $this->handle(function () {
             $seasons = $this->seasonRepository->findAll();
+            $counts  = $this->seasonPlayerRepository->countBySeason();
 
-            return $this->ok(array_map($this->serializer->serialize(...), $seasons));
+            return $this->ok(array_map(
+                fn ($s) => $this->serializer->serialize($s) + ['player_count' => $counts[$s->id] ?? 0],
+                $seasons
+            ));
         });
     }
 
@@ -191,6 +200,31 @@ class SeasonController extends RestController
             $this->seasonRepository->update($season->id, $data);
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
+        });
+    }
+
+    // Delete a tournament and all its scoped data. Restricted to Preparation for
+    // now, so a tournament with played rounds/standings can't be wiped by accident.
+    public function destroy(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('Only a tournament in preparation can be deleted.');
+            }
+
+            // No FK cascade, so clear child rows first (children before the season).
+            $this->standingsSnapshotRepository->deleteBySeason($season->id);
+            $this->gameRepository->deleteBySeason($season->id);
+            $this->attendanceRepository->deleteBySeason($season->id);
+            $this->seasonPlayerRepository->deleteBySeason($season->id);
+            $this->roundRepository->deleteBySeason($season->id);
+            $this->seasonRepository->delete($season->id);
+
+            return $this->ok(['deleted' => true]);
         });
     }
 
