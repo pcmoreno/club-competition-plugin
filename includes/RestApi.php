@@ -305,6 +305,11 @@ class RestApi
                     'permission_callback' => '__return_true',
                 ],
                 [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$seasons, 'setPlayerCategory'],
+                    'permission_callback' => $isAdmin,
+                ],
+                [
                     'methods'             => 'DELETE',
                     'callback'            => [$seasons, 'removePlayer'],
                     'permission_callback' => $isAdmin,

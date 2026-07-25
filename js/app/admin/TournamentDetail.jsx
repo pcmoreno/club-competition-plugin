@@ -1,0 +1,106 @@
+import { useState } from '@wordpress/element';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
+import { Link } from '../router/router';
+import { Notice } from '../components/ui';
+import { STATUS_LABELS } from './tournamentShared';
+import { TournamentBasicTab } from './TournamentBasicTab';
+import { TournamentPlayersTab } from './TournamentPlayersTab';
+import { TournamentCategoriesTab } from './TournamentCategoriesTab';
+
+// ADMIN. Detail page for a single tournament (= season), reached by clicking a
+// name in the Tournaments list (/admin/tournaments/:id). Three tabs: Basic
+// details (name/pairing/dates/location), Players (enrolment) and Categories.
+// Scoring/tie-breaks/display and delete stay in the separate Settings dialog.
+
+const TABS = [
+	{ key: 'basic', label: 'Basic details' },
+	{ key: 'players', label: 'Players' },
+	{ key: 'categories', label: 'Categories' },
+];
+
+export function TournamentDetail( { seasonId } ) {
+	const [ tab, setTab ] = useState( 'basic' );
+	const { data, isLoading, isError } = useQuery( {
+		queryKey: [ 'season', seasonId ],
+		queryFn: () => api.get( `seasons/${ seasonId }` ),
+	} );
+
+	if ( isLoading ) {
+		return <Notice>Loading…</Notice>;
+	}
+	if ( isError || ! data?.season ) {
+		return (
+			<Notice>
+				Couldn’t load this tournament.{ ' ' }
+				<Link to="/admin/tournaments" className="underline">
+					Back to tournaments
+				</Link>
+				.
+			</Notice>
+		);
+	}
+
+	const { season, players = [] } = data;
+
+	return (
+		<div className="flex flex-col gap-6">
+			<div>
+				<Link
+					to="/admin/tournaments"
+					className="text-sm text-ink-3 hover:text-ink"
+				>
+					← Tournaments
+				</Link>
+				<div className="mt-1 flex items-baseline gap-3">
+					<h1 className="font-serif text-3xl leading-tight">
+						{ season.name }
+					</h1>
+					<span className="text-xs uppercase tracking-wide text-muted">
+						{ STATUS_LABELS[ season.status ] ?? season.status }
+					</span>
+				</div>
+			</div>
+
+			<div className="border-b border-rule">
+				<nav className="-mb-px flex gap-6">
+					{ TABS.map( ( t ) => (
+						<button
+							key={ t.key }
+							type="button"
+							onClick={ () => setTab( t.key ) }
+							className={
+								'border-b-2 px-1 py-2 text-sm font-medium ' +
+								( tab === t.key
+									? 'border-accent text-ink'
+									: 'border-transparent text-ink-3 hover:text-ink' )
+							}
+						>
+							{ t.label }
+						</button>
+					) ) }
+				</nav>
+			</div>
+
+			<div>
+				{ tab === 'basic' && (
+					<div className="max-w-2xl">
+						<TournamentBasicTab season={ season } />
+					</div>
+				) }
+				{ tab === 'players' && (
+					<TournamentPlayersTab
+						season={ season }
+						players={ players }
+					/>
+				) }
+				{ tab === 'categories' && (
+					<TournamentCategoriesTab
+						season={ season }
+						players={ players }
+					/>
+				) }
+			</div>
+		</div>
+	);
+}

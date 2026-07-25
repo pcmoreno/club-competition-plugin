@@ -322,20 +322,18 @@ class SeasonController extends RestController
             $input = EnrollPlayerRequest::fromRequest($request);
             $this->validate($input);
 
-            if ($season->categories === []) {
-                if ($input->category !== null) {
+            // Category is optional on enrol; when given it must match the season's set.
+            if ($input->category !== null) {
+                if ($season->categories === []) {
                     throw new ValidationException([
                         'category' => 'This season has no categories; leave the category empty.',
                     ]);
                 }
-            } elseif ($input->category === null) {
-                throw new ValidationException([
-                    'category' => sprintf('Category is required. Choose one of: %s.', implode(', ', $season->categories)),
-                ]);
-            } elseif (!in_array($input->category, $season->categories, true)) {
-                throw new ValidationException([
-                    'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
-                ]);
+                if (!in_array($input->category, $season->categories, true)) {
+                    throw new ValidationException([
+                        'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
+                    ]);
+                }
             }
 
             $player = $this->playerRepository->findById($input->player_id);
@@ -353,6 +351,45 @@ class SeasonController extends RestController
             $seasonPlayer = $this->seasonPlayerRepository->create($season->id, $input->player_id, $input->category, $eloRating);
 
             return $this->created($this->serializer->serialize($seasonPlayer));
+        });
+    }
+
+    // Assign/reassign/clear an enrolled player's category. A null (or empty)
+    // category unassigns; a given category must be one the season defines.
+    public function setPlayerCategory(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
+                $season->id,
+                (int)$request->get_param('player_id')
+            );
+            if ($seasonPlayer === null) {
+                throw new NotFoundException('Player is not enrolled in this season.');
+            }
+
+            $raw      = $request->get_param('category');
+            $category = ($raw === null || $raw === '') ? null : (string)$raw;
+
+            if ($category !== null) {
+                if ($season->categories === []) {
+                    throw new ValidationException(['category' => 'This season has no categories.']);
+                }
+                if (!in_array($category, $season->categories, true)) {
+                    throw new ValidationException([
+                        'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
+                    ]);
+                }
+            }
+
+            $this->seasonPlayerRepository->update($seasonPlayer->id, ['category' => $category]);
+            $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
+
+            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
         });
     }
 
