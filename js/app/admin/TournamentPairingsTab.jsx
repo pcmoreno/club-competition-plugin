@@ -152,21 +152,21 @@ export function TournamentPairingsTab( { season, players } ) {
 		},
 	} );
 
-	// Assign a bye (status absent + type) or clear it (present, no type) for one
-	// player. Upserts a single attendance row; the pairing bye stays automatic.
+	// Assign a bye or clear it (no type) for one player. The pairing bye means
+	// "present but unpaired"; other byes (personal, club duty) are absences.
 	const setAttendance = useMutation( {
-		mutationFn: ( { seasonPlayerId, byeType } ) =>
-			api.put( `rounds/${ currentRoundId }/attendance`, {
-				attendance: [
-					byeType
-						? {
-								season_player_id: seasonPlayerId,
-								status: 'absent',
-								bye_type: byeType,
-						  }
-						: { season_player_id: seasonPlayerId, status: 'present' },
-				],
-			} ),
+		mutationFn: ( { seasonPlayerId, byeType } ) => {
+			const entry = byeType
+				? {
+						season_player_id: seasonPlayerId,
+						status: byeType === 'pairing_bye' ? 'present' : 'absent',
+						bye_type: byeType,
+				  }
+				: { season_player_id: seasonPlayerId, status: 'present' };
+			return api.put( `rounds/${ currentRoundId }/attendance`, {
+				attendance: [ entry ],
+			} );
+		},
 		onSuccess: invalidateRound,
 	} );
 
@@ -219,7 +219,17 @@ export function TournamentPairingsTab( { season, players } ) {
 		return map;
 	}, [ roundData ] );
 	const byeLabel = ( key ) =>
-		byeTypes.find( ( b ) => b.key === key )?.label ?? key;
+		key === 'pairing_bye'
+			? 'Pairing bye'
+			: byeTypes.find( ( b ) => b.key === key )?.label ?? key;
+
+	// Players holding the automatic pairing bye (present but with no opponent).
+	const pairingByes = ( roundData?.attendance ?? [] )
+		.filter( ( a ) => a.bye_type === 'pairing_bye' )
+		.map( ( a ) =>
+			players.find( ( p ) => p.season_player_id === a.season_player_id )
+		)
+		.filter( Boolean );
 
 	// Enrolled players, strongest first — the order you pair a manual board in.
 	const pool = useMemo(
@@ -255,6 +265,19 @@ export function TournamentPairingsTab( { season, players } ) {
 			createGame.mutate( {
 				white: next.white.season_player_id,
 				black: next.black.season_player_id,
+			} );
+			setBuilder( { white: null, black: null } );
+			return;
+		}
+		// Only one seat filled and no one else left to oppose them → the odd
+		// player out takes the pairing bye instead of a half-made pairing.
+		const opponentsLeft = unpaired.filter(
+			( u ) => u.season_player_id !== p.season_player_id
+		);
+		if ( opponentsLeft.length === 0 ) {
+			setAttendance.mutate( {
+				seasonPlayerId: p.season_player_id,
+				byeType: 'pairing_bye',
 			} );
 			setBuilder( { white: null, black: null } );
 		} else {
@@ -407,7 +430,23 @@ export function TournamentPairingsTab( { season, players } ) {
 					/>
 				) ) }
 
-				{ editable && (
+				{ pairingByes.map( ( p ) => (
+					<ByeBoard
+						key={ p.season_player_id }
+						player={ p }
+						scoreOf={ scoreOf }
+						editable={ editable }
+						onRemove={ () =>
+							setAttendance.mutate( {
+								seasonPlayerId: p.season_player_id,
+								byeType: null,
+							} )
+						}
+					/>
+				) ) }
+
+				{ editable &&
+					( unpaired.length > 0 || builder.white || builder.black ) && (
 					<BuilderBoard
 						board={ nextBoardNumber }
 						builder={ builder }
@@ -704,6 +743,46 @@ function Board( {
 						type="button"
 						onClick={ onRemove }
 						title="Remove pairing"
+						className="rounded px-1.5 py-1 text-xs text-loss hover:bg-loss/10"
+					>
+						×
+					</button>
+				</div>
+			) }
+		</div>
+	);
+}
+
+// The odd player out: present but with no opponent, so they take the pairing
+// bye. Rendered as a board (without a number) so it reads as part of the round.
+function ByeBoard( { player, scoreOf, editable, onRemove } ) {
+	const score = formatScore( scoreOf[ player.season_player_id ] ?? 0 );
+	return (
+		<div className="flex items-center gap-3 rounded border border-dashed border-rule bg-surface px-3 py-2">
+			<span className="num w-8 shrink-0 text-center font-mono text-xs text-muted">
+				–
+			</span>
+			<div className="grid flex-1 grid-cols-[1fr_auto_1fr] items-center gap-2">
+				<span className="truncate text-right text-sm text-ink">
+					{ player.name }
+					<span className="num ml-1 font-mono text-xs text-muted">
+						({ score })
+					</span>
+				</span>
+				<span className="text-xs text-muted">bye</span>
+				<span className="truncate text-left text-sm italic text-muted">
+					Pairing bye
+				</span>
+			</div>
+			{ editable && (
+				<div className="flex shrink-0 items-center gap-1">
+					<span className="px-1.5 py-1 text-xs" aria-hidden="true">
+						{ ' ' }
+					</span>
+					<button
+						type="button"
+						onClick={ onRemove }
+						title="Remove bye"
 						className="rounded px-1.5 py-1 text-xs text-loss hover:bg-loss/10"
 					>
 						×
