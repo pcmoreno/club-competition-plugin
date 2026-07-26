@@ -52,23 +52,19 @@ export function TournamentPairingsTab( { season, players } ) {
 	} );
 
 	// Current standings (latest completed round) → each player's tournament score
-	// going into this round. Keizer tournaments rank by Keizer score, others by
-	// classical points.
+	// going into this round. rank_score is resolved server-side from the season's
+	// RANK BY setting (points, TPR, Sonneborn-Berger, …), so we just read it.
 	const { data: standingsData } = useQuery( {
 		queryKey: [ 'standings', String( season.id ) ],
 		queryFn: () => api.get( `seasons/${ season.id }/standings` ),
 	} );
 	const scoreOf = useMemo( () => {
-		const rows = standingsData?.standings ?? [];
-		const keizer = season.pairing_system === 'keizer';
 		const map = {};
-		for ( const r of rows ) {
-			map[ r.season_player_id ] = keizer
-				? r.keizer_score
-				: r.classical_points;
+		for ( const r of standingsData?.standings ?? [] ) {
+			map[ r.season_player_id ] = r.rank_score;
 		}
 		return map;
-	}, [ standingsData, season.pairing_system ] );
+	}, [ standingsData ] );
 
 	const round = roundData?.round ?? null;
 	const games = roundData?.games ?? [];

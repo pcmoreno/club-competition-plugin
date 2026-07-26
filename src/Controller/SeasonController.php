@@ -112,8 +112,19 @@ class SeasonController extends RestController
                 }
             }
 
-            $standings = array_map(function ($s) use ($display, $previousRank) {
+            // The metric the season ranks by (StandingsMetric value, e.g. 'points'
+            // or 'sonneborn_berger'); each row exposes its value as rank_score so
+            // callers don't need to know which column to read.
+            $rankByKey = $this->settingsResolver->scoring($season)?->getSettings()['rankBy'] ?? null;
+
+            $standings = array_map(function ($s) use ($display, $previousRank, $rankByKey) {
                 $d = $display[$s->season_player_id] ?? null;
+
+                $rankScore = $s->keizer_score !== null
+                    ? (float)$s->keizer_score
+                    : ($rankByKey !== null && isset($s->scores[$rankByKey])
+                        ? (float)$s->scores[$rankByKey]
+                        : $s->classical_points);
 
                 return [
                     'rank'             => $s->rank,
@@ -124,6 +135,7 @@ class SeasonController extends RestController
                     'elo'              => $d['elo'] ?? null,
                     'keizer_score'     => $s->keizer_score,
                     'classical_points' => $s->classical_points,
+                    'rank_score'       => $rankScore,
                     'wins'             => $s->wins,
                     'draws'            => $s->draws,
                     'losses'           => $s->losses,
@@ -140,6 +152,7 @@ class SeasonController extends RestController
             return $this->ok([
                 'season'           => $this->serializer->serialize($season),
                 'completed_rounds' => $this->roundRepository->countCompletedBySeason($season->id),
+                'rank_by'          => $rankByKey,
                 'standings'        => $standings,
             ]);
         });
