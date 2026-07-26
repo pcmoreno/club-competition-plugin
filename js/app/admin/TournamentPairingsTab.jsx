@@ -606,7 +606,6 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 			<div className="grid flex-1 grid-cols-[1fr_auto_1fr] items-center gap-2">
 				<Slot
 					side="white"
-					label="White"
 					player={ builder.white }
 					isOver={ overSlot === 'white' }
 					onOver={ onOver }
@@ -616,7 +615,6 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 				<span className="text-xs text-muted">vs</span>
 				<Slot
 					side="black"
-					label="Black"
 					player={ builder.black }
 					isOver={ overSlot === 'black' }
 					onOver={ onOver }
@@ -628,7 +626,7 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 	);
 }
 
-function Slot( { side, label, player, isOver, onOver, onDrop, onClear } ) {
+function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 	return (
 		<div
 			onDragOver={ ( e ) => {
@@ -660,7 +658,7 @@ function Slot( { side, label, player, isOver, onOver, onDrop, onClear } ) {
 					</button>
 				</>
 			) : (
-				<span className="flex-1">Drop { label }…</span>
+				<span className="flex-1">{ side } player
 			) }
 		</div>
 	);
