@@ -51,6 +51,25 @@ export function TournamentPairingsTab( { season, players } ) {
 		enabled: currentRoundId !== null,
 	} );
 
+	// Current standings (latest completed round) → each player's tournament score
+	// going into this round. Keizer tournaments rank by Keizer score, others by
+	// classical points.
+	const { data: standingsData } = useQuery( {
+		queryKey: [ 'standings', String( season.id ) ],
+		queryFn: () => api.get( `seasons/${ season.id }/standings` ),
+	} );
+	const scoreOf = useMemo( () => {
+		const rows = standingsData?.standings ?? [];
+		const keizer = season.pairing_system === 'keizer';
+		const map = {};
+		for ( const r of rows ) {
+			map[ r.season_player_id ] = keizer
+				? r.keizer_score
+				: r.classical_points;
+		}
+		return map;
+	}, [ standingsData, season.pairing_system ] );
+
 	const round = roundData?.round ?? null;
 	const games = roundData?.games ?? [];
 	// Phases: draft/published build the board (pairings editable, no results);
@@ -309,6 +328,7 @@ export function TournamentPairingsTab( { season, players } ) {
 						editable={ editable }
 						resultsVisible={ resultsVisible }
 						resultsOpen={ resultsOpen }
+						scoreOf={ scoreOf }
 						onResult={ ( result ) =>
 							setResult.mutate( {
 								id: g.id,
@@ -452,6 +472,13 @@ export function TournamentPairingsTab( { season, players } ) {
 	);
 }
 
+// Tournament score for display: whole numbers stay whole, fractions (½-point
+// steps, Keizer decimals) trim to at most two places.
+function formatScore( value ) {
+	const n = Number( value ) || 0;
+	return Number.isInteger( n ) ? String( n ) : String( Math.round( n * 100 ) / 100 );
+}
+
 // A persisted pairing: White vs Black, with a result control, colour swap and
 // remove. Each player can be dragged out (onto the pool) to unpair. Locked
 // (read-only result view) once the round isn't editable.
@@ -460,38 +487,53 @@ function Board( {
 	editable,
 	resultsVisible,
 	resultsOpen,
+	scoreOf,
 	onResult,
 	onSwap,
 	onRemove,
 	onDragOut,
 } ) {
-	const seat = ( player, align ) => (
-		<span
-			draggable={ editable && !! player }
-			onDragStart={ () => onDragOut( player ) }
-			className={
-				'truncate text-sm text-ink ' +
-				align +
-				( editable && player ? ' cursor-grab' : '' )
-			}
-		>
-			{ player?.name ?? '—' }
-			{ !! player?.elo && (
-				<span className="num ml-1 font-mono text-xs text-muted">
-					({ player.elo })
-				</span>
-			) }
-		</span>
-	);
+	// side 'white' reads name (score); side 'black' mirrors to (score) name, so
+	// both scores sit next to the central "vs".
+	const seat = ( player, side ) => {
+		const score = player
+			? formatScore( scoreOf[ player.season_player_id ] ?? 0 )
+			: null;
+		const scoreEl = player && (
+			<span
+				className={
+					'num font-mono text-xs text-muted ' +
+					( side === 'white' ? 'ml-1' : 'mr-1' )
+				}
+			>
+				({ score })
+			</span>
+		);
+		return (
+			<span
+				draggable={ editable && !! player }
+				onDragStart={ () => onDragOut( player ) }
+				className={
+					'truncate text-sm text-ink ' +
+					( side === 'white' ? 'text-right' : 'text-left' ) +
+					( editable && player ? ' cursor-grab' : '' )
+				}
+			>
+				{ side === 'black' && scoreEl }
+				{ player?.name ?? '—' }
+				{ side === 'white' && scoreEl }
+			</span>
+		);
+	};
 	return (
 		<div className="flex items-center gap-3 rounded border border-rule bg-surface px-3 py-2">
 			<span className="num w-8 shrink-0 font-mono text-xs text-muted">
 				{ game.board }
 			</span>
 			<div className="grid flex-1 grid-cols-[1fr_auto_1fr] items-center gap-2">
-				{ seat( game.white, 'text-right' ) }
+				{ seat( game.white, 'white' ) }
 				<span className="text-xs text-muted">vs</span>
-				{ seat( game.black, 'text-left' ) }
+				{ seat( game.black, 'black' ) }
 			</div>
 			{ resultsVisible && (
 				<ResultControl
