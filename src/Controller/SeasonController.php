@@ -282,6 +282,12 @@ class SeasonController extends RestController
         $scoringLocked = $this->roundRepository->countCompletedBySeason($season->id) > 0;
 
         if ($systemChanged) {
+            // The pairing system is fixed once the tournament leaves preparation;
+            // its games/scoring are already keyed to that system.
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ValidationException(['pairing_system' => 'The pairing system can only be changed while the tournament is in preparation.']);
+            }
+
             // Pairing settings are system-specific, so they never survive a switch.
             $data['pairing_settings'] = null;
 

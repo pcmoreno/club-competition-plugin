@@ -23,6 +23,11 @@ export function TournamentBasicTab( { season } ) {
 	const [ endDate, setEndDate ] = useState( season.end_date ?? '' );
 	const [ location, setLocation ] = useState( season.location ?? '' );
 
+	// The pairing system can only change while the tournament is in preparation;
+	// once it's active the games are already keyed to that system. (Pairing
+	// *settings* stay editable — those are tuned per round.)
+	const pairingLocked = season.status !== 'preparation';
+
 	const save = useMutation( {
 		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
@@ -84,7 +89,8 @@ export function TournamentBasicTab( { season } ) {
 				<select
 					value={ pairing }
 					onChange={ ( e ) => setPairing( e.target.value ) }
-					className={ fieldInput }
+					disabled={ pairingLocked }
+					className={ fieldInput + ( pairingLocked ? ' cursor-not-allowed opacity-60' : '' ) }
 				>
 					{ PAIRING_OPTIONS.map( ( o ) => (
 						<option key={ o.value } value={ o.value }>
@@ -92,6 +98,12 @@ export function TournamentBasicTab( { season } ) {
 						</option>
 					) ) }
 				</select>
+				{ pairingLocked && (
+					<span className="mt-1 block text-xs text-muted">
+						The pairing system is locked once the tournament has
+						started.
+					</span>
+				) }
 			</label>
 
 			<div className="grid grid-cols-2 gap-3">
