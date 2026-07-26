@@ -658,7 +658,7 @@ function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 					</button>
 				</>
 			) : (
-				<span className="flex-1">{ side } player
+				<span className="flex-1">{ side } player</span>
 			) }
 		</div>
 	);
