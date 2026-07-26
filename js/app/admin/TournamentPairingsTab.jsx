@@ -170,6 +170,20 @@ export function TournamentPairingsTab( { season, players } ) {
 		onSuccess: invalidateRound,
 	} );
 
+	// Bulk-assign a bye to every still-unpaired player in one request (the "move
+	// remaining here" shortcut on each bye box).
+	const moveRemainingToBye = useMutation( {
+		mutationFn: ( { ids, byeType } ) =>
+			api.put( `rounds/${ currentRoundId }/attendance`, {
+				attendance: ids.map( ( id ) => ( {
+					season_player_id: id,
+					status: 'absent',
+					bye_type: byeType,
+				} ) ),
+			} ),
+		onSuccess: invalidateRound,
+	} );
+
 	// season_player ids already placed this round (on a board or in the builder),
 	// plus a lookup from player → board number for the pool's "on board N" tag.
 	const { pairedIds, boardOf } = useMemo( () => {
@@ -529,6 +543,15 @@ export function TournamentPairingsTab( { season, players } ) {
 											byeOf[ p.season_player_id ] === b.key
 									) }
 									editable={ editable }
+									remaining={ unpaired.length }
+									onMoveRemaining={ () =>
+										moveRemainingToBye.mutate( {
+											ids: unpaired.map(
+												( p ) => p.season_player_id
+											),
+											byeType: b.key,
+										} )
+									}
 									isOver={ byeOver === b.key }
 									onOver={ () => setByeOver( b.key ) }
 									onLeave={ () => setByeOver( null ) }
@@ -804,6 +827,8 @@ function ByeBox( {
 	type,
 	players,
 	editable,
+	remaining,
+	onMoveRemaining,
 	isOver,
 	onOver,
 	onLeave,
@@ -833,6 +858,15 @@ function ByeBox( {
 					{ Number( type.points ) } pt · { players.length }
 				</span>
 			</div>
+			{ editable && remaining > 0 && (
+				<button
+					type="button"
+					onClick={ onMoveRemaining }
+					className="w-full border-b border-rule-soft px-3 py-1.5 text-left text-xs text-accent-2 hover:bg-paper"
+				>
+					Move remaining { remaining } here
+				</button>
+			) }
 			<ul className="min-h-16 space-y-1 p-1.5">
 				{ players.length === 0 ? (
 					<li className="px-2 py-3 text-center text-xs text-muted">
