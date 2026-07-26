@@ -5,6 +5,7 @@ import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
 import { STATUS_LABELS, errorMessage } from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
+import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
 import { TournamentCategoriesTab } from './TournamentCategoriesTab';
 
@@ -13,14 +14,21 @@ import { TournamentCategoriesTab } from './TournamentCategoriesTab';
 // details (name/pairing/dates/location), Players (enrolment) and Categories.
 // Scoring/tie-breaks/display and delete stay in the separate Settings dialog.
 
-const TABS = [
-	{ key: 'basic', label: 'Basic details' },
-	{ key: 'players', label: 'Players' },
-	{ key: 'categories', label: 'Categories' },
-];
+// The Pairings tab only applies once the tournament has started (you enrol and
+// set categories in preparation, then Start). It's the default tab while active.
+function tabsFor( status ) {
+	return [
+		{ key: 'basic', label: 'Basic details' },
+		...( status !== 'preparation'
+			? [ { key: 'pairings', label: 'Pairings' } ]
+			: [] ),
+		{ key: 'players', label: 'Players' },
+		{ key: 'categories', label: 'Categories' },
+	];
+}
 
 export function TournamentDetail( { seasonId } ) {
-	const [ tab, setTab ] = useState( 'basic' );
+	const [ tab, setTab ] = useState( null );
 	const [ confirmingStart, setConfirmingStart ] = useState( false );
 	const queryClient = useQueryClient();
 	const { data, isLoading, isError } = useQuery( {
@@ -55,6 +63,8 @@ export function TournamentDetail( { seasonId } ) {
 	}
 
 	const { season, players = [] } = data;
+	const tabs = tabsFor( season.status );
+	const activeTab = tab ?? ( season.status === 'active' ? 'pairings' : 'basic' );
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -89,14 +99,14 @@ export function TournamentDetail( { seasonId } ) {
 
 			<div className="border-b border-rule">
 				<nav className="-mb-px flex gap-6">
-					{ TABS.map( ( t ) => (
+					{ tabs.map( ( t ) => (
 						<button
 							key={ t.key }
 							type="button"
 							onClick={ () => setTab( t.key ) }
 							className={
 								'border-b-2 px-1 py-2 text-sm font-medium ' +
-								( tab === t.key
+								( activeTab === t.key
 									? 'border-accent text-ink'
 									: 'border-transparent text-ink-3 hover:text-ink' )
 							}
@@ -108,18 +118,24 @@ export function TournamentDetail( { seasonId } ) {
 			</div>
 
 			<div>
-				{ tab === 'basic' && (
+				{ activeTab === 'basic' && (
 					<div className="max-w-2xl">
 						<TournamentBasicTab season={ season } />
 					</div>
 				) }
-				{ tab === 'players' && (
+				{ activeTab === 'pairings' && (
+					<TournamentPairingsTab
+						season={ season }
+						players={ players }
+					/>
+				) }
+				{ activeTab === 'players' && (
 					<TournamentPlayersTab
 						season={ season }
 						players={ players }
 					/>
 				) }
-				{ tab === 'categories' && (
+				{ activeTab === 'categories' && (
 					<TournamentCategoriesTab
 						season={ season }
 						players={ players }

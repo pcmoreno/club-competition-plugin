@@ -75,6 +75,7 @@ class SerializerService
             'start_date'     => $s->start_date?->format('Y-m-d'),
             'end_date'       => $s->end_date?->format('Y-m-d'),
             'pairing_system' => $s->pairing_system->value,
+            'cadence'        => $s->pairing_system->cadence(),
             'status'         => $s->status->value,
             'categories'     => $s->categories,
         ];

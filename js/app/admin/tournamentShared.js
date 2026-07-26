@@ -25,6 +25,29 @@ export const STATUS_LABELS = {
 	completed: 'Completed',
 };
 
+// RoundStatus enum (src/Entity/Enum/RoundStatus.php). Pairings are editable
+// while draft/published; finalised and complete lock the board.
+export const ROUND_STATUS_LABELS = {
+	draft: 'Draft',
+	published: 'Published',
+	finalised: 'Finalised',
+	complete: 'Complete',
+};
+
+export const ROUND_EDITABLE = [ 'draft', 'published' ];
+
+// Label for the "Generate pairings" action, keyed off the season's pairing
+// cadence (PairingSystem::cadence()). Manual has no generator.
+export function generateLabel( cadence ) {
+	if ( cadence === 'full' ) {
+		return 'Generate tournament pairings';
+	}
+	if ( cadence === 'per-round' ) {
+		return 'Generate next round pairings';
+	}
+	return null;
+}
+
 export const fieldInput =
 	'w-full rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-60';
 export const primaryBtn =
