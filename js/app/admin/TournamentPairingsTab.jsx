@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { Notice } from '../components/ui';
+import { Notice, ConfirmModal } from '../components/ui';
 import {
 	ROUND_STATUS_LABELS,
 	ROUND_EDITABLE,
+	ROUND_ADVANCE_LABELS,
+	nextRoundStatus,
 	generateLabel,
 	errorMessage,
 } from './tournamentShared';
@@ -20,6 +22,9 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ selectedRoundId, setSelectedRoundId ] = useState( null );
 	const [ builder, setBuilder ] = useState( { white: null, black: null } );
 	const [ overSlot, setOverSlot ] = useState( null );
+	const [ poolOver, setPoolOver ] = useState( false );
+	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
+	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
 	const roundsKey = [ 'rounds', String( season.id ) ];
@@ -48,7 +53,10 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	const round = roundData?.round ?? null;
 	const games = roundData?.games ?? [];
+	// Pairings (the board structure) lock once the round is finalised; results
+	// can still be entered until the round is complete (which freezes standings).
 	const editable = round !== null && ROUND_EDITABLE.includes( round.status );
+	const resultsOpen = round !== null && round.status !== 'complete';
 
 	// Clearing the builder whenever the round changes avoids a slot carrying a
 	// half-made pairing across rounds.
@@ -103,6 +111,7 @@ export function TournamentPairingsTab( { season, players } ) {
 		mutationFn: ( status ) =>
 			api.patch( `rounds/${ currentRoundId }/status`, { status } ),
 		onSuccess: () => {
+			setConfirmAdvance( false );
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
@@ -142,12 +151,15 @@ export function TournamentPairingsTab( { season, players } ) {
 	const unpaired = pool.filter( ( p ) => ! pairedIds.has( p.season_player_id ) );
 
 	const dropToSlot = ( slot ) => {
-		const p = drag.current;
+		const d = drag.current;
 		drag.current = null;
 		setOverSlot( null );
-		if ( ! p || ! editable ) {
+		// Only a pool player forms a new pairing; a board player is unpaired by
+		// dropping it back onto the enrolled list.
+		if ( ! d || d.from !== 'pool' || ! editable ) {
 			return;
 		}
+		const p = d.player;
 		const other = slot === 'white' ? builder.black : builder.white;
 		if ( other && other.season_player_id === p.season_player_id ) {
 			return;
@@ -196,6 +208,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	}
 
 	const genLabel = generateLabel( season.cadence );
+	const nextStatus = round ? nextRoundStatus( round.status ) : null;
 
 	return (
 		<div className="space-y-6">
@@ -239,25 +252,19 @@ export function TournamentPairingsTab( { season, players } ) {
 							{ genLabel }
 						</button>
 					) }
-					<label className="flex items-center gap-2 text-sm text-ink-3">
-						<span className="text-xs uppercase tracking-wide text-muted">
-							Status
-						</span>
-						<select
-							value={ round?.status ?? 'draft' }
-							onChange={ ( e ) => setStatus.mutate( e.target.value ) }
+					<span className="text-xs uppercase tracking-wide text-muted">
+						{ ROUND_STATUS_LABELS[ round?.status ] ?? round?.status }
+					</span>
+					{ nextStatus && (
+						<button
+							type="button"
+							onClick={ () => setConfirmAdvance( true ) }
 							disabled={ setStatus.isPending }
-							className="rounded border border-rule bg-surface px-2 py-1 text-sm text-ink disabled:opacity-60"
+							className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
 						>
-							{ Object.entries( ROUND_STATUS_LABELS ).map(
-								( [ value, label ] ) => (
-									<option key={ value } value={ value }>
-										{ label }
-									</option>
-								)
-							) }
-						</select>
-					</label>
+							{ ROUND_ADVANCE_LABELS[ nextStatus ] }
+						</button>
+					) }
 				</div>
 			</div>
 
@@ -277,7 +284,8 @@ export function TournamentPairingsTab( { season, players } ) {
 				<Notice>
 					Round { round.round_number } is{ ' ' }
 					{ ROUND_STATUS_LABELS[ round.status ]?.toLowerCase() }, so its
-					pairings are locked. Set it back to Published to edit.
+					pairings are locked.
+					{ resultsOpen ? ' Results can still be entered.' : '' }
 				</Notice>
 			) }
 
@@ -295,6 +303,7 @@ export function TournamentPairingsTab( { season, players } ) {
 						key={ g.id }
 						game={ g }
 						editable={ editable }
+						resultsOpen={ resultsOpen }
 						onResult={ ( result ) =>
 							setResult.mutate( {
 								id: g.id,
@@ -303,6 +312,9 @@ export function TournamentPairingsTab( { season, players } ) {
 						}
 						onSwap={ () => swapGame.mutate( g ) }
 						onRemove={ () => deleteGame.mutate( g.id ) }
+						onDragOut={ ( player ) => {
+							drag.current = { from: 'board', player, gameId: g.id };
+						} }
 					/>
 				) ) }
 
@@ -328,8 +340,29 @@ export function TournamentPairingsTab( { season, players } ) {
 				</p>
 			) }
 
-			{ /* Enrolled players pool */ }
-			<div className="border-t border-rule pt-4">
+			{ /* Enrolled players pool — also a drop target: dropping a board
+			     player here dissolves that pairing. */ }
+			<div
+				className={
+					'rounded border-t pt-4 ' +
+					( poolOver ? 'border-accent bg-accent-soft/40' : 'border-rule' )
+				}
+				onDragOver={ ( e ) => {
+					if ( editable && drag.current?.from === 'board' ) {
+						e.preventDefault();
+						setPoolOver( true );
+					}
+				} }
+				onDragLeave={ () => setPoolOver( false ) }
+				onDrop={ () => {
+					const d = drag.current;
+					drag.current = null;
+					setPoolOver( false );
+					if ( editable && d?.from === 'board' ) {
+						deleteGame.mutate( d.gameId );
+					}
+				} }
+			>
 				<div className="mb-2 flex items-baseline justify-between">
 					<h3 className="text-sm font-medium text-ink">
 						Enrolled players
@@ -348,7 +381,7 @@ export function TournamentPairingsTab( { season, players } ) {
 								key={ p.season_player_id }
 								draggable={ editable && ! placed }
 								onDragStart={ () => {
-									drag.current = p;
+									drag.current = { from: 'pool', player: p };
 								} }
 								className={
 									'flex items-center justify-between rounded border px-2 py-1.5 text-sm ' +
@@ -384,30 +417,74 @@ export function TournamentPairingsTab( { season, players } ) {
 					} ) }
 				</ul>
 			</div>
+
+			{ confirmAdvance && nextStatus && (
+				<ConfirmModal
+					title={ ROUND_ADVANCE_LABELS[ nextStatus ] }
+					confirmLabel={
+						setStatus.isPending
+							? 'Working…'
+							: ROUND_ADVANCE_LABELS[ nextStatus ]
+					}
+					danger={ nextStatus === 'complete' }
+					onCancel={ () => setConfirmAdvance( false ) }
+					onConfirm={ () => setStatus.mutate( nextStatus ) }
+				>
+					{ nextStatus === 'published' &&
+						'Publishing makes this round’s pairings visible. You can still adjust them afterwards.' }
+					{ nextStatus === 'finalised' &&
+						'Finalising locks the pairings so they can’t be changed. Results can still be entered.' }
+					{ nextStatus === 'complete' &&
+						'Completing the round freezes its standings snapshot.' }
+					{ setStatus.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( setStatus.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
 		</div>
 	);
 }
 
 // A persisted pairing: White vs Black, with a result control, colour swap and
-// remove. Locked (read-only result view) once the round isn't editable.
-function Board( { game, editable, onResult, onSwap, onRemove } ) {
+// remove. Each player can be dragged out (onto the pool) to unpair. Locked
+// (read-only result view) once the round isn't editable.
+function Board( {
+	game,
+	editable,
+	resultsOpen,
+	onResult,
+	onSwap,
+	onRemove,
+	onDragOut,
+} ) {
+	const seat = ( player, align ) => (
+		<span
+			draggable={ editable && !! player }
+			onDragStart={ () => onDragOut( player ) }
+			className={
+				'truncate text-sm text-ink ' +
+				align +
+				( editable && player ? ' cursor-grab' : '' )
+			}
+		>
+			{ player?.name ?? '—' }
+		</span>
+	);
 	return (
 		<div className="flex items-center gap-3 rounded border border-rule bg-surface px-3 py-2">
 			<span className="num w-8 shrink-0 font-mono text-xs text-muted">
 				{ game.board }
 			</span>
 			<div className="grid flex-1 grid-cols-[1fr_auto_1fr] items-center gap-2">
-				<span className="truncate text-right text-sm text-ink">
-					{ game.white?.name ?? '—' }
-				</span>
+				{ seat( game.white, 'text-right' ) }
 				<span className="text-xs text-muted">vs</span>
-				<span className="truncate text-sm text-ink">
-					{ game.black?.name ?? '—' }
-				</span>
+				{ seat( game.black, 'text-left' ) }
 			</div>
 			<ResultControl
 				result={ game.result }
-				disabled={ ! editable }
+				disabled={ ! resultsOpen }
 				onResult={ onResult }
 			/>
 			{ editable && (

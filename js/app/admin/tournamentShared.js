@@ -36,6 +36,25 @@ export const ROUND_STATUS_LABELS = {
 
 export const ROUND_EDITABLE = [ 'draft', 'published' ];
 
+// Round status advances one step at a time along this path.
+export const ROUND_STATUS_FLOW = [
+	'draft',
+	'published',
+	'finalised',
+	'complete',
+];
+
+// Verb for advancing *into* each status (the button label / confirm action).
+export const ROUND_ADVANCE_LABELS = {
+	published: 'Publish round',
+	finalised: 'Finalise round',
+	complete: 'Complete round',
+};
+
+export function nextRoundStatus( status ) {
+	return ROUND_STATUS_FLOW[ ROUND_STATUS_FLOW.indexOf( status ) + 1 ] ?? null;
+}
+
 // Label for the "Generate pairings" action, keyed off the season's pairing
 // cadence (PairingSystem::cadence()). Manual has no generator.
 export function generateLabel( cadence ) {
