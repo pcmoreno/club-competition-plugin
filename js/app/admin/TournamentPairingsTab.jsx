@@ -23,6 +23,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ builder, setBuilder ] = useState( { white: null, black: null } );
 	const [ overSlot, setOverSlot ] = useState( null );
 	const [ poolOver, setPoolOver ] = useState( false );
+	const [ byeOver, setByeOver ] = useState( null );
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
@@ -65,6 +66,20 @@ export function TournamentPairingsTab( { season, players } ) {
 		}
 		return map;
 	}, [ standingsData ] );
+
+	// Bye types the season defines (scoring settings), minus the reserved pairing
+	// bye which the engine assigns to the odd player automatically.
+	const { data: settingsData } = useQuery( {
+		queryKey: [ 'season-settings', season.id ],
+		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
+	} );
+	const byeTypes = useMemo(
+		() =>
+			( settingsData?.scoring?.values?.byeTypes ?? [] ).filter(
+				( b ) => ! b.reserved
+			),
+		[ settingsData ]
+	);
 
 	const round = roundData?.round ?? null;
 	const games = roundData?.games ?? [];
@@ -137,6 +152,24 @@ export function TournamentPairingsTab( { season, players } ) {
 		},
 	} );
 
+	// Assign a bye (status absent + type) or clear it (present, no type) for one
+	// player. Upserts a single attendance row; the pairing bye stays automatic.
+	const setAttendance = useMutation( {
+		mutationFn: ( { seasonPlayerId, byeType } ) =>
+			api.put( `rounds/${ currentRoundId }/attendance`, {
+				attendance: [
+					byeType
+						? {
+								season_player_id: seasonPlayerId,
+								status: 'absent',
+								bye_type: byeType,
+						  }
+						: { season_player_id: seasonPlayerId, status: 'present' },
+				],
+			} ),
+		onSuccess: invalidateRound,
+	} );
+
 	// season_player ids already placed this round (on a board or in the builder),
 	// plus a lookup from player → board number for the pool's "on board N" tag.
 	const { pairedIds, boardOf } = useMemo( () => {
@@ -161,13 +194,30 @@ export function TournamentPairingsTab( { season, players } ) {
 		return { pairedIds: paired, boardOf: board };
 	}, [ games, builder ] );
 
+	// Players sitting out this round: season_player_id → bye type key.
+	const byeOf = useMemo( () => {
+		const map = {};
+		for ( const a of roundData?.attendance ?? [] ) {
+			if ( a.bye_type ) {
+				map[ a.season_player_id ] = a.bye_type;
+			}
+		}
+		return map;
+	}, [ roundData ] );
+	const byeLabel = ( key ) =>
+		byeTypes.find( ( b ) => b.key === key )?.label ?? key;
+
 	// Enrolled players, strongest first — the order you pair a manual board in.
 	const pool = useMemo(
 		() =>
 			[ ...players ].sort( ( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 ) ),
 		[ players ]
 	);
-	const unpaired = pool.filter( ( p ) => ! pairedIds.has( p.season_player_id ) );
+	// Still to pair: not on a board and not sitting out on a bye.
+	const unpaired = pool.filter(
+		( p ) =>
+			! pairedIds.has( p.season_player_id ) && ! byeOf[ p.season_player_id ]
+	);
 
 	const dropToSlot = ( slot ) => {
 		const d = drag.current;
@@ -366,14 +416,16 @@ export function TournamentPairingsTab( { season, players } ) {
 			) }
 
 			{ /* Enrolled players pool — also a drop target: dropping a board
-			     player here dissolves that pairing. */ }
+			     player here dissolves that pairing; dropping a bye player here
+			     clears their bye. */ }
 			<div
 				className={
 					'rounded border-t pt-4 ' +
 					( poolOver ? 'border-accent bg-accent-soft/40' : 'border-rule' )
 				}
 				onDragOver={ ( e ) => {
-					if ( editable && drag.current?.from === 'board' ) {
+					const from = drag.current?.from;
+					if ( editable && ( from === 'board' || from === 'bye' ) ) {
 						e.preventDefault();
 						setPoolOver( true );
 					}
@@ -383,8 +435,16 @@ export function TournamentPairingsTab( { season, players } ) {
 					const d = drag.current;
 					drag.current = null;
 					setPoolOver( false );
-					if ( editable && d?.from === 'board' ) {
+					if ( ! editable || ! d ) {
+						return;
+					}
+					if ( d.from === 'board' ) {
 						deleteGame.mutate( d.gameId );
+					} else if ( d.from === 'bye' ) {
+						setAttendance.mutate( {
+							seasonPlayerId: d.player.season_player_id,
+							byeType: null,
+						} );
 					}
 				} }
 			>
@@ -400,7 +460,9 @@ export function TournamentPairingsTab( { season, players } ) {
 				</div>
 				<ul className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
 					{ pool.map( ( p ) => {
-						const placed = pairedIds.has( p.season_player_id );
+						const onBoard = pairedIds.has( p.season_player_id );
+						const bye = byeOf[ p.season_player_id ];
+						const placed = onBoard || !! bye;
 						return (
 							<li
 								key={ p.season_player_id }
@@ -426,9 +488,14 @@ export function TournamentPairingsTab( { season, players } ) {
 									) : null }
 								</span>
 								<span className="ml-2 flex shrink-0 items-center gap-2">
-									{ placed && (
+									{ onBoard && (
 										<span className="text-[11px] text-muted">
 											board { boardOf[ p.season_player_id ] }
+										</span>
+									) }
+									{ ! onBoard && bye && (
+										<span className="text-[11px] text-muted">
+											{ byeLabel( bye ) }
 										</span>
 									) }
 									{ !! p.elo && (
@@ -441,6 +508,64 @@ export function TournamentPairingsTab( { season, players } ) {
 						);
 					} ) }
 				</ul>
+
+				{ byeTypes.length > 0 && (
+					<div className="mt-4 border-t border-rule-soft pt-4">
+						<h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+							Byes
+						</h4>
+						<p className="mb-3 text-xs text-muted">
+							Drag a player into a bye to sit them out this round; drag
+							them back to the list to clear it. The odd player out is
+							given the pairing bye automatically.
+						</p>
+						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+							{ byeTypes.map( ( b ) => (
+								<ByeBox
+									key={ b.key }
+									type={ b }
+									players={ pool.filter(
+										( p ) =>
+											byeOf[ p.season_player_id ] === b.key
+									) }
+									editable={ editable }
+									isOver={ byeOver === b.key }
+									onOver={ () => setByeOver( b.key ) }
+									onLeave={ () => setByeOver( null ) }
+									onDrop={ () => {
+										const d = drag.current;
+										drag.current = null;
+										setByeOver( null );
+										if (
+											! editable ||
+											! d ||
+											d.from === 'board'
+										) {
+											return;
+										}
+										setAttendance.mutate( {
+											seasonPlayerId:
+												d.player.season_player_id,
+											byeType: b.key,
+										} );
+									} }
+									onDragOut={ ( player ) => {
+										drag.current = {
+											from: 'bye',
+											player,
+											byeType: b.key,
+										};
+									} }
+								/>
+							) ) }
+						</div>
+						{ setAttendance.isError && (
+							<p className="mt-2 text-sm text-loss">
+								{ errorMessage( setAttendance.error ) }
+							</p>
+						) }
+					</div>
+				) }
 			</div>
 
 			{ confirmAdvance && nextStatus && (
@@ -670,5 +795,70 @@ function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 				<span className="flex-1">{ side } player</span>
 			) }
 		</div>
+	);
+}
+
+// One droppable bye box (e.g. "Club duty"). Players dropped here sit out this
+// round; each row can be dragged back to the pool to clear the bye.
+function ByeBox( {
+	type,
+	players,
+	editable,
+	isOver,
+	onOver,
+	onLeave,
+	onDrop,
+	onDragOut,
+} ) {
+	return (
+		<section
+			onDragOver={ ( e ) => {
+				if ( editable ) {
+					e.preventDefault();
+					onOver();
+				}
+			} }
+			onDragLeave={ onLeave }
+			onDrop={ onDrop }
+			className={
+				'rounded border bg-surface ' +
+				( isOver ? 'border-accent ring-1 ring-accent' : 'border-rule' )
+			}
+		>
+			<div className="flex items-center justify-between border-b border-rule-soft px-3 py-2">
+				<span className="text-sm font-medium text-ink">
+					{ type.label }
+				</span>
+				<span className="num font-mono text-xs text-muted">
+					{ Number( type.points ) } pt · { players.length }
+				</span>
+			</div>
+			<ul className="min-h-16 space-y-1 p-1.5">
+				{ players.length === 0 ? (
+					<li className="px-2 py-3 text-center text-xs text-muted">
+						Drop players here
+					</li>
+				) : (
+					players.map( ( p ) => (
+						<li
+							key={ p.season_player_id }
+							draggable={ editable }
+							onDragStart={ () => onDragOut( p ) }
+							className={
+								'flex items-center justify-between rounded px-2 py-1 text-sm text-ink-3 ' +
+								( editable ? 'cursor-grab hover:bg-paper' : '' )
+							}
+						>
+							<span className="truncate">{ p.name }</span>
+							{ !! p.elo && (
+								<span className="num ml-2 shrink-0 font-mono text-xs text-muted">
+									{ p.elo }
+								</span>
+							) }
+						</li>
+					) )
+				) }
+			</ul>
+		</section>
 	);
 }
