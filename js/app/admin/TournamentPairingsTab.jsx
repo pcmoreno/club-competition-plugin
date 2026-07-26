@@ -53,10 +53,14 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	const round = roundData?.round ?? null;
 	const games = roundData?.games ?? [];
-	// Pairings (the board structure) lock once the round is finalised; results
-	// can still be entered until the round is complete (which freezes standings).
+	// Phases: draft/published build the board (pairings editable, no results);
+	// finalised locks the board and opens result entry; complete freezes the
+	// standings and shows results read-only.
 	const editable = round !== null && ROUND_EDITABLE.includes( round.status );
-	const resultsOpen = round !== null && round.status !== 'complete';
+	const resultsVisible =
+		round !== null &&
+		( round.status === 'finalised' || round.status === 'complete' );
+	const resultsOpen = round !== null && round.status === 'finalised';
 
 	// Clearing the builder whenever the round changes avoids a slot carrying a
 	// half-made pairing across rounds.
@@ -303,6 +307,7 @@ export function TournamentPairingsTab( { season, players } ) {
 						key={ g.id }
 						game={ g }
 						editable={ editable }
+						resultsVisible={ resultsVisible }
 						resultsOpen={ resultsOpen }
 						onResult={ ( result ) =>
 							setResult.mutate( {
@@ -453,6 +458,7 @@ export function TournamentPairingsTab( { season, players } ) {
 function Board( {
 	game,
 	editable,
+	resultsVisible,
 	resultsOpen,
 	onResult,
 	onSwap,
@@ -482,11 +488,13 @@ function Board( {
 				<span className="text-xs text-muted">vs</span>
 				{ seat( game.black, 'text-left' ) }
 			</div>
-			<ResultControl
-				result={ game.result }
-				disabled={ ! resultsOpen }
-				onResult={ onResult }
-			/>
+			{ resultsVisible && (
+				<ResultControl
+					result={ game.result }
+					disabled={ ! resultsOpen }
+					onResult={ onResult }
+				/>
+			) }
 			{ editable && (
 				<div className="flex shrink-0 items-center gap-1">
 					<button
