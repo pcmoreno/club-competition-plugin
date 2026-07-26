@@ -228,6 +228,10 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	const genLabel = generateLabel( season.cadence );
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
+	// Match the backend's board numbering (max existing board + 1) so the
+	// builder shows the number the new pairing will actually get.
+	const nextBoardNumber =
+		games.reduce( ( m, g ) => Math.max( m, g.board || 0 ), 0 ) + 1;
 
 	return (
 		<div className="space-y-6">
@@ -341,7 +345,7 @@ export function TournamentPairingsTab( { season, players } ) {
 
 				{ editable && (
 					<BuilderBoard
-						board={ games.length + 1 }
+						board={ nextBoardNumber }
 						builder={ builder }
 						overSlot={ overSlot }
 						onOver={ setOverSlot }
