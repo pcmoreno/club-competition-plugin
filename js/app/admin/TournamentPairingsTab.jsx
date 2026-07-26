@@ -622,6 +622,15 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 					onClear={ onClear }
 				/>
 			</div>
+			{ /* Reserve the same right-side space the filled boards use for the
+			     swap/remove controls, so the "vs" lines up with them. */ }
+			<div
+				className="invisible flex shrink-0 items-center gap-1"
+				aria-hidden="true"
+			>
+				<span className="px-1.5 py-1 text-xs">⇄</span>
+				<span className="px-1.5 py-1 text-xs">×</span>
+			</div>
 		</div>
 	);
 }
