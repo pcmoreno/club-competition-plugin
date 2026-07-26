@@ -1,9 +1,9 @@
 import { useState } from '@wordpress/element';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Link } from '../router/router';
-import { Notice } from '../components/ui';
-import { STATUS_LABELS } from './tournamentShared';
+import { Notice, ConfirmModal } from '../components/ui';
+import { STATUS_LABELS, errorMessage } from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
 import { TournamentCategoriesTab } from './TournamentCategoriesTab';
@@ -21,9 +21,22 @@ const TABS = [
 
 export function TournamentDetail( { seasonId } ) {
 	const [ tab, setTab ] = useState( 'basic' );
+	const [ confirmingStart, setConfirmingStart ] = useState( false );
+	const queryClient = useQueryClient();
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: [ 'season', seasonId ],
 		queryFn: () => api.get( `seasons/${ seasonId }` ),
+	} );
+
+	// Moves the tournament out of preparation into active. Once started it can
+	// no longer be deleted, so it's guarded by a confirmation.
+	const start = useMutation( {
+		mutationFn: () => api.patch( `seasons/${ seasonId }`, { status: 'active' } ),
+		onSuccess: () => {
+			setConfirmingStart( false );
+			queryClient.invalidateQueries( { queryKey: [ 'season', seasonId ] } );
+			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+		},
 	} );
 
 	if ( isLoading ) {
@@ -52,13 +65,25 @@ export function TournamentDetail( { seasonId } ) {
 				>
 					← Tournaments
 				</Link>
-				<div className="mt-1 flex items-baseline gap-3">
-					<h1 className="font-serif text-3xl leading-tight">
-						{ season.name }
-					</h1>
-					<span className="text-xs uppercase tracking-wide text-muted">
-						{ STATUS_LABELS[ season.status ] ?? season.status }
-					</span>
+				<div className="mt-1 flex items-center justify-between gap-3">
+					<div className="flex items-baseline gap-3">
+						<h1 className="font-serif text-3xl leading-tight">
+							{ season.name }
+						</h1>
+						<span className="text-xs uppercase tracking-wide text-muted">
+							{ STATUS_LABELS[ season.status ] ?? season.status }
+						</span>
+					</div>
+					{ season.status === 'preparation' && (
+						<button
+							type="button"
+							onClick={ () => setConfirmingStart( true ) }
+							disabled={ start.isPending }
+							className="shrink-0 rounded bg-win px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-40"
+						>
+							{ start.isPending ? 'Starting…' : 'Start' }
+						</button>
+					) }
 				</div>
 			</div>
 
@@ -101,6 +126,23 @@ export function TournamentDetail( { seasonId } ) {
 					/>
 				) }
 			</div>
+
+			{ confirmingStart && (
+				<ConfirmModal
+					title="Start tournament"
+					confirmLabel={ start.isPending ? 'Starting…' : 'Start' }
+					onCancel={ () => setConfirmingStart( false ) }
+					onConfirm={ () => start.mutate() }
+				>
+					This moves the tournament from preparation to active. Once
+					started it can no longer be deleted.
+					{ start.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( start.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
 		</div>
 	);
 }
