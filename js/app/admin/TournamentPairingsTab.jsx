@@ -476,6 +476,11 @@ function Board( {
 			}
 		>
 			{ player?.name ?? '—' }
+			{ !! player?.elo && (
+				<span className="num ml-1 font-mono text-xs text-muted">
+					({ player.elo })
+				</span>
+			) }
 		</span>
 	);
 	return (
