@@ -1,10 +1,12 @@
 import { useState } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { Link } from '../router/router';
 import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
 import { CreateTournamentDialog } from './CreateTournamentDialog';
 import { TournamentSettingsDialog } from './TournamentSettingsDialog';
+import { PAIRING_LABELS, STATUS_LABELS } from './tournamentShared';
 import {
 	Notice,
 	formatDate,
@@ -13,16 +15,8 @@ import {
 } from '../components/ui';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
-// Completed, from GET /seasons. Row counts (#players, rounds-played) and the
-// "New tournament" flow are a later pass — see dev/page-inventory.md.
-
-const PAIRING_LABELS = {
-	manual: 'Manual',
-	keizer: 'Keizer',
-	swiss: 'Swiss',
-	'round-robin-full': 'Round-robin',
-	'round-robin-groups': 'Round-robin (groups)',
-};
+// Completed, from GET /seasons. Clicking a name opens the detail page
+// (/admin/tournaments/:id) with basic-details / players / categories tabs.
 
 // Display order of the status groups.
 const GROUPS = [
@@ -30,12 +24,6 @@ const GROUPS = [
 	{ status: 'preparation', label: 'Preparation' },
 	{ status: 'completed', label: 'Completed' },
 ];
-
-const STATUS_LABELS = {
-	preparation: 'Preparation',
-	active: 'Active',
-	completed: 'Completed',
-};
 
 export function Tournaments() {
 	const [ importing, setImporting ] = useState( false );
@@ -166,8 +154,13 @@ function TournamentGroup( { label, rows, onSettings } ) {
 								key={ s.id }
 								className="border-b border-rule-soft"
 							>
-								<td className="px-4 py-2.5 text-ink">
-									{ s.name }
+								<td className="px-4 py-2.5">
+									<Link
+										to={ `/admin/tournaments/${ s.id }` }
+										className="text-ink hover:text-accent hover:underline"
+									>
+										{ s.name }
+									</Link>
 								</td>
 								<td className="num px-4 py-2.5 font-mono text-ink-3">
 									{ s.player_count ?? 0 }

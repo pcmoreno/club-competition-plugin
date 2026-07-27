@@ -20,4 +20,16 @@ enum PairingSystem: string
             default      => ScoringSystem::Standard,
         };
     }
+
+    // Pairing cadence, which drives the admin UI: 'manual' has no generator (the
+    // board is hand-built), 'per-round' pairs the next round from the standings
+    // (Keizer, Swiss), 'full' lays out the whole fixture up front (round-robin).
+    public function cadence(): string
+    {
+        return match ($this) {
+            self::Manual                                 => 'manual',
+            self::RoundRobinFull, self::RoundRobinGroups => 'full',
+            default                                      => 'per-round',
+        };
+    }
 }

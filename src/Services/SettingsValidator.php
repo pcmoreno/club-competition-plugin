@@ -8,6 +8,7 @@ use SCS\Engine\Settings\ManualPairingSettings;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
 use SCS\Entity\Enum\BuchholzMethod;
+use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\StandingsColumn;
 use SCS\Entity\Enum\StandingsMetric;
 use SCS\Entity\Enum\TprMethod;
@@ -31,8 +32,15 @@ final class SettingsValidator
         }
 
         foreach ($input['byeTypes'] ?? [] as $i => $bye) {
-            if (!is_array($bye) || ($bye['key'] ?? '') === '') {
+            $key = is_array($bye) ? ($bye['key'] ?? '') : '';
+            if ($key === '') {
                 $errors["byeTypes.$i.key"] = 'Key is required.';
+            } elseif (ByeType::tryFrom((string)$key) === null) {
+                // Attendance stores bye_type as a fixed enum; a key outside it
+                // would render a box every drop silently fails against, so reject
+                // it here rather than at drop time. (Free-form types are a
+                // possible future direction — see the I5 review note.)
+                $errors["byeTypes.$i.key"] = 'Unknown bye type.';
             }
             if (isset($bye['points']) && !is_numeric($bye['points'])) {
                 $errors["byeTypes.$i.points"] = 'Must be a number.';

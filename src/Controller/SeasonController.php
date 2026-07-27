@@ -19,6 +19,8 @@ use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Repository\StandingsSnapshotRepository;
+use SCS\Request\AssignCategoriesRequest;
+use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
@@ -112,8 +114,19 @@ class SeasonController extends RestController
                 }
             }
 
-            $standings = array_map(function ($s) use ($display, $previousRank) {
+            // The metric the season ranks by (StandingsMetric value, e.g. 'points'
+            // or 'sonneborn_berger'); each row exposes its value as rank_score so
+            // callers don't need to know which column to read.
+            $rankByKey = $this->settingsResolver->scoring($season)?->getSettings()['rankBy'] ?? null;
+
+            $standings = array_map(function ($s) use ($display, $previousRank, $rankByKey) {
                 $d = $display[$s->season_player_id] ?? null;
+
+                $rankScore = $s->keizer_score !== null
+                    ? (float)$s->keizer_score
+                    : ($rankByKey !== null && isset($s->scores[$rankByKey])
+                        ? (float)$s->scores[$rankByKey]
+                        : $s->classical_points);
 
                 return [
                     'rank'             => $s->rank,
@@ -124,6 +137,7 @@ class SeasonController extends RestController
                     'elo'              => $d['elo'] ?? null,
                     'keizer_score'     => $s->keizer_score,
                     'classical_points' => $s->classical_points,
+                    'rank_score'       => $rankScore,
                     'wins'             => $s->wins,
                     'draws'            => $s->draws,
                     'losses'           => $s->losses,
@@ -140,6 +154,7 @@ class SeasonController extends RestController
             return $this->ok([
                 'season'           => $this->serializer->serialize($season),
                 'completed_rounds' => $this->roundRepository->countCompletedBySeason($season->id),
+                'rank_by'          => $rankByKey,
                 'standings'        => $standings,
             ]);
         });
@@ -282,6 +297,12 @@ class SeasonController extends RestController
         $scoringLocked = $this->roundRepository->countCompletedBySeason($season->id) > 0;
 
         if ($systemChanged) {
+            // The pairing system is fixed once the tournament leaves preparation;
+            // its games/scoring are already keyed to that system.
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ValidationException(['pairing_system' => 'The pairing system can only be changed while the tournament is in preparation.']);
+            }
+
             // Pairing settings are system-specific, so they never survive a switch.
             $data['pairing_settings'] = null;
 
@@ -322,20 +343,18 @@ class SeasonController extends RestController
             $input = EnrollPlayerRequest::fromRequest($request);
             $this->validate($input);
 
-            if ($season->categories === []) {
-                if ($input->category !== null) {
+            // Category is optional on enrol; when given it must match the season's set.
+            if ($input->category !== null) {
+                if ($season->categories === []) {
                     throw new ValidationException([
                         'category' => 'This season has no categories; leave the category empty.',
                     ]);
                 }
-            } elseif ($input->category === null) {
-                throw new ValidationException([
-                    'category' => sprintf('Category is required. Choose one of: %s.', implode(', ', $season->categories)),
-                ]);
-            } elseif (!in_array($input->category, $season->categories, true)) {
-                throw new ValidationException([
-                    'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
-                ]);
+                if (!in_array($input->category, $season->categories, true)) {
+                    throw new ValidationException([
+                        'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
+                    ]);
+                }
             }
 
             $player = $this->playerRepository->findById($input->player_id);
@@ -356,12 +375,55 @@ class SeasonController extends RestController
         });
     }
 
+    // Assign/reassign/clear an enrolled player's category. A null (or empty)
+    // category unassigns; a given category must be one the season defines.
+    public function setPlayerCategory(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
+                $season->id,
+                (int)$request->get_param('player_id')
+            );
+            if ($seasonPlayer === null) {
+                throw new NotFoundException('Player is not enrolled in this season.');
+            }
+
+            $raw      = $request->get_param('category');
+            $category = ($raw === null || $raw === '') ? null : (string)$raw;
+
+            if ($category !== null) {
+                if ($season->categories === []) {
+                    throw new ValidationException(['category' => 'This season has no categories.']);
+                }
+                if (!in_array($category, $season->categories, true)) {
+                    throw new ValidationException([
+                        'category' => sprintf('Category must be one of: %s.', implode(', ', $season->categories)),
+                    ]);
+                }
+            }
+
+            $this->seasonPlayerRepository->update($seasonPlayer->id, ['category' => $category]);
+            $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
+
+            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
+        });
+    }
+
     public function removePlayer(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
             $season = $this->seasonRepository->findById((int)$request->get_param('id'));
             if ($season === null) {
                 throw new NotFoundException('Season not found.');
+            }
+
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('Players can only be removed while the tournament is in preparation.');
             }
 
             $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
@@ -376,6 +438,125 @@ class SeasonController extends RestController
             $this->seasonPlayerRepository->delete($seasonPlayer->id);
 
             return $this->noContent();
+        });
+    }
+
+    // Enrol many players in one atomic request (the Players tab "Add all"). Ids
+    // already enrolled or not matching a player are skipped, so it's idempotent;
+    // categories aren't set here (they're assigned on the Categories tab).
+    public function enrollPlayers(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = true;
+            }
+
+            $entries = [];
+            foreach (array_unique($input->player_ids ?? []) as $playerId) {
+                if (isset($enrolled[$playerId])) {
+                    continue;
+                }
+                $player = $this->playerRepository->findById((int)$playerId);
+                if ($player === null) {
+                    continue;
+                }
+                $entries[] = [
+                    'player_id'  => (int)$playerId,
+                    'category'   => null,
+                    'elo_rating' => $player->knsb_elo ?? 0,
+                ];
+            }
+
+            $this->seasonPlayerRepository->createMany($season->id, $entries);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
+    }
+
+    // Remove many players in one atomic request (the Players tab "Remove all").
+    // Gated to preparation for the same reason as the single remove: a played
+    // player's games/attendance/snapshots would be orphaned.
+    public function removePlayers(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('Players can only be removed while the tournament is in preparation.');
+            }
+
+            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $this->validate($input);
+
+            $this->seasonPlayerRepository->deleteBySeasonAndPlayers($season->id, $input->player_ids ?? []);
+
+            return $this->noContent();
+        });
+    }
+
+    // Apply many category assignments in one atomic request (Auto Fill). Every
+    // category is validated against the season's set up front, so either all
+    // land or the whole batch is rejected with field errors.
+    public function assignCategories(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $input = AssignCategoriesRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = $sp;
+            }
+
+            $errors  = [];
+            $updates = [];
+            foreach ($input->assignments ?? [] as $i => $assignment) {
+                $playerId = (int)$assignment['player_id'];
+                $raw      = $assignment['category'] ?? null;
+                $category = ($raw === null || $raw === '') ? null : (string)$raw;
+
+                if ($category !== null && !in_array($category, $season->categories, true)) {
+                    $errors["assignments.$i.category"] = $season->categories === []
+                        ? 'This season has no categories.'
+                        : sprintf('Category must be one of: %s.', implode(', ', $season->categories));
+                    continue;
+                }
+
+                if (!isset($enrolled[$playerId])) {
+                    continue;
+                }
+
+                $updates[] = [ 'id' => $enrolled[$playerId]->id, 'category' => $category ];
+            }
+
+            if ($errors !== []) {
+                throw new ValidationException($errors);
+            }
+
+            $this->seasonPlayerRepository->updateCategories($updates);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
         });
     }
 }

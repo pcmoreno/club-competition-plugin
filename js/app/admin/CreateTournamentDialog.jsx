@@ -1,38 +1,13 @@
 import { useState } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../api/client';
-
-const primaryBtn =
-	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60';
-const ghostBtn =
-	'rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink disabled:opacity-60';
-const fieldInput =
-	'w-full rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-60';
-
-function errorMessage( err ) {
-	if ( err instanceof ApiError ) {
-		// Field-level validation errors come back keyed by path.
-		const errors = err.body?.data?.errors || err.body?.errors;
-		if ( errors && typeof errors === 'object' ) {
-			return Object.entries( errors )
-				.map( ( [ key, msg ] ) => `${ key }: ${ msg }` )
-				.join( ' · ' );
-		}
-		return err.message;
-	}
-	return 'Something went wrong. Please try again.';
-}
-
-// PairingSystem enum (src/Entity/Enum/PairingSystem.php). Scoring is derived
-// from the pairing system on the backend, so it isn't chosen here. Keizer is
-// the club default.
-const PAIRING_OPTIONS = [
-	{ value: 'keizer', label: 'Keizer' },
-	{ value: 'swiss', label: 'Swiss' },
-	{ value: 'manual', label: 'Manual' },
-	{ value: 'round-robin-full', label: 'Round-robin' },
-	{ value: 'round-robin-groups', label: 'Round-robin (groups)' },
-];
+import { api } from '../api/client';
+import {
+	PAIRING_OPTIONS,
+	fieldInput,
+	primaryBtn,
+	ghostBtn,
+	errorMessage,
+} from './tournamentShared';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
 // only — name, location, dates, pairing system. The tournament is created in

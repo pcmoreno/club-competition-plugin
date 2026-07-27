@@ -92,9 +92,10 @@ class RoundController extends RestController
             ));
 
             return $this->ok([
-                'round' => $this->serializer->serialize($round),
-                'games' => $games,
-                'byes'  => $byes,
+                'round'      => $this->serializer->serialize($round),
+                'games'      => $games,
+                'byes'       => $byes,
+                'attendance' => array_map($this->serializer->serialize(...), $attendance),
             ]);
         });
     }

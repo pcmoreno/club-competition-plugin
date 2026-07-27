@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\SeasonPlayer;
 
@@ -99,6 +100,65 @@ class SeasonPlayerRepository
     public function update(int $id, array $data): void
     {
         $this->connection->update(SCS_TABLE_PREFIX . 'season_players', $data, [ 'id' => $id ]);
+    }
+
+    /**
+     * Enrol many players in one transaction — either every insert lands or none
+     * does, so a partial bulk enrol can't leave the season half-populated.
+     *
+     * @param list<array{player_id: int, category: ?string, elo_rating: int}> $entries
+     */
+    public function createMany(int $season_id, array $entries): void
+    {
+        $this->connection->transactional(function () use ($season_id, $entries): void {
+            foreach ($entries as $entry) {
+                $this->connection->insert(SCS_TABLE_PREFIX . 'season_players', [
+                    'season_id'  => $season_id,
+                    'player_id'  => $entry['player_id'],
+                    'category'   => $entry['category'],
+                    'elo_rating' => $entry['elo_rating'],
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Remove many enrolments in one transaction, scoped to the season so a stray
+     * player id can't delete another season's row.
+     *
+     * @param list<int> $player_ids
+     */
+    public function deleteBySeasonAndPlayers(int $season_id, array $player_ids): void
+    {
+        if ($player_ids === []) {
+            return;
+        }
+
+        $this->connection->createQueryBuilder()
+            ->delete(SCS_TABLE_PREFIX . 'season_players')
+            ->where('season_id = :season_id')
+            ->andWhere('player_id IN (:player_ids)')
+            ->setParameter('season_id', $season_id)
+            ->setParameter('player_ids', $player_ids, ArrayParameterType::INTEGER)
+            ->executeStatement();
+    }
+
+    /**
+     * Apply many category assignments in one transaction (Auto Fill).
+     *
+     * @param list<array{id: int, category: ?string}> $updates
+     */
+    public function updateCategories(array $updates): void
+    {
+        $this->connection->transactional(function () use ($updates): void {
+            foreach ($updates as $update) {
+                $this->connection->update(
+                    SCS_TABLE_PREFIX . 'season_players',
+                    [ 'category' => $update['category'] ],
+                    [ 'id' => $update['id'] ]
+                );
+            }
+        });
     }
 
     public function delete(int $id): void

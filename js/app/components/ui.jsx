@@ -99,6 +99,53 @@ function ChevronIcon( { className } ) {
 	);
 }
 
+// Generic confirmation dialog. `children` is the body copy; `danger` styles the
+// confirm button red for destructive actions. Backdrop click cancels.
+export function ConfirmModal( {
+	title,
+	children,
+	confirmLabel = 'Confirm',
+	onConfirm,
+	onCancel,
+	danger = false,
+} ) {
+	return (
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+			onClick={ onCancel }
+		>
+			<div
+				className="w-full max-w-md rounded-lg bg-paper p-6 shadow-md"
+				onClick={ ( e ) => e.stopPropagation() }
+			>
+				<h2 className="font-serif text-2xl leading-tight">{ title }</h2>
+				<div className="mt-2 text-sm text-ink-3">{ children }</div>
+				<div className="mt-6 flex justify-end gap-2">
+					<button
+						type="button"
+						className="rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink"
+						onClick={ onCancel }
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className={
+							'rounded px-4 py-2 text-sm font-medium text-paper ' +
+							( danger
+								? 'bg-loss hover:opacity-90'
+								: 'bg-ink hover:bg-ink-2' )
+						}
+						onClick={ onConfirm }
+					>
+						{ confirmLabel }
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 // Dashed-border card for loading / error / empty / "coming later" states.
 export function Notice( { children } ) {
 	return (
