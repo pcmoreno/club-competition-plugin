@@ -46,18 +46,31 @@ export function TournamentPairingsTab( { season, players } ) {
 	const currentRoundId =
 		selectedRoundId ?? ( ordered.length ? ordered[ ordered.length - 1 ].id : null );
 
+	// The round immediately before the selected one — its frozen snapshot is the
+	// score each player carries *into* this round.
+	const previousRoundId = useMemo( () => {
+		const i = ordered.findIndex( ( r ) => r.id === currentRoundId );
+		return i > 0 ? ordered[ i - 1 ].id : null;
+	}, [ ordered, currentRoundId ] );
+
 	const { data: roundData } = useQuery( {
 		queryKey: [ 'round', String( currentRoundId ) ],
 		queryFn: () => api.get( `rounds/${ currentRoundId }` ),
 		enabled: currentRoundId !== null,
 	} );
 
-	// Current standings (latest completed round) → each player's tournament score
-	// going into this round. rank_score is resolved server-side from the season's
-	// RANK BY setting (points, TPR, Sonneborn-Berger, …), so we just read it.
+	// Board scores are "entering this round" — the standings frozen after the
+	// *previous* round, so they stay fixed once this round is scored (scoring
+	// round N mustn't change round N's board numbers). rank_score is resolved
+	// server-side from the season's RANK BY setting (points, TPR, …). The first
+	// round has no previous snapshot, so everyone enters on 0.
 	const { data: standingsData } = useQuery( {
-		queryKey: [ 'standings', String( season.id ) ],
-		queryFn: () => api.get( `seasons/${ season.id }/standings` ),
+		queryKey: [ 'standings', String( season.id ), previousRoundId ],
+		queryFn: () =>
+			api.get( `seasons/${ season.id }/standings`, {
+				params: { round: previousRoundId },
+			} ),
+		enabled: previousRoundId !== null,
 	} );
 	const scoreOf = useMemo( () => {
 		const map = {};
@@ -149,6 +162,9 @@ export function TournamentPairingsTab( { season, players } ) {
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
+			// Completing a round rewrites its snapshot; refresh any entering-round
+			// scores that read it (prefix covers all ['standings', …] keys).
+			queryClient.invalidateQueries( { queryKey: [ 'standings' ] } );
 		},
 	} );
 
@@ -271,9 +287,17 @@ export function TournamentPairingsTab( { season, players } ) {
 		}
 		// Only one seat filled and no one else left to oppose them → the odd
 		// player out takes the pairing bye instead of a half-made pairing.
-		const opponentsLeft = unpaired.filter(
-			( u ) => u.season_player_id !== p.season_player_id
-		);
+		// A player displaced from the slot we're dropping onto returns to the
+		// pool, so count them as an available opponent (else a re-drop onto an
+		// occupied slot would award a spurious bye and discard the occupant).
+		const displaced = slot === 'white' ? builder.white : builder.black;
+		const opponentsLeft = unpaired
+			.filter( ( u ) => u.season_player_id !== p.season_player_id )
+			.concat(
+				displaced && displaced.season_player_id !== p.season_player_id
+					? [ displaced ]
+					: []
+			);
 		if ( opponentsLeft.length === 0 ) {
 			setAttendance.mutate( {
 				seasonPlayerId: p.season_player_id,

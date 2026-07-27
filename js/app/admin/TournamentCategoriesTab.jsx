@@ -88,23 +88,16 @@ export function TournamentCategoriesTab( { season, players } ) {
 		},
 	} );
 
-	// Bulk-apply many category assignments at once (Auto Fill), optimistic like
-	// the single assign so the whole board rearranges immediately.
+	// Bulk-apply many category assignments in one atomic request (Auto Fill),
+	// optimistic like the single assign so the whole board rearranges immediately.
 	const autoFill = useMutation( {
-		mutationFn: async ( assignments ) => {
-			const results = await Promise.allSettled(
-				assignments.map( ( a ) =>
-					api.patch(
-						`seasons/${ season.id }/players/${ a.playerId }`,
-						{ category: a.category }
-					)
-				)
-			);
-			const failed = results.find( ( r ) => r.status === 'rejected' );
-			if ( failed ) {
-				throw failed.reason;
-			}
-		},
+		mutationFn: ( assignments ) =>
+			api.patch( `seasons/${ season.id }/players/bulk`, {
+				assignments: assignments.map( ( a ) => ( {
+					player_id: a.playerId,
+					category: a.category,
+				} ) ),
+			} ),
 		onMutate: async ( assignments ) => {
 			await queryClient.cancelQueries( { queryKey: seasonKey } );
 			const prev = queryClient.getQueryData( seasonKey );
@@ -276,41 +269,43 @@ export function TournamentCategoriesTab( { season, players } ) {
 						</p>
 					</div>
 
-					{ players.length === 0 ? (
+					{ players.length === 0 && (
 						<p className="text-sm text-muted">
 							No players enrolled yet — add them on the Players
-							tab.
+							tab. You can still add and remove categories here.
 						</p>
-					) : (
-						<div className="grid grid-cols-[2fr_1fr] items-start gap-4">
-							<div className="flex flex-col gap-4">
-								{ list.map( ( c ) => (
-									<AssignBox
-										key={ c }
-										title={ c }
-										rows={ grouped.groups[ c ] }
-										isOver={ over === c }
-										onOver={ () => setOver( c ) }
-										onLeave={ () => setOver( null ) }
-										onDrop={ () => onDropTo( c ) }
-										onDragStart={ onDragStart }
-										onRemove={ () => removeAt( c ) }
-										empty="Drop players here"
-									/>
-								) ) }
-							</div>
-							<AssignBox
-								title="Unassigned"
-								rows={ grouped.unassigned }
-								isOver={ over === '__none' }
-								onOver={ () => setOver( '__none' ) }
-								onLeave={ () => setOver( null ) }
-								onDrop={ () => onDropTo( null ) }
-								onDragStart={ onDragStart }
-								empty="No unassigned players"
-							/>
-						</div>
 					) }
+
+					{ /* Boxes render even with no players so the category list
+					     (and each box's Remove) is always reachable. */ }
+					<div className="grid grid-cols-[2fr_1fr] items-start gap-4">
+						<div className="flex flex-col gap-4">
+							{ list.map( ( c ) => (
+								<AssignBox
+									key={ c }
+									title={ c }
+									rows={ grouped.groups[ c ] }
+									isOver={ over === c }
+									onOver={ () => setOver( c ) }
+									onLeave={ () => setOver( null ) }
+									onDrop={ () => onDropTo( c ) }
+									onDragStart={ onDragStart }
+									onRemove={ () => removeAt( c ) }
+									empty="Drop players here"
+								/>
+							) ) }
+						</div>
+						<AssignBox
+							title="Unassigned"
+							rows={ grouped.unassigned }
+							isOver={ over === '__none' }
+							onOver={ () => setOver( '__none' ) }
+							onLeave={ () => setOver( null ) }
+							onDrop={ () => onDropTo( null ) }
+							onDragStart={ onDragStart }
+							empty="No unassigned players"
+						/>
+					</div>
 
 					{ ( assign.isError || autoFill.isError ) && (
 						<p className="text-sm text-loss">

@@ -298,6 +298,27 @@ class RestApi
                 ],
             ]);
 
+            // Bulk enrol / remove / category-assign in one atomic request (the
+            // Players and Categories tabs' "Add all" / "Remove all" / "Auto Fill").
+            // 'bulk' is non-numeric so it can't collide with the {player_id} route.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/bulk', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$seasons, 'enrollPlayers'],
+                    'permission_callback' => $isAdmin,
+                ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$seasons, 'removePlayers'],
+                    'permission_callback' => $isAdmin,
+                ],
+                [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$seasons, 'assignCategories'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)', [
                 [
                     'methods'             => 'GET',

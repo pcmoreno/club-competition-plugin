@@ -37,20 +37,24 @@ export function TournamentPlayersTab( { season, players } ) {
 			.sort( ( a, b ) => ( a.name ?? '' ).localeCompare( b.name ?? '' ) );
 	}, [ players, enrolledSearch ] );
 
+	// Only active (non-retired) club players are enrollable — GET /players
+	// returns everyone, so filter here (in both the visible list and "Add all").
 	const available = useMemo( () => {
 		const list = Array.isArray( allPlayers ) ? allPlayers : [];
 		const q = availableSearch.trim().toLowerCase();
 		return list
+			.filter( ( p ) => p.active )
 			.filter( ( p ) => ! enrolledIds.has( p.id ) )
 			.filter( ( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q ) )
 			.sort( ( a, b ) => ( a.name ?? '' ).localeCompare( b.name ?? '' ) );
 	}, [ allPlayers, enrolledIds, availableSearch ] );
 
 	// Every enrollable / enrolled id, ignoring the filters — the bulk buttons
-	// act on all players, not just the currently visible ones.
+	// act on all active players, not just the currently visible ones.
 	const addAllIds = useMemo(
 		() =>
 			( Array.isArray( allPlayers ) ? allPlayers : [] )
+				.filter( ( p ) => p.active )
 				.filter( ( p ) => ! enrolledIds.has( p.id ) )
 				.map( ( p ) => p.id ),
 		[ allPlayers, enrolledIds ]
@@ -61,44 +65,33 @@ export function TournamentPlayersTab( { season, players } ) {
 		queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
 	};
 
-	// Enrol/remove run one request per player so a single failure doesn't sink
-	// the batch; the first error is surfaced and successes are reflected either
-	// way via invalidate on settle.
+	// Enrol/remove go through the atomic bulk endpoints — one request for the
+	// whole selection, so a 50-player "Add all" doesn't fan out 50 POSTs and a
+	// partial failure can't leave the season half-populated.
 	const enroll = useMutation( {
-		mutationFn: async ( { ids } ) => {
-			const results = await Promise.allSettled(
-				ids.map( ( id ) =>
-					api.post( `seasons/${ season.id }/players`, {
-						player_id: id,
-					} )
-				)
-			);
-			const failed = results.find( ( r ) => r.status === 'rejected' );
-			if ( failed ) {
-				throw failed.reason;
-			}
-		},
+		mutationFn: ( { ids } ) =>
+			api.post( `seasons/${ season.id }/players/bulk`, {
+				player_ids: ids,
+			} ),
 		onSuccess: () => setSelAvailable( new Set() ),
 		onSettled: invalidate,
 	} );
 
 	const remove = useMutation( {
-		mutationFn: async ( { ids } ) => {
-			const results = await Promise.allSettled(
-				ids.map( ( id ) =>
-					api.del( `seasons/${ season.id }/players/${ id }` )
-				)
-			);
-			const failed = results.find( ( r ) => r.status === 'rejected' );
-			if ( failed ) {
-				throw failed.reason;
-			}
-		},
+		mutationFn: ( { ids } ) =>
+			api.del( `seasons/${ season.id }/players/bulk`, {
+				body: { player_ids: ids },
+			} ),
 		onSuccess: () => setSelEnrolled( new Set() ),
 		onSettled: invalidate,
 	} );
 
 	const busy = enroll.isPending || remove.isPending;
+
+	// Removing a player who has played orphans their games/attendance/snapshots,
+	// so removal is only allowed while the tournament is still in preparation
+	// (the server enforces the same rule).
+	const canRemove = season.status === 'preparation';
 
 	const doEnroll = ( ids ) => {
 		if ( ids.length > 0 ) {
@@ -107,7 +100,7 @@ export function TournamentPlayersTab( { season, players } ) {
 	};
 
 	const doRemove = ( ids ) => {
-		if ( ids.length > 0 ) {
+		if ( canRemove && ids.length > 0 ) {
 			remove.mutate( { ids } );
 		}
 	};
@@ -191,7 +184,8 @@ export function TournamentPlayersTab( { season, players } ) {
 					onDrop={ () => onDropTo( 'enrolled' ) }
 					empty="No players enrolled yet."
 					action={
-						players.length > 0 && (
+						players.length > 0 &&
+						canRemove && (
 							<button
 								type="button"
 								onClick={ () => setConfirm( 'remove' ) }
@@ -212,7 +206,11 @@ export function TournamentPlayersTab( { season, players } ) {
 								? doEnroll( [ ...selAvailable ] )
 								: doRemove( [ ...selEnrolled ] )
 						}
-						disabled={ ! addMode && ! removeMode || busy }
+						disabled={
+						( ! addMode && ! removeMode ) ||
+						busy ||
+						( removeMode && ! canRemove )
+					}
 						className={
 							'sticky top-28 mt-24 self-start whitespace-nowrap rounded px-3 py-2 text-sm font-medium disabled:opacity-40 ' +
 							( removeMode

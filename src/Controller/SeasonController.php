@@ -19,6 +19,8 @@ use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Repository\StandingsSnapshotRepository;
+use SCS\Request\AssignCategoriesRequest;
+use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
@@ -420,6 +422,10 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('Players can only be removed while the tournament is in preparation.');
+            }
+
             $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
                 $season->id,
                 (int)$request->get_param('player_id')
@@ -432,6 +438,125 @@ class SeasonController extends RestController
             $this->seasonPlayerRepository->delete($seasonPlayer->id);
 
             return $this->noContent();
+        });
+    }
+
+    // Enrol many players in one atomic request (the Players tab "Add all"). Ids
+    // already enrolled or not matching a player are skipped, so it's idempotent;
+    // categories aren't set here (they're assigned on the Categories tab).
+    public function enrollPlayers(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = true;
+            }
+
+            $entries = [];
+            foreach (array_unique($input->player_ids ?? []) as $playerId) {
+                if (isset($enrolled[$playerId])) {
+                    continue;
+                }
+                $player = $this->playerRepository->findById((int)$playerId);
+                if ($player === null) {
+                    continue;
+                }
+                $entries[] = [
+                    'player_id'  => (int)$playerId,
+                    'category'   => null,
+                    'elo_rating' => $player->knsb_elo ?? 0,
+                ];
+            }
+
+            $this->seasonPlayerRepository->createMany($season->id, $entries);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
+    }
+
+    // Remove many players in one atomic request (the Players tab "Remove all").
+    // Gated to preparation for the same reason as the single remove: a played
+    // player's games/attendance/snapshots would be orphaned.
+    public function removePlayers(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('Players can only be removed while the tournament is in preparation.');
+            }
+
+            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $this->validate($input);
+
+            $this->seasonPlayerRepository->deleteBySeasonAndPlayers($season->id, $input->player_ids ?? []);
+
+            return $this->noContent();
+        });
+    }
+
+    // Apply many category assignments in one atomic request (Auto Fill). Every
+    // category is validated against the season's set up front, so either all
+    // land or the whole batch is rejected with field errors.
+    public function assignCategories(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $input = AssignCategoriesRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = $sp;
+            }
+
+            $errors  = [];
+            $updates = [];
+            foreach ($input->assignments ?? [] as $i => $assignment) {
+                $playerId = (int)$assignment['player_id'];
+                $raw      = $assignment['category'] ?? null;
+                $category = ($raw === null || $raw === '') ? null : (string)$raw;
+
+                if ($category !== null && !in_array($category, $season->categories, true)) {
+                    $errors["assignments.$i.category"] = $season->categories === []
+                        ? 'This season has no categories.'
+                        : sprintf('Category must be one of: %s.', implode(', ', $season->categories));
+                    continue;
+                }
+
+                if (!isset($enrolled[$playerId])) {
+                    continue;
+                }
+
+                $updates[] = [ 'id' => $enrolled[$playerId]->id, 'category' => $category ];
+            }
+
+            if ($errors !== []) {
+                throw new ValidationException($errors);
+            }
+
+            $this->seasonPlayerRepository->updateCategories($updates);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
         });
     }
 }
