@@ -30,6 +30,18 @@ function errorMessage( err ) {
 	return 'Something went wrong. Please try again.';
 }
 
+// Clearing a number input yields '', and parseFloat('') is NaN — which isn't
+// nullish, so the `?? default` on the value prop doesn't catch it. React then
+// renders value={NaN} (a warning and a control that won't accept input) and the
+// NaN rides along into the PATCH payload. Fall back to the field's own default
+// rather than a bare 0: direct encounter's maxGroup defaults to 2 and the
+// server rejects anything below it, so 0 would turn a cleared field into a
+// validation error on save.
+function toNumber( raw, fallback = 0 ) {
+	const n = parseFloat( raw );
+	return Number.isFinite( n ) ? n : fallback;
+}
+
 function SectionTitle( { children, hint } ) {
 	return (
 		<div className="mb-2">
@@ -240,7 +252,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 							disabled={ disabled }
 							onChange={ ( e ) =>
 								patch( i, {
-									points: parseFloat( e.target.value ),
+									points: toNumber( e.target.value ),
 								} )
 							}
 							aria-label="Bye points"
@@ -354,7 +366,7 @@ function TiebreakConfig( {
 										value={ current }
 										disabled={ disabled }
 										onChange={ ( e ) =>
-											set( parseFloat( e.target.value ) )
+											set( toNumber( e.target.value, f.default ?? 0 ) )
 										}
 									/>
 								) }
@@ -392,8 +404,9 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 										...values,
 										gameOutcomes: {
 											...values.gameOutcomes,
-											[ f.key ]: parseFloat(
-												e.target.value
+											[ f.key ]: toNumber(
+												e.target.value,
+												f.default ?? 0
 											),
 										},
 									} )
