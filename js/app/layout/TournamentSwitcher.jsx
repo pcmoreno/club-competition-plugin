@@ -63,13 +63,9 @@ export function TournamentSwitcher( { value, onChange } ) {
 		) : null;
 	}
 
-	// The group label separates the two sets in the open dropdown, but a closed
-	// <select> shows only the option's own text — so completed entries carry the
-	// tag themselves, and stay identifiable once selected.
-	const option = ( s, suffix = '' ) => (
+	const option = ( s ) => (
 		<option key={ s.id } value={ s.id }>
 			{ s.name }
-			{ suffix }
 		</option>
 	);
 
@@ -85,13 +81,11 @@ export function TournamentSwitcher( { value, onChange } ) {
 				onChange={ ( e ) => onChange( Number( e.target.value ) ) }
 			>
 				{ active.length > 0 && (
-					<optgroup label="Active">
-						{ active.map( ( s ) => option( s ) ) }
-					</optgroup>
+					<optgroup label="Active">{ active.map( option ) }</optgroup>
 				) }
 				{ completed.length > 0 && (
 					<optgroup label="Completed">
-						{ completed.map( ( s ) => option( s, ' — completed' ) ) }
+						{ completed.map( option ) }
 					</optgroup>
 				) }
 			</select>
