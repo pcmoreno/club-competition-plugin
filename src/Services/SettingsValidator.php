@@ -56,8 +56,13 @@ final class SettingsValidator
             }
         }
 
-        if (isset($input['rankBy']) && StandingsMetric::tryFrom((string)$input['rankBy']) === null) {
-            $errors['rankBy'] = 'Unknown ranking metric.';
+        if (isset($input['rankBy'])) {
+            $rankBy = StandingsMetric::tryFrom((string)$input['rankBy']);
+            if ($rankBy === null) {
+                $errors['rankBy'] = 'Unknown ranking metric.';
+            } elseif (!$rankBy->canRankBy()) {
+                $errors['rankBy'] = sprintf('%s can only be used as a tiebreaker, not to rank by.', $rankBy->label());
+            }
         }
 
         foreach ($input['tiebreakers'] ?? [] as $i => $metric) {
@@ -66,14 +71,27 @@ final class SettingsValidator
             }
         }
 
+        // The method must be implemented, not merely a valid enum case: an
+        // unimplemented one makes the calculator skip itself, so the metric
+        // silently reads 0 for every player while the UI shows it as configured.
         $buchholz = $input['tiebreakConfig']['buchholz']['method'] ?? null;
-        if ($buchholz !== null && BuchholzMethod::tryFrom((string)$buchholz) === null) {
-            $errors['tiebreakConfig.buchholz.method'] = 'Unknown Buchholz method.';
+        if ($buchholz !== null) {
+            $method = BuchholzMethod::tryFrom((string)$buchholz);
+            if ($method === null) {
+                $errors['tiebreakConfig.buchholz.method'] = 'Unknown Buchholz method.';
+            } elseif (!$method->isImplemented()) {
+                $errors['tiebreakConfig.buchholz.method'] = sprintf('The %s Buchholz method is not implemented yet.', $method->label());
+            }
         }
 
         $tpr = $input['tiebreakConfig']['performance_rating']['method'] ?? null;
-        if ($tpr !== null && TprMethod::tryFrom((string)$tpr) === null) {
-            $errors['tiebreakConfig.performance_rating.method'] = 'Unknown TPR method.';
+        if ($tpr !== null) {
+            $method = TprMethod::tryFrom((string)$tpr);
+            if ($method === null) {
+                $errors['tiebreakConfig.performance_rating.method'] = 'Unknown TPR method.';
+            } elseif (!$method->isImplemented()) {
+                $errors['tiebreakConfig.performance_rating.method'] = sprintf('The %s TPR method is not implemented yet.', $method->label());
+            }
         }
 
         $maxGroup = $input['tiebreakConfig']['direct_encounter']['maxGroup'] ?? null;
