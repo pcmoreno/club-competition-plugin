@@ -20,6 +20,11 @@ class Assets
      * The CSRF token is intentionally NOT injected here — issuing one mutates
      * the scs_csrf cookie, which must not happen on a GET; the app fetches it
      * lazily via GET /auth/csrf-token once it knows it's authenticated.
+     *
+     * A wp_rest nonce is deliberately NOT injected either. No scs/v1 route
+     * verifies one, and core's rest_cookie_check_errors() rejects a nonce that
+     * is present but stale with a 403 before any permission_callback runs — so
+     * a cached page older than the nonce tick would break every API call.
      */
     public static function enqueue_frontend(
         JwtService $jwt,
@@ -66,7 +71,6 @@ class Assets
 
         wp_localize_script('scs-viewer', 'scsBootstrap', [
             'apiRoot'   => esc_url_raw(rest_url('scs/v1/')),
-            'restNonce' => wp_create_nonce('wp_rest'),
             'role'      => $claims['role'] ?? null,
             // The logged-in member's player id (null for anonymous/admins), so
             // the frontend can identify "you" — e.g. highlight your own game.

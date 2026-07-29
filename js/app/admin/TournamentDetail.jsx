@@ -8,6 +8,7 @@ import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
 import { TournamentCategoriesTab } from './TournamentCategoriesTab';
+import { keys } from '../api/keys';
 
 // ADMIN. Detail page for a single tournament (= season), reached by clicking a
 // name in the Tournaments list (/admin/tournaments/:id). Three tabs: Basic
@@ -32,7 +33,7 @@ export function TournamentDetail( { seasonId } ) {
 	const [ confirmingStart, setConfirmingStart ] = useState( false );
 	const queryClient = useQueryClient();
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'season', seasonId ],
+		queryKey: keys.season( seasonId ),
 		queryFn: () => api.get( `seasons/${ seasonId }` ),
 	} );
 
@@ -42,8 +43,8 @@ export function TournamentDetail( { seasonId } ) {
 		mutationFn: () => api.patch( `seasons/${ seasonId }`, { status: 'active' } ),
 		onSuccess: () => {
 			setConfirmingStart( false );
-			queryClient.invalidateQueries( { queryKey: [ 'season', seasonId ] } );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.season( seasonId ) } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ConfirmModal } from '../components/ui';
 import { fieldInput, primaryBtn, errorMessage } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Categories tab. Add categories (persisted to the season's `categories`
 // column via PATCH /seasons/{id}) then assign enrolled players by dragging them
@@ -19,7 +20,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 	const [ confirming, setConfirming ] = useState( false );
 	const drag = useRef( null );
 
-	const seasonKey = [ 'season', String( season.id ) ];
+	const seasonKey = keys.season( season.id );
 
 	// Enrolled players split into a box per category plus the leftover pool,
 	// each ordered by rating (highest first).
@@ -48,7 +49,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 			api.patch( `seasons/${ season.id }`, { categories } ),
 		onSuccess: () => {
 			queryClient.invalidateQueries( { queryKey: seasonKey } );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 		onError: () => setList( season.categories ?? [] ),
 	} );
@@ -84,7 +85,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 		},
 		onSettled: () => {
 			queryClient.invalidateQueries( { queryKey: seasonKey } );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 
@@ -125,7 +126,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 		},
 		onSettled: () => {
 			queryClient.invalidateQueries( { queryKey: seasonKey } );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 

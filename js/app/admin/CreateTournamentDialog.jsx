@@ -3,11 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
 	PAIRING_OPTIONS,
+	DEFAULT_PAIRING_SYSTEM,
 	fieldInput,
 	primaryBtn,
 	ghostBtn,
 	errorMessage,
 } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
 // only — name, location, dates, pairing system. The tournament is created in
@@ -19,12 +21,12 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ location, setLocation ] = useState( '' );
 	const [ startDate, setStartDate ] = useState( '' );
 	const [ endDate, setEndDate ] = useState( '' );
-	const [ pairing, setPairing ] = useState( 'keizer' );
+	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
 
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 			onClose();
 		},
 	} );
@@ -94,8 +96,15 @@ export function CreateTournamentDialog( { onClose } ) {
 							className={ fieldInput }
 						>
 							{ PAIRING_OPTIONS.map( ( o ) => (
-								<option key={ o.value } value={ o.value }>
+								<option
+									key={ o.value }
+									value={ o.value }
+									disabled={ o.implemented === false }
+								>
 									{ o.label }
+									{ o.implemented === false
+										? ' (not implemented)'
+										: '' }
 								</option>
 							) ) }
 						</select>

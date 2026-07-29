@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useEffect,
 } from '@wordpress/element';
+import { useQueryClient } from '@tanstack/react-query';
 import { bootstrap } from '../bootstrap';
 import { api, setCsrfToken } from '../api/client';
 
@@ -18,6 +19,9 @@ const AuthContext = createContext( null );
 // round-trip. The CSRF token isn't known at render (it would mutate the
 // cookie on a GET), so it's fetched lazily on mount instead.
 export function AuthProvider( { children } ) {
+	// AuthProvider sits inside QueryClientProvider (see App.jsx), so the cache
+	// can be dropped whenever the identity behind it changes.
+	const queryClient = useQueryClient();
 	const [ role, setRole ] = useState( bootstrap.role );
 	// The logged-in member's player id (null for anonymous/admins), used to
 	// identify "you" in lists.
@@ -52,17 +56,25 @@ export function AuthProvider( { children } ) {
 			email: nextEmail,
 			csrf_token: csrfToken,
 		} = await api.post( 'auth/login', { email: emailInput, password } );
+		// Anything cached belongs to whoever was here before — an anonymous
+		// visitor, or the previous user on a shared club laptop. Serving it to
+		// the account that just signed in would leak their data (['admin-players']
+		// carries email addresses) and would show stale, wrongly-scoped views.
+		queryClient.clear();
 		setCsrfToken( csrfToken );
 		setRole( nextRole );
 		setPlayerId( nextPlayerId ?? null );
 		setEmail( nextEmail ?? emailInput );
 		return nextRole;
-	}, [] );
+	}, [ queryClient ] );
 
 	const logout = useCallback( async () => {
 		try {
 			await api.post( 'auth/logout' );
 		} finally {
+			// Drop every cached response for the session being ended, so the
+			// next user in this tab can't be served the previous one's data.
+			queryClient.clear();
 			setRole( null );
 			setPlayerId( null );
 			setEmail( null );
@@ -71,7 +83,7 @@ export function AuthProvider( { children } ) {
 			// same-page re-login doesn't 403.
 			refreshCsrf();
 		}
-	}, [ refreshCsrf ] );
+	}, [ refreshCsrf, queryClient ] );
 
 	const value = {
 		role,

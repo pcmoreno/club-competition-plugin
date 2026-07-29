@@ -130,7 +130,13 @@ class Container
 
         $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
 
+        // Under uploads/, not the plugin dir: the list is personal data of ~20k
+        // non-users, and a plugin subdirectory is web-reachable (and wiped by a
+        // reinstall). The store hardens the directory and migrates any file left
+        // at the old location.
+        $uploads = wp_upload_dir();
         $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
+            ->addArgument($uploads['basedir'])
             ->addArgument(SCS_PLUGIN_PATH . 'resources/KnsbRatings');
 
         $container->register('knsb_name_normalizer', Services\KnsbNameNormalizer::class);
@@ -182,6 +188,7 @@ class Container
 
         $container->register('round_service', Services\RoundService::class)
             ->addArgument(new Reference('scoring_strategy_resolver'))
+            ->addArgument(new Reference('transaction_manager'))
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('round_repository'))
@@ -211,7 +218,8 @@ class Container
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('serializer_service'))
             ->addArgument(new Reference('player_tournament_service'))
-            ->addArgument(new Reference('player_merge_service'));
+            ->addArgument(new Reference('player_merge_service'))
+            ->addArgument(new Reference('transaction_manager'));
 
         $container->register('season_controller', Controller\SeasonController::class)
             ->setPublic(true)
@@ -227,7 +235,8 @@ class Container
             ->addArgument(new Reference('settings_validator'))
             ->addArgument(new Reference('settings_resolver'))
             ->addArgument(new Reference('game_repository'))
-            ->addArgument(new Reference('attendance_repository'));
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('transaction_manager'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)

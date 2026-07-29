@@ -4,6 +4,7 @@ import { Page } from '../layout/Page';
 import { Link } from '../router/router';
 import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass } from '../components/ui';
+import { keys } from '../api/keys';
 
 // MEMBER. Plain roster (NOT standings) scoped to the selected tournament:
 // Name · Cat · Elo, sorted by Elo desc; rows link to player detail. Backed by
@@ -13,7 +14,7 @@ import { Notice, YouTag, youRowClass } from '../components/ui';
 export function Players( { seasonId } ) {
 	const { playerId } = useAuth();
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'season', seasonId ],
+		queryKey: keys.season( seasonId ),
 		queryFn: () => api.get( `seasons/${ seasonId }` ),
 		enabled: seasonId !== null,
 	} );

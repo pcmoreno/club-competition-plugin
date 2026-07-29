@@ -2,6 +2,7 @@ import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
+import { keys } from '../api/keys';
 
 // ADMIN. Modal launched from the Tournaments tab. Lists the plugin-shipped
 // fixtures (GET /fixtures) and loads one on demand (POST /fixtures/load). The
@@ -30,7 +31,7 @@ export function ImportSeasonDialog( { onClose } ) {
 	const [ result, setResult ] = useState( null ); // { counts } on success
 
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'fixtures' ],
+		queryKey: keys.fixtures(),
 		queryFn: () => api.get( 'fixtures' ),
 	} );
 
@@ -39,7 +40,7 @@ export function ImportSeasonDialog( { onClose } ) {
 		onSuccess: ( counts ) => {
 			setResult( counts );
 			setConfirming( null );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 

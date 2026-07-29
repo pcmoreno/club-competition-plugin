@@ -21,6 +21,24 @@ enum PairingSystem: string
         };
     }
 
+    // Selectable for a season. Automatic pairing generation is unavailable for
+    // every system (the admin builds boards by hand), so what actually gates a
+    // season is whether its scoring can be computed — without that, completing
+    // a round throws and the season is stuck. Keizer is the one that can't.
+    public function isImplemented(): bool
+    {
+        return $this->scoringSystem()->isImplemented();
+    }
+
+    /** @return list<string> the only values a season may be created or updated with */
+    public static function implementedValues(): array
+    {
+        return array_values(array_map(
+            static fn (self $system) => $system->value,
+            array_filter(self::cases(), static fn (self $system) => $system->isImplemented())
+        ));
+    }
+
     // Pairing cadence, which drives the admin UI: 'manual' has no generator (the
     // board is hand-built), 'per-round' pairs the next round from the standings
     // (Keizer, Swiss), 'full' lays out the whole fixture up front (round-robin).

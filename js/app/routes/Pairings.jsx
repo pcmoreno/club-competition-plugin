@@ -4,6 +4,7 @@ import { Page } from '../layout/Page';
 import { Link } from '../router/router';
 import { Notice, formatDate } from '../components/ui';
 import { Square, resultToken, categoryLabel } from '../components/game';
+import { keys } from '../api/keys';
 
 // PUBLIC. Shows the most-recent non-draft round of the selected tournament:
 // pairings appear at `published`, results at `complete`. Backed by
@@ -60,7 +61,7 @@ function PlayerCell( { player, color, seasonId } ) {
 
 export function Pairings( { seasonId } ) {
 	const roundsQuery = useQuery( {
-		queryKey: [ 'rounds', seasonId ],
+		queryKey: keys.rounds( seasonId ),
 		queryFn: () => api.get( `seasons/${ seasonId }/rounds` ),
 		enabled: seasonId !== null,
 	} );
@@ -70,7 +71,7 @@ export function Pairings( { seasonId } ) {
 		: null;
 
 	const roundQuery = useQuery( {
-		queryKey: [ 'round', current?.id ],
+		queryKey: keys.round( current?.id ),
 		queryFn: () => api.get( `rounds/${ current.id }` ),
 		enabled: current !== null,
 	} );

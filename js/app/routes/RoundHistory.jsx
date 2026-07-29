@@ -6,6 +6,7 @@ import { Link } from '../router/router';
 import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass, formatDate } from '../components/ui';
 import { Square, resultToken } from '../components/game';
+import { keys } from '../api/keys';
 
 // MEMBER. Browse any played round: a round navigator + the round's games, with
 // the standings as of that round (movers ▲/▼ vs the previous round) alongside.
@@ -50,7 +51,7 @@ function PlayerInline( { player, color, seasonId } ) {
 export function RoundHistory( { seasonId } ) {
 	const { playerId } = useAuth();
 	const roundsQuery = useQuery( {
-		queryKey: [ 'rounds', seasonId ],
+		queryKey: keys.rounds( seasonId ),
 		queryFn: () => api.get( `seasons/${ seasonId }/rounds` ),
 		enabled: seasonId !== null,
 	} );
@@ -75,7 +76,7 @@ export function RoundHistory( { seasonId } ) {
 	}, [ rounds, selectedId ] );
 
 	const roundQuery = useQuery( {
-		queryKey: [ 'round', selectedId ],
+		queryKey: keys.round( selectedId ),
 		queryFn: () => api.get( `rounds/${ selectedId }` ),
 		enabled: selectedId !== null,
 	} );
@@ -319,7 +320,11 @@ function Mover( { delta } ) {
 // diffed against the previous round's snapshot.
 function StandingsAfter( { round, seasonId, meId } ) {
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'round-standings', round?.id ],
+		// Same endpoint the admin pairings tab reads, so it must be the same
+		// key: it used to be ['round-standings', …], which the ['standings']
+		// prefix invalidation deliberately doesn't match, so this panel served a
+		// stale snapshot after a round was completed.
+		queryKey: keys.standings( seasonId, round?.id ),
 		queryFn: () =>
 			api.get( `seasons/${ seasonId }/standings`, {
 				params: { round: round.id },

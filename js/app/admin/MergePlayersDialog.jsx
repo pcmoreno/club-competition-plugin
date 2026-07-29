@@ -2,6 +2,7 @@ import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
+import { keys } from '../api/keys';
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -190,12 +191,12 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 		mutationFn: () =>
 			api.post( `players/${ keep.id }/merge`, { source_id: remove.id } ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'player-tournaments', keep.id ],
+				queryKey: keys.playerTournaments( keep.id ),
 			} );
 			queryClient.removeQueries( {
-				queryKey: [ 'player-tournaments', remove.id ],
+				queryKey: keys.playerTournaments( remove.id ),
 			} );
 			onDone();
 		},
@@ -325,7 +326,7 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 // opening a player's detail then merging reuses the same fetch.
 function usePlayerTournaments( playerId ) {
 	return useQuery( {
-		queryKey: [ 'player-tournaments', playerId ],
+		queryKey: keys.playerTournaments( playerId ),
 		queryFn: () => api.get( `players/${ playerId }/tournaments` ),
 		enabled: playerId != null,
 	} );

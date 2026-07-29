@@ -2,6 +2,7 @@ import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
+import { keys } from '../api/keys';
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
@@ -45,7 +46,7 @@ const SEASON_STATUS_LABEL = {
 // holding its own stale snapshot.
 export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 	const { data: roster } = useQuery( {
-		queryKey: [ 'admin-players' ],
+		queryKey: keys.adminPlayers(),
 		queryFn: () => api.get( 'players' ),
 	} );
 	const player = Array.isArray( roster )
@@ -55,7 +56,7 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 	// Lifted here (not only in TournamentsSection) because the delete affordance
 	// is gated on it: a player can be deleted only when enrolled in nothing.
 	const tournamentsQuery = useQuery( {
-		queryKey: [ 'player-tournaments', playerId ],
+		queryKey: keys.playerTournaments( playerId ),
 		queryFn: () => api.get( `players/${ playerId }/tournaments` ),
 	} );
 	const canDelete =
@@ -359,7 +360,7 @@ function ToggleActiveConfirm( { player, onClose } ) {
 		mutationFn: () =>
 			api.patch( `players/${ player.id }`, { active: ! player.active } ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 			onClose();
 		},
 	} );
@@ -421,7 +422,7 @@ function RevokeConfirm( { player, onClose } ) {
 	const revoke = useMutation( {
 		mutationFn: () => api.post( `players/${ player.id }/revoke` ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 			onClose();
 		},
 	} );
@@ -474,7 +475,7 @@ function DeleteConfirm( { player, onClose, onDeleted } ) {
 		mutationFn: () => api.del( `players/${ player.id }` ),
 		onSuccess: () => {
 			onDeleted();
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 		},
 	} );
 

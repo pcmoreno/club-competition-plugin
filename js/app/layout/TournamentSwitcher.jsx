@@ -1,6 +1,7 @@
 import { useEffect } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { keys } from '../api/keys';
 
 // Global tournament switcher — scopes every member/public view at once.
 // Normally lists active seasons (multiple can be active: a league plus side
@@ -15,7 +16,7 @@ export function TournamentSwitcher( { value, onChange } ) {
 	// narrow here: active ones while a competition is running, else the
 	// completed ones (newest first) so the off-season still shows a season.
 	const { data: all = [], isLoading } = useQuery( {
-		queryKey: [ 'seasons' ],
+		queryKey: keys.seasons(),
 		queryFn: () => api.get( 'seasons' ),
 	} );
 	const active = all.filter( ( s ) => s.status === 'active' );

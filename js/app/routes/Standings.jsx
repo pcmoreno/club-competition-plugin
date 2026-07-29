@@ -6,6 +6,7 @@ import { Link } from '../router/router';
 import { useAuth } from '../auth/AuthContext';
 import { Notice, YouTag, youRowClass } from '../components/ui';
 import { pieceForRank } from '../components/game';
+import { keys } from '../api/keys';
 
 // PUBLIC. Pieces-ladder standings for the selected tournament, read from the
 // latest frozen StandingsSnapshot (no live compute). The piece reflects the
@@ -43,7 +44,7 @@ export function Standings( { seasonId } ) {
 	}, [ seasonId ] );
 
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'standings', seasonId ],
+		queryKey: keys.standings( seasonId ),
 		queryFn: () => api.get( `seasons/${ seasonId }/standings` ),
 		enabled: seasonId !== null,
 	} );

@@ -8,6 +8,7 @@ use SCS\Engine\Pairing\ManualPairing;
 use SCS\Engine\Pairing\PairingEngineInterface;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Season;
+use SCS\Exception\ConflictException;
 
 // Builds the pairing engine for a season from its pairing system.
 final class PairingEngineResolver
@@ -16,8 +17,8 @@ final class PairingEngineResolver
     {
         return match ($season->pairing_system) {
             PairingSystem::Manual => new ManualPairing(),
-            default => throw new \RuntimeException(
-                sprintf('Pairing engine is not implemented for "%s" yet.', $season->pairing_system->value)
+            default => throw new ConflictException(
+                sprintf('Automatic pairing is not available for %s yet — build the board by hand.', $season->pairing_system->value)
             ),
         };
     }

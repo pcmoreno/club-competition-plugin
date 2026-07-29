@@ -20,6 +20,7 @@ use SCS\Services\KnsbRatingStore;
 use SCS\Services\PlayerMergeService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
+use SCS\Services\TransactionManager;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class PlayerController extends RestController
@@ -34,6 +35,7 @@ class PlayerController extends RestController
         private readonly SerializerService $serializer,
         private readonly PlayerTournamentService $playerTournamentService,
         private readonly PlayerMergeService $playerMergeService,
+        private readonly TransactionManager $transactions,
     ) {
         parent::__construct($validator);
     }
@@ -117,11 +119,17 @@ class PlayerController extends RestController
                 );
             }
 
-            $member = $this->memberRepository->findByPlayerId($player->id);
-            if ($member !== null) {
-                $this->memberRepository->delete($member->id);
-            }
-            $this->playerRepository->delete($player->id);
+            // One unit: a failure between the two deletes would leave a member
+            // row pointing at a player id that no longer exists, and
+            // AuthContextService only validates the member — so that account
+            // would keep authenticating while /auth/me returns player: null.
+            $this->transactions->transactional(function () use ($player): void {
+                $member = $this->memberRepository->findByPlayerId($player->id);
+                if ($member !== null) {
+                    $this->memberRepository->delete($member->id);
+                }
+                $this->playerRepository->delete($player->id);
+            });
 
             return $this->noContent();
         });

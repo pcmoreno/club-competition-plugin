@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SearchInput, ConfirmModal } from '../components/ui';
 import { errorMessage } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Players (enrolment) tab, as a two-panel transfer list: Enrolled on the
 // left, the remaining active club players on the right. Move players by
@@ -21,7 +22,7 @@ export function TournamentPlayersTab( { season, players } ) {
 	const drag = useRef( null );
 
 	const { data: allPlayers } = useQuery( {
-		queryKey: [ 'admin-players' ],
+		queryKey: keys.adminPlayers(),
 		queryFn: () => api.get( 'players' ),
 	} );
 
@@ -61,8 +62,8 @@ export function TournamentPlayersTab( { season, players } ) {
 	);
 
 	const invalidate = () => {
-		queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
-		queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+		queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+		queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 	};
 
 	// Enrol/remove go through the atomic bulk endpoints — one request for the

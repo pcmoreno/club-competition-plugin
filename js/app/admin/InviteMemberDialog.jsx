@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { keys } from '../api/keys';
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
@@ -35,7 +36,7 @@ export function InviteMemberDialog( { player, onClose } ) {
 		mutationFn: ( payload ) =>
 			api.post( `players/${ player.id }/invite`, payload ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 			onClose();
 		},
 	} );

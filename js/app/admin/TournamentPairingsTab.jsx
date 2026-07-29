@@ -10,6 +10,7 @@ import {
 	generateLabel,
 	errorMessage,
 } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Pairings tab of the tournament detail page (default tab while active).
 // A manual round + pairings manager: create/select a round, build the board by
@@ -25,10 +26,11 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ poolOver, setPoolOver ] = useState( false );
 	const [ byeOver, setByeOver ] = useState( null );
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
+	const [ confirmReopen, setConfirmReopen ] = useState( false );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
-	const roundsKey = [ 'rounds', String( season.id ) ];
+	const roundsKey = keys.rounds( season.id );
 
 	const { data: rounds, isLoading: roundsLoading } = useQuery( {
 		queryKey: roundsKey,
@@ -54,7 +56,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	}, [ ordered, currentRoundId ] );
 
 	const { data: roundData } = useQuery( {
-		queryKey: [ 'round', String( currentRoundId ) ],
+		queryKey: keys.round( currentRoundId ),
 		queryFn: () => api.get( `rounds/${ currentRoundId }` ),
 		enabled: currentRoundId !== null,
 	} );
@@ -65,7 +67,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	// server-side from the season's RANK BY setting (points, TPR, …). The first
 	// round has no previous snapshot, so everyone enters on 0.
 	const { data: standingsData } = useQuery( {
-		queryKey: [ 'standings', String( season.id ), previousRoundId ],
+		queryKey: keys.standings( season.id, previousRoundId ),
 		queryFn: () =>
 			api.get( `seasons/${ season.id }/standings`, {
 				params: { round: previousRoundId },
@@ -83,7 +85,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	// Bye types the season defines (scoring settings), minus the reserved pairing
 	// bye which the engine assigns to the odd player automatically.
 	const { data: settingsData } = useQuery( {
-		queryKey: [ 'season-settings', season.id ],
+		queryKey: keys.seasonSettings( season.id ),
 		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
 	} );
 	const byeTypes = useMemo(
@@ -111,7 +113,7 @@ export function TournamentPairingsTab( { season, players } ) {
 		setBuilder( { white: null, black: null } );
 	}, [ currentRoundId ] );
 
-	const roundKey = [ 'round', String( currentRoundId ) ];
+	const roundKey = keys.round( currentRoundId );
 	const invalidateRound = () =>
 		queryClient.invalidateQueries( { queryKey: roundKey } );
 
@@ -159,12 +161,13 @@ export function TournamentPairingsTab( { season, players } ) {
 			api.patch( `rounds/${ currentRoundId }/status`, { status } ),
 		onSuccess: () => {
 			setConfirmAdvance( false );
+			setConfirmReopen( false );
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
-			queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
+			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
 			// Completing a round rewrites its snapshot; refresh any entering-round
 			// scores that read it (prefix covers all ['standings', …] keys).
-			queryClient.invalidateQueries( { queryKey: [ 'standings' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.standings() } );
 		},
 	} );
 
@@ -397,6 +400,18 @@ export function TournamentPairingsTab( { season, players } ) {
 							className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
 						>
 							{ ROUND_ADVANCE_LABELS[ nextStatus ] }
+						</button>
+					) }
+					{ /* The status flow is forward-only, so without this a wrong
+					     result in a completed round could never be corrected. */ }
+					{ round?.status === 'complete' && (
+						<button
+							type="button"
+							onClick={ () => setConfirmReopen( true ) }
+							disabled={ setStatus.isPending }
+							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:text-ink disabled:opacity-60"
+						>
+							Reopen
 						</button>
 					) }
 				</div>
@@ -672,6 +687,26 @@ export function TournamentPairingsTab( { season, players } ) {
 						'Finalising locks the pairings so they can’t be changed. Results can still be entered.' }
 					{ nextStatus === 'complete' &&
 						'Completing the round freezes its standings snapshot.' }
+					{ setStatus.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( setStatus.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
+
+			{ confirmReopen && (
+				<ConfirmModal
+					title="Reopen this round"
+					confirmLabel={
+						setStatus.isPending ? 'Working…' : 'Reopen round'
+					}
+					onCancel={ () => setConfirmReopen( false ) }
+					onConfirm={ () => setStatus.mutate( 'finalised' ) }
+				>
+					Reopening lets you correct a result. The published standings
+					stay as they are until you complete the round again — which
+					recalculates this round and every later completed round.
 					{ setStatus.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( setStatus.error ) }

@@ -22,9 +22,11 @@ final class StandardScoringSettings implements TournamentScoringSettings
 
     private const DEFAULT_GAME_OUTCOMES = ['win' => 1.0, 'draw' => 0.5, 'loss' => 0.0];
 
+    // Buchholz defaults to Classic because it is the only implemented variant;
+    // an unimplemented method makes the calculator no-op and the column read 0.
     private const DEFAULT_TIEBREAK_CONFIG = [
         'direct_encounter'   => ['maxGroup' => 2],
-        'buchholz'           => ['method' => 'baku_2023'],
+        'buchholz'           => ['method' => 'classic'],
         'performance_rating' => ['method' => 'fide_dp'],
     ];
 
@@ -121,7 +123,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
             [
                 'group'   => ScoringSettingsGroup::RankBy->value,
                 'type'    => FieldType::Select->value,
-                'options' => self::metricOptions(),
+                'options' => self::rankByOptions(),
                 'default' => StandingsMetric::Points->value,
             ],
             [
@@ -139,9 +141,15 @@ final class StandardScoringSettings implements TournamentScoringSettings
     {
         $defaults = new self();
 
+        // Fall back to the default for an unknown metric, and for a tiebreak-only
+        // one: settings stored before rankBy was constrained may still hold it,
+        // and honouring it would collapse the whole field onto rank 1.
         $rankBy = isset($values['rankBy'])
             ? (StandingsMetric::tryFrom((string)$values['rankBy']) ?? $defaults->rankBy)
             : $defaults->rankBy;
+        if (!$rankBy->canRankBy()) {
+            $rankBy = $defaults->rankBy;
+        }
 
         $tiebreakers = isset($values['tiebreakers']) && is_array($values['tiebreakers'])
             ? array_values(array_filter(array_map(
@@ -168,6 +176,16 @@ final class StandardScoringSettings implements TournamentScoringSettings
         );
     }
 
+    // rankBy excludes the tiebreak-only metrics (see StandingsMetric::canRankBy).
+    /** @return list<array<string,string>> */
+    private static function rankByOptions(): array
+    {
+        return array_values(array_filter(
+            self::metricOptions(),
+            static fn (array $option) => StandingsMetric::from($option['value'])->canRankBy()
+        ));
+    }
+
     // Parametric tiebreakers expose sub-fields, revealed only when the metric is selected.
     /** @return array<string,list<array<string,mixed>>> */
     private static function tiebreakConfigSchema(): array
@@ -185,7 +203,7 @@ final class StandardScoringSettings implements TournamentScoringSettings
                         static fn (BuchholzMethod $m) => ['value' => $m->value, 'label' => $m->label(), 'implemented' => $m->isImplemented()],
                         BuchholzMethod::cases()
                     ),
-                    'default' => BuchholzMethod::Baku2023->value,
+                    'default' => BuchholzMethod::Classic->value,
                 ],
             ],
             StandingsMetric::PerformanceRating->value => [

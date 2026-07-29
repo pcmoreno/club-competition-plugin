@@ -25,4 +25,12 @@ enum StandingsMetric: string
             self::DirectEncounter   => 'Direct encounter',
         };
     }
+
+    // Direct encounter is tiebreak-only: it compares a tied group against itself,
+    // so it has no value to rank a whole field by. Used as rankBy it is filtered
+    // out of the rank key, leaving an empty key that puts every player on rank 1.
+    public function canRankBy(): bool
+    {
+        return $this !== self::DirectEncounter;
+    }
 }

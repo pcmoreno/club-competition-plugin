@@ -8,6 +8,7 @@ import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
 import { FetchKnsbDialog } from './FetchKnsbDialog';
 import { Notice, ActionsMenu, SearchInput } from '../components/ui';
+import { keys } from '../api/keys';
 
 function errorMessage( err ) {
 	// Our typed exceptions (404/403/409/429) return a curated, user-safe message
@@ -75,7 +76,7 @@ function syncedLabel( dt ) {
 
 export function Players() {
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'admin-players' ],
+		queryKey: keys.adminPlayers(),
 		queryFn: () => api.get( 'players' ),
 	} );
 	const [ search, setSearch ] = useState( '' );
@@ -397,7 +398,7 @@ function SyncDialog( { player, onClose } ) {
 	const sync = useMutation( {
 		mutationFn: () => api.post( `players/${ player.id }/knsb-rating` ),
 		onSuccess: () =>
-			queryClient.invalidateQueries( { queryKey: [ 'admin-players' ] } ),
+			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } ),
 	} );
 	const updated = sync.data;
 

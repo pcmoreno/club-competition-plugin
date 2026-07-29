@@ -11,6 +11,7 @@ use SCS\Engine\Scoring\StandingsCalculator;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Entity\Enum\ScoringSystem;
 use SCS\Entity\Season;
+use SCS\Exception\ConflictException;
 
 // Builds the scoring strategy for a season, configured with that season's stored settings.
 final class ScoringStrategyResolver
@@ -29,7 +30,10 @@ final class ScoringStrategyResolver
                 $this->playerScores,
                 $this->standings,
             ),
-            ScoringSystem::Keizer => throw new \RuntimeException('Keizer scoring is not implemented yet.'),
+            // ConflictException, not a bare RuntimeException: this is reachable
+            // from a season stored before the system was constrained, and the
+            // admin needs a 409 they can read rather than a generic 500.
+            ScoringSystem::Keizer => throw new ConflictException('Keizer scoring is not implemented yet, so this round cannot be completed.'),
         };
     }
 }

@@ -6,8 +6,14 @@ namespace SCS\Entity;
 
 /**
  * A player's standing frozen at the moment a round completed — the official
- * record after that round. Immutable once written (an already-complete round
- * can't be edited). Engine changes affect only future snapshots, never these.
+ * record after that round. Engine changes affect only future snapshots, never
+ * these.
+ *
+ * Not immutable, but rewritten only through one path: results and attendance
+ * are locked while a round is complete, so changing the record means reopening
+ * the round (RoundService::reopenRound) and completing it again. That rewrites
+ * this round's snapshots and every later completed round's, because standings
+ * accumulate.
  */
 class StandingsSnapshot
 {
