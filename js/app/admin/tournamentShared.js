@@ -6,13 +6,22 @@ import { ApiError } from '../api/client';
 
 // PairingSystem enum (src/Entity/Enum/PairingSystem.php). Scoring is derived
 // from the pairing system on the backend, so it isn't chosen separately.
+//
+// Keizer is not selectable: it's the one system whose scoring has no strategy
+// yet, so a Keizer season can't complete a round. The backend rejects it too
+// (PairingSystem::implementedValues); the label stays here so existing seasons
+// still render a name. Automatic pairing is unavailable for every system —
+// boards are built by hand — which is why the others remain selectable.
 export const PAIRING_OPTIONS = [
-	{ value: 'keizer', label: 'Keizer' },
+	{ value: 'keizer', label: 'Keizer', implemented: false },
 	{ value: 'swiss', label: 'Swiss' },
 	{ value: 'manual', label: 'Manual' },
 	{ value: 'round-robin-full', label: 'Round-robin' },
 	{ value: 'round-robin-groups', label: 'Round-robin (groups)' },
 ];
+
+// The system a fresh tournament starts on.
+export const DEFAULT_PAIRING_SYSTEM = 'manual';
 
 export const PAIRING_LABELS = Object.fromEntries(
 	PAIRING_OPTIONS.map( ( o ) => [ o.value, o.label ] )

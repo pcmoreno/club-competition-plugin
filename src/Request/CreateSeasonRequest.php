@@ -20,8 +20,10 @@ class CreateSeasonRequest
     #[Assert\Date(message: 'End date must be in YYYY-MM-DD format.')]
     public ?string $end_date = null;
 
+    // Defaults to Manual: it's the only system with no unimplemented moving
+    // parts, so an untouched form always produces a season that can be run.
     #[Assert\Choice(callback: [self::class, 'pairingSystemChoices'], message: 'Pairing system is not valid.')]
-    public string $pairing_system = PairingSystem::Keizer->value;
+    public string $pairing_system = PairingSystem::Manual->value;
 
     /** @var list<string> */
     public array $categories = [];
@@ -29,7 +31,7 @@ class CreateSeasonRequest
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
-        return array_column(PairingSystem::cases(), 'value');
+        return PairingSystem::implementedValues();
     }
 
     public static function fromRequest(\WP_REST_Request $request): self

@@ -39,7 +39,7 @@ class UpdateSeasonRequest
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
-        return array_column(PairingSystem::cases(), 'value');
+        return PairingSystem::implementedValues();
     }
 
     /** @return list<string> */

@@ -93,8 +93,20 @@ export function TournamentBasicTab( { season } ) {
 					className={ fieldInput + ( pairingLocked ? ' cursor-not-allowed opacity-60' : '' ) }
 				>
 					{ PAIRING_OPTIONS.map( ( o ) => (
-						<option key={ o.value } value={ o.value }>
+						<option
+							key={ o.value }
+							value={ o.value }
+							// Keep the season's current system selectable even if
+							// it's unimplemented, so the select can render it.
+							disabled={
+								o.implemented === false &&
+								o.value !== season.pairing_system
+							}
+						>
 							{ o.label }
+							{ o.implemented === false
+								? ' (not implemented)'
+								: '' }
 						</option>
 					) ) }
 				</select>
