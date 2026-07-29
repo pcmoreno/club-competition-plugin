@@ -45,9 +45,12 @@ function buildUrl( path, params ) {
 
 async function request( method, path, { body, signal, params } = {} ) {
 	const headers = { Accept: 'application/json' };
-	if ( bootstrap.restNonce ) {
-		headers[ 'X-WP-Nonce' ] = bootstrap.restNonce;
-	}
+	// No X-WP-Nonce: the plugin authenticates with the scs_token JWT plus the
+	// scs_csrf double-submit token, and no scs/v1 route verifies a wp_rest
+	// nonce. Sending one is pure liability — core rejects a *present but
+	// expired* nonce with a 403 before any permission_callback runs, so a page
+	// served from cache older than the nonce tick would 403 every call,
+	// public reads included.
 	if ( body !== undefined ) {
 		headers[ 'Content-Type' ] = 'application/json';
 	}
