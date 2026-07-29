@@ -21,8 +21,10 @@ Makefile
 .phpstorm.meta.php
 _ide_helper.php
 
-# KNSB rating data — fetched at runtime (wp scs fetch-knsb-ratings), not
-# committed. The folder itself ships via resources/KnsbRatings/.gitkeep.
+# KNSB rating data — fetched at runtime (wp scs fetch-knsb-ratings) into
+# uploads/, never the plugin dir. This entry stays so a list left behind by a
+# pre-0.3.3 install (KnsbRatingStore migrates it on first use) can't be
+# committed by accident.
 /resources/KnsbRatings/*.json
 
 # OS

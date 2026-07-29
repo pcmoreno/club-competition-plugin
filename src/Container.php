@@ -130,7 +130,13 @@ class Container
 
         $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
 
+        // Under uploads/, not the plugin dir: the list is personal data of ~20k
+        // non-users, and a plugin subdirectory is web-reachable (and wiped by a
+        // reinstall). The store hardens the directory and migrates any file left
+        // at the old location.
+        $uploads = wp_upload_dir();
         $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
+            ->addArgument($uploads['basedir'])
             ->addArgument(SCS_PLUGIN_PATH . 'resources/KnsbRatings');
 
         $container->register('knsb_name_normalizer', Services\KnsbNameNormalizer::class);
