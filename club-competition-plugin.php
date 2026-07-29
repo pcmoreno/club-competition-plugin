@@ -35,6 +35,37 @@ require_once SCS_PLUGIN_PATH . 'vendor/autoload.php';
 register_activation_hook(__FILE__, [ \SCS\includes\Database::class, 'activate' ]);
 register_deactivation_hook(__FILE__, [ \SCS\includes\Database::class, 'deactivate' ]);
 
+/**
+ * Run one boot step, converting a fatal into an admin notice.
+ *
+ * plugins_loaded fires on every request — front end, REST, cron and wp-admin —
+ * so an uncaught throw here white-screens the whole site, including the screen
+ * the admin would use to deactivate the plugin; recovery then needs SSH or DB
+ * access. Migrations throw deliberately (0005 refuses to add UNIQUE(name) while
+ * duplicates exist), and the deploy path is a git pull straight to production
+ * with no staging, so this is the most likely way to take the club site down.
+ *
+ * The CLI keeps the loud failure: `wp scs migrate` still throws, which is
+ * correct where someone is watching the output.
+ */
+function scs_boot_step(string $label, callable $step): void
+{
+    try {
+        $step();
+    } catch (\Throwable $e) {
+        error_log(sprintf('[SCS] %s failed: %s', $label, $e->getMessage()));
+
+        $notice = sprintf(
+            'Club Competition Manager: %s failed — %s. The plugin is inactive until this is resolved; see the PHP error log.',
+            $label,
+            $e->getMessage()
+        );
+        add_action('admin_notices', static function () use ($notice) {
+            printf('<div class="notice notice-error"><p>%s</p></div>', esc_html($notice));
+        });
+    }
+}
+
 // Apply any pending schema migrations on load. WordPress only fires the
 // activation hook on manual activation, never on update, so updates that ship
 // new migration files (e.g. via the GitHub-Releases update path) would
@@ -42,11 +73,11 @@ register_deactivation_hook(__FILE__, [ \SCS\includes\Database::class, 'deactivat
 // scs_applied_migrations option, so this is a cheap no-op once everything is
 // applied. Runs before Container::boot so services see the current schema.
 add_action('plugins_loaded', function () {
-    \SCS\includes\Database::migrate();
+    scs_boot_step('Database migration', [ \SCS\includes\Database::class, 'migrate' ]);
 }, 5);
 
 add_action('plugins_loaded', function () {
-    \SCS\Container::boot();
+    scs_boot_step('Service container boot', [ \SCS\Container::class, 'boot' ]);
 }, 10);
 
 // Seed the shipped season fixtures once each. Runs after the container is built
@@ -54,5 +85,5 @@ add_action('plugins_loaded', function () {
 // no-op once everything is imported. On plugins_loaded rather than activation
 // because the deploy flow (upload + replace) never fires the activation hook.
 add_action('plugins_loaded', function () {
-    \SCS\includes\FixtureSeeder::seed();
+    scs_boot_step('Fixture seeding', [ \SCS\includes\FixtureSeeder::class, 'seed' ]);
 }, 15);
