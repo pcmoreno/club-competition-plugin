@@ -28,6 +28,7 @@ use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
 use SCS\Services\SettingsValidator;
+use SCS\Services\TransactionManager;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class SeasonController extends RestController
@@ -46,6 +47,7 @@ class SeasonController extends RestController
         private readonly SettingsResolver $settingsResolver,
         private readonly GameRepository $gameRepository,
         private readonly AttendanceRepository $attendanceRepository,
+        private readonly TransactionManager $transactions,
     ) {
         parent::__construct($validator);
     }
@@ -231,13 +233,19 @@ class SeasonController extends RestController
                 throw new ConflictException('Only a tournament in preparation can be deleted.');
             }
 
-            // No FK cascade, so clear child rows first (children before the season).
-            $this->standingsSnapshotRepository->deleteBySeason($season->id);
-            $this->gameRepository->deleteBySeason($season->id);
-            $this->attendanceRepository->deleteBySeason($season->id);
-            $this->seasonPlayerRepository->deleteBySeason($season->id);
-            $this->roundRepository->deleteBySeason($season->id);
-            $this->seasonRepository->delete($season->id);
+            // No FK cascade, so clear child rows first (children before the
+            // season) — and transactionally, because a failure part-way through
+            // would leave a season whose enrolments are gone but whose rounds
+            // remain: every player in the round view resolves to null, and the
+            // snapshots point at season_player ids that no longer exist.
+            $this->transactions->transactional(function () use ($season): void {
+                $this->standingsSnapshotRepository->deleteBySeason($season->id);
+                $this->gameRepository->deleteBySeason($season->id);
+                $this->attendanceRepository->deleteBySeason($season->id);
+                $this->seasonPlayerRepository->deleteBySeason($season->id);
+                $this->roundRepository->deleteBySeason($season->id);
+                $this->seasonRepository->delete($season->id);
+            });
 
             return $this->ok(['deleted' => true]);
         });

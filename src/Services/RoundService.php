@@ -23,6 +23,7 @@ final class RoundService
 {
     public function __construct(
         private readonly ScoringStrategyResolver $scoringResolver,
+        private readonly TransactionManager $transactions,
         private readonly SeasonRepository $seasons,
         private readonly SeasonPlayerRepository $seasonPlayers,
         private readonly RoundRepository $rounds,
@@ -96,25 +97,33 @@ final class RoundService
         $snapshots = $strategy->computeStandings($season, $round, $roster, $games, $attendance);
 
         // Write-once per round; rewrite on a re-completion (the un-complete edge case).
-        $this->snapshots->deleteByRound($round->id);
-        foreach ($snapshots as $snapshot) {
-            $this->snapshots->create(
-                $snapshot->season_id,
-                $snapshot->round_id,
-                $snapshot->season_player_id,
-                $snapshot->rank,
-                $snapshot->keizer_score,
-                $snapshot->classical_points,
-                $snapshot->wins,
-                $snapshot->draws,
-                $snapshot->losses,
-                $snapshot->games,
-                $snapshot->byes,
-                $snapshot->color_balance,
-                $snapshot->tpr,
-                $snapshot->scores,
-            );
-        }
+        //
+        // Transactional because the delete and the per-player inserts are one
+        // unit: a failure part-way through would otherwise leave the round with
+        // a partial standings table (some players, ranks with holes), and
+        // findLatestForSeason picks the highest round_number that has *any*
+        // snapshot, so that fragment would become the published standings.
+        $this->transactions->transactional(function () use ($round, $snapshots): void {
+            $this->snapshots->deleteByRound($round->id);
+            foreach ($snapshots as $snapshot) {
+                $this->snapshots->create(
+                    $snapshot->season_id,
+                    $snapshot->round_id,
+                    $snapshot->season_player_id,
+                    $snapshot->rank,
+                    $snapshot->keizer_score,
+                    $snapshot->classical_points,
+                    $snapshot->wins,
+                    $snapshot->draws,
+                    $snapshot->losses,
+                    $snapshot->games,
+                    $snapshot->byes,
+                    $snapshot->color_balance,
+                    $snapshot->tpr,
+                    $snapshot->scores,
+                );
+            }
+        });
     }
 
     private function requireGame(int $gameId): Game
