@@ -7,6 +7,7 @@ import {
 	primaryBtn,
 	errorMessage,
 } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Basic-details tab of the tournament detail page. Edits the same fields
 // as the Create dialog (name, pairing system, dates, location) via
@@ -31,8 +32,8 @@ export function TournamentBasicTab( { season } ) {
 	const save = useMutation( {
 		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 

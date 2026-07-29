@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { api, ApiError } from '../api/client';
 import { navigate } from '../router/router';
+import { keys } from '../api/keys';
 
 const inputClass =
 	'w-full rounded border-rule bg-surface px-3 py-2 text-ink focus:border-accent focus:ring-accent';
@@ -57,7 +58,7 @@ export function BootstrapAdminDialog( { onClose } ) {
 			await api.post( 'auth/bootstrap-admin', { email, password } );
 			// The button must disappear now that an admin exists.
 			queryClient.invalidateQueries( {
-				queryKey: [ 'admin-bootstrap-status' ],
+				queryKey: keys.adminBootstrapStatus(),
 			} );
 			// Log straight in with the credentials just set, then land in-app.
 			try {

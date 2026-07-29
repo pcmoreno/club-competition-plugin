@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { keys } from '../api/keys';
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -32,7 +33,7 @@ function Row( { label, value } ) {
 export function FetchKnsbDialog( { onClose } ) {
 	const queryClient = useQueryClient();
 	const status = useQuery( {
-		queryKey: [ 'knsb-status' ],
+		queryKey: keys.knsbStatus(),
 		queryFn: () => api.get( 'knsb/status' ),
 	} );
 	const fetchList = useMutation( {

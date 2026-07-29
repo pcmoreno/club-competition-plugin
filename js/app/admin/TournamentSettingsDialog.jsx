@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
+import { keys } from '../api/keys';
 
 // ADMIN. Tournament engine settings. The form is rendered entirely from the
 // field schema served by GET /seasons/{id}/settings, so a new scoring system
@@ -494,13 +495,13 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	const remove = useMutation( {
 		mutationFn: () => api.del( `seasons/${ season.id }` ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 			onClose();
 		},
 	} );
 
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'season-settings', season.id ],
+		queryKey: keys.seasonSettings( season.id ),
 		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
 	} );
 
@@ -516,9 +517,9 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 		onSuccess: () => {
 			setSaved( true );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'season-settings', season.id ],
+				queryKey: keys.seasonSettings( season.id ),
 			} );
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
 

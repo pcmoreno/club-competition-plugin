@@ -9,6 +9,7 @@ import {
 	ghostBtn,
 	errorMessage,
 } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
 // only — name, location, dates, pairing system. The tournament is created in
@@ -25,7 +26,7 @@ export function CreateTournamentDialog( { onClose } ) {
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'seasons' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 			onClose();
 		},
 	} );

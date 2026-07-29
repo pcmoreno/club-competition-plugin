@@ -10,6 +10,7 @@ import {
 	generateLabel,
 	errorMessage,
 } from './tournamentShared';
+import { keys } from '../api/keys';
 
 // ADMIN. Pairings tab of the tournament detail page (default tab while active).
 // A manual round + pairings manager: create/select a round, build the board by
@@ -28,7 +29,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
-	const roundsKey = [ 'rounds', String( season.id ) ];
+	const roundsKey = keys.rounds( season.id );
 
 	const { data: rounds, isLoading: roundsLoading } = useQuery( {
 		queryKey: roundsKey,
@@ -54,7 +55,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	}, [ ordered, currentRoundId ] );
 
 	const { data: roundData } = useQuery( {
-		queryKey: [ 'round', String( currentRoundId ) ],
+		queryKey: keys.round( currentRoundId ),
 		queryFn: () => api.get( `rounds/${ currentRoundId }` ),
 		enabled: currentRoundId !== null,
 	} );
@@ -65,7 +66,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	// server-side from the season's RANK BY setting (points, TPR, …). The first
 	// round has no previous snapshot, so everyone enters on 0.
 	const { data: standingsData } = useQuery( {
-		queryKey: [ 'standings', String( season.id ), previousRoundId ],
+		queryKey: keys.standings( season.id, previousRoundId ),
 		queryFn: () =>
 			api.get( `seasons/${ season.id }/standings`, {
 				params: { round: previousRoundId },
@@ -83,7 +84,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	// Bye types the season defines (scoring settings), minus the reserved pairing
 	// bye which the engine assigns to the odd player automatically.
 	const { data: settingsData } = useQuery( {
-		queryKey: [ 'season-settings', season.id ],
+		queryKey: keys.seasonSettings( season.id ),
 		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
 	} );
 	const byeTypes = useMemo(
@@ -111,7 +112,7 @@ export function TournamentPairingsTab( { season, players } ) {
 		setBuilder( { white: null, black: null } );
 	}, [ currentRoundId ] );
 
-	const roundKey = [ 'round', String( currentRoundId ) ];
+	const roundKey = keys.round( currentRoundId );
 	const invalidateRound = () =>
 		queryClient.invalidateQueries( { queryKey: roundKey } );
 
@@ -161,10 +162,10 @@ export function TournamentPairingsTab( { season, players } ) {
 			setConfirmAdvance( false );
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
-			queryClient.invalidateQueries( { queryKey: [ 'season', String( season.id ) ] } );
+			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
 			// Completing a round rewrites its snapshot; refresh any entering-round
 			// scores that read it (prefix covers all ['standings', …] keys).
-			queryClient.invalidateQueries( { queryKey: [ 'standings' ] } );
+			queryClient.invalidateQueries( { queryKey: keys.standings() } );
 		},
 	} );
 

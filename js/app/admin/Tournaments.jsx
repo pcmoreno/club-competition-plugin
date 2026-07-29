@@ -13,6 +13,7 @@ import {
 	ActionsMenu,
 	SearchInput,
 } from '../components/ui';
+import { keys } from '../api/keys';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
 // Completed, from GET /seasons. Clicking a name opens the detail page
@@ -31,7 +32,7 @@ export function Tournaments() {
 	const [ settingsFor, setSettingsFor ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'seasons' ],
+		queryKey: keys.seasons(),
 		queryFn: () => api.get( 'seasons' ),
 	} );
 

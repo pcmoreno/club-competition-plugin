@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Page } from '../layout/Page';
 import { Notice, formatDate } from '../components/ui';
 import { ChangePasswordDialog } from '../account/ChangePasswordDialog';
+import { keys } from '../api/keys';
 
 const GENDER_LABELS = { male: 'Male', female: 'Female', other: 'Other' };
 
@@ -66,7 +67,7 @@ export function Account() {
 	const [ showChangePassword, setShowChangePassword ] = useState( false );
 
 	const { data, isLoading, isError } = useQuery( {
-		queryKey: [ 'account' ],
+		queryKey: keys.account(),
 		queryFn: () => api.get( 'auth/me' ),
 	} );
 

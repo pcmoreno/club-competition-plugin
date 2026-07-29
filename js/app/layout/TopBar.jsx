@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { navigate } from '../router/router';
 import { BootstrapAdminDialog } from '../auth/BootstrapAdminDialog';
 import { TournamentSwitcher } from './TournamentSwitcher';
+import { keys } from '../api/keys';
 
 /** Brand mark: a tiny 2×2 chessboard, matching the hi-fi `.brand-mark`. */
 function BrandMark() {
@@ -117,7 +118,7 @@ export function TopBar( { seasonId, onSeasonChange, showTournamentSwitcher } ) {
 	// Break-glass "New admin" entry, shown only while the site has no admin yet.
 	// The server re-checks this invariant, so the button is just UX gating.
 	const { data: bootstrapStatus } = useQuery( {
-		queryKey: [ 'admin-bootstrap-status' ],
+		queryKey: keys.adminBootstrapStatus(),
 		queryFn: () => api.get( 'auth/bootstrap-status' ),
 		staleTime: Infinity,
 	} );

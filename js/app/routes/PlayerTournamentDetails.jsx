@@ -14,6 +14,7 @@ import {
 	Highlights,
 	AgainstYou,
 } from '../components/player/blocks';
+import { keys } from '../api/keys';
 
 // PUBLIC. One player's whole run through a single season: their games (left),
 // a summary card, per-opponent-category and per-colour splits, streaks, a
@@ -27,7 +28,7 @@ import {
 export function PlayerTournamentDetails( { seasonId, playerId } ) {
 	const { playerId: meId } = useAuth();
 	const { data, isLoading, isError, error } = useQuery( {
-		queryKey: [ 'player-tournament', seasonId, playerId ],
+		queryKey: keys.playerTournament( seasonId, playerId ),
 		queryFn: () => api.get( `seasons/${ seasonId }/players/${ playerId }` ),
 	} );
 
