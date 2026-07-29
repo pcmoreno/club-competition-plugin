@@ -39,6 +39,18 @@ class RoundController extends RestController
         parent::__construct($validator);
     }
 
+    // Re-read after a write. Throws rather than handing a null to the
+    // serializer, which would surface as a 500 on a request that succeeded.
+    private function requireRound(int $id): \SCS\Entity\Round
+    {
+        $round = $this->roundRepository->findById($id);
+        if ($round === null) {
+            throw new NotFoundException('Round not found.');
+        }
+
+        return $round;
+    }
+
     public function index(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
@@ -132,14 +144,24 @@ class RoundController extends RestController
             $this->validate($input);
 
             $newStatus = RoundStatus::from($input->status);
+
+            // Reopening runs through the service so the "only a completed round"
+            // guard applies; it deliberately keeps the existing snapshot.
+            if ($round->status === RoundStatus::Complete && $newStatus === RoundStatus::Finalised) {
+                $this->roundService->reopenRound($round);
+
+                return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
+            }
+
             $this->roundRepository->updateStatus($round->id, $newStatus);
 
-            // Completing a round freezes its standings snapshot.
+            // Completing a round freezes its standings snapshot, and refreshes
+            // every later completed round's — they accumulate this one's games.
             if ($newStatus === RoundStatus::Complete) {
                 $this->roundService->completeRound($round);
             }
 
-            return $this->ok($this->serializer->serialize($this->roundRepository->findById($round->id), SerializerService::GROUP_ADMIN));
+            return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -163,7 +185,7 @@ class RoundController extends RestController
                 ];
             }
 
-            $this->attendanceRepository->saveMany($round->id, $parsed);
+            $this->roundService->saveAttendance($round->id, $parsed);
 
             $attendance = $this->attendanceRepository->findByRound($round->id);
 
@@ -174,19 +196,16 @@ class RoundController extends RestController
     public function updateGameResult(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
-            $game = $this->gameRepository->findById((int)$request->get_param('id'));
-            if ($game === null) {
-                throw new NotFoundException('Game not found.');
-            }
-
             $input = UpdateGameResultRequest::fromRequest($request);
             $this->validate($input);
 
             $result = $input->result !== null ? GameResult::from($input->result) : null;
 
-            $this->gameRepository->updateResult($game->id, $result);
+            // The round status guard lives in the service, alongside the one
+            // for pairing edits.
+            $game = $this->roundService->updateGameResult((int)$request->get_param('id'), $result);
 
-            return $this->ok($this->serializer->serialize($this->gameRepository->findById($game->id)));
+            return $this->ok($this->serializer->serialize($game));
         });
     }
 

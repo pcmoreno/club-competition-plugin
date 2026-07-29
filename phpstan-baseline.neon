@@ -103,18 +103,6 @@ parameters:
 			path: src/Controller/RoundController.php
 
 		-
-			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Game\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/RoundController.php
-
-		-
-			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Round\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/RoundController.php
-
-		-
 			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Season\|null given\.$#'
 			identifier: argument.type
 			count: 1

@@ -26,6 +26,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ poolOver, setPoolOver ] = useState( false );
 	const [ byeOver, setByeOver ] = useState( null );
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
+	const [ confirmReopen, setConfirmReopen ] = useState( false );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
@@ -160,6 +161,7 @@ export function TournamentPairingsTab( { season, players } ) {
 			api.patch( `rounds/${ currentRoundId }/status`, { status } ),
 		onSuccess: () => {
 			setConfirmAdvance( false );
+			setConfirmReopen( false );
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
@@ -398,6 +400,18 @@ export function TournamentPairingsTab( { season, players } ) {
 							className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
 						>
 							{ ROUND_ADVANCE_LABELS[ nextStatus ] }
+						</button>
+					) }
+					{ /* The status flow is forward-only, so without this a wrong
+					     result in a completed round could never be corrected. */ }
+					{ round?.status === 'complete' && (
+						<button
+							type="button"
+							onClick={ () => setConfirmReopen( true ) }
+							disabled={ setStatus.isPending }
+							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:text-ink disabled:opacity-60"
+						>
+							Reopen
 						</button>
 					) }
 				</div>
@@ -673,6 +687,26 @@ export function TournamentPairingsTab( { season, players } ) {
 						'Finalising locks the pairings so they can’t be changed. Results can still be entered.' }
 					{ nextStatus === 'complete' &&
 						'Completing the round freezes its standings snapshot.' }
+					{ setStatus.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( setStatus.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
+
+			{ confirmReopen && (
+				<ConfirmModal
+					title="Reopen this round"
+					confirmLabel={
+						setStatus.isPending ? 'Working…' : 'Reopen round'
+					}
+					onCancel={ () => setConfirmReopen( false ) }
+					onConfirm={ () => setStatus.mutate( 'finalised' ) }
+				>
+					Reopening lets you correct a result. The published standings
+					stay as they are until you complete the round again — which
+					recalculates this round and every later completed round.
 					{ setStatus.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( setStatus.error ) }
