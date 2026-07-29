@@ -1,4 +1,4 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Notice } from '../components/ui';
@@ -174,23 +174,45 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 	);
 }
 
+// Bye-type rows carry no server-side id, so identity is assigned here. Keying
+// on row.key would change the key on every keystroke while it's being typed,
+// remounting the input and losing focus after one character.
+let byeRowSeq = 0;
+
 // Editable {key, label, points} rows. Reserved keys (the engine-assigned
 // pairing bye) can be re-priced but never removed.
 function ByeTypeList( { field, rows, onChange, disabled } ) {
 	const reserved = field.reservedKeys || [];
 	const list = Array.isArray( rows ) ? rows : [];
 
+	// One stable id per row, held alongside the list. Rows are only ever added
+	// or removed through this component, so index stays a valid handle; a
+	// wholesale replacement (a refetch) just re-seeds the ids.
+	const idsRef = useRef( [] );
+	while ( idsRef.current.length < list.length ) {
+		idsRef.current.push( ++byeRowSeq );
+	}
+	idsRef.current.length = list.length;
+
 	const patch = ( index, changes ) =>
 		onChange(
 			list.map( ( row, i ) => ( i === index ? { ...row, ...changes } : row ) )
 		);
+
+	const removeAt = ( index ) => {
+		idsRef.current.splice( index, 1 );
+		onChange( list.filter( ( _, k ) => k !== index ) );
+	};
 
 	return (
 		<div className="flex flex-col gap-2">
 			{ list.map( ( row, i ) => {
 				const isReserved = reserved.includes( row.key );
 				return (
-					<div key={ row.key || i } className="flex items-center gap-2">
+					<div
+						key={ idsRef.current[ i ] }
+						className="flex items-center gap-2"
+					>
 						<input
 							className={ inputCls + ' w-40' }
 							value={ row.key || '' }
@@ -231,9 +253,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 									? 'The pairing bye is assigned by the engine and can’t be removed.'
 									: 'Remove'
 							}
-							onClick={ () =>
-								onChange( list.filter( ( _, k ) => k !== i ) )
-							}
+							onClick={ () => removeAt( i ) }
 						>
 							×
 						</button>
