@@ -134,9 +134,10 @@ class Container
         // non-users, and a plugin subdirectory is web-reachable (and wiped by a
         // reinstall). The store hardens the directory and migrates any file left
         // at the old location.
-        $uploads = wp_upload_dir();
+        // The uploads path is resolved inside the store on first use, not here:
+        // this container is rebuilt every request, and the store is touched only
+        // during a KNSB sync.
         $container->register('knsb_rating_store', Services\KnsbRatingStore::class)
-            ->addArgument($uploads['basedir'])
             ->addArgument(SCS_PLUGIN_PATH . 'resources/KnsbRatings');
 
         $container->register('knsb_name_normalizer', Services\KnsbNameNormalizer::class);

@@ -30,11 +30,9 @@ class KnsbRatingStore
     private ?string $resolvedDir = null;
 
     /**
-     * @param string $uploadsBaseDir wp_upload_dir()['basedir']
-     * @param string $legacyDir      pre-0.3.3 location inside the plugin, migrated on first use
+     * @param string $legacyDir pre-0.3.3 location inside the plugin, migrated on first use
      */
     public function __construct(
-        private readonly string $uploadsBaseDir,
         private readonly string $legacyDir,
     ) {
     }
@@ -149,7 +147,15 @@ class KnsbRatingStore
             $suffix = is_string($stored) && $stored !== '' ? $stored : $suffix;
         }
 
-        $dir = rtrim($this->uploadsBaseDir, '/') . '/scs-knsb-' . $suffix;
+        // Resolved here rather than injected: the container is rebuilt on every
+        // request, so calling wp_upload_dir() to construct this service made
+        // every front-end, REST, wp-admin and cron request pay for it — and its
+        // $create_dir default means each one also attempted wp_mkdir_p(). This
+        // service is only ever touched during a KNSB sync. Passing false keeps
+        // the uploads dir from being created as a side effect of a lookup;
+        // mkdir below creates what this class actually needs.
+        $uploads = wp_upload_dir(null, false);
+        $dir     = rtrim((string)$uploads['basedir'], '/') . '/scs-knsb-' . $suffix;
 
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new \RuntimeException(sprintf('Could not create the KNSB ratings dir "%s".', $dir));
