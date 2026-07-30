@@ -22,7 +22,30 @@ export function setCsrfToken( token ) {
 	csrfToken = token || null;
 }
 
+// Called when the server says we're not signed in, so the UI can stop showing a
+// session that no longer exists. AuthProvider registers it; keeping it a
+// callback avoids importing AuthContext here and creating a cycle.
+let onUnauthenticated = null;
+export function setUnauthenticatedHandler( fn ) {
+	onUnauthenticated = fn;
+}
+
 const WRITE_METHODS = new Set( [ 'POST', 'PUT', 'PATCH', 'DELETE' ] );
+
+// Shared promise so several writes firing at once fetch one token, not one each.
+let csrfFetch = null;
+function fetchCsrfToken() {
+	csrfFetch ??= request( 'GET', 'auth/csrf-token' )
+		.then( ( res ) => {
+			csrfToken = res?.csrf_token ?? null;
+			return csrfToken;
+		} )
+		.catch( () => null )
+		.finally( () => {
+			csrfFetch = null;
+		} );
+	return csrfFetch;
+}
 
 function buildUrl( path, params ) {
 	// `path` is relative to the REST namespace root, e.g. 'seasons' or
@@ -43,7 +66,21 @@ function buildUrl( path, params ) {
 	return url;
 }
 
-async function request( method, path, { body, signal, params } = {} ) {
+async function request(
+	method,
+	path,
+	{ body, signal, params } = {},
+	retry = true
+) {
+	const isWrite = WRITE_METHODS.has( method );
+
+	// Login and logout need the header too, so an anonymous visitor who submits
+	// before AuthProvider's token has landed would otherwise 403 on correct
+	// credentials. Fetch on demand rather than gating the form.
+	if ( isWrite && ! csrfToken ) {
+		await fetchCsrfToken();
+	}
+
 	const headers = { Accept: 'application/json' };
 	// No X-WP-Nonce: the plugin authenticates with the scs_token JWT plus the
 	// scs_csrf double-submit token, and no scs/v1 route verifies a wp_rest
@@ -55,7 +92,7 @@ async function request( method, path, { body, signal, params } = {} ) {
 		headers[ 'Content-Type' ] = 'application/json';
 	}
 	// CSRF is required by the $isAdmin permission callback on every write route.
-	if ( WRITE_METHODS.has( method ) && csrfToken ) {
+	if ( isWrite && csrfToken ) {
 		headers[ 'X-SCS-CSRF-Token' ] = csrfToken;
 	}
 
@@ -74,6 +111,23 @@ async function request( method, path, { body, signal, params } = {} ) {
 
 	const payload = await res.json().catch( () => null );
 	if ( ! res.ok ) {
+		// The CSRF cookie outlives no session but does expire; without this a
+		// stale token bricks every write in the tab with no way to recover.
+		if (
+			res.status === 403 &&
+			isWrite &&
+			retry &&
+			payload?.code === 'invalid_csrf_token'
+		) {
+			csrfToken = null;
+			await fetchCsrfToken();
+			return request( method, path, { body, signal, params }, false );
+		}
+		// Not on login: a wrong password is also a 401 and must not be treated
+		// as an expired session.
+		if ( res.status === 401 && path !== 'auth/login' ) {
+			onUnauthenticated?.();
+		}
 		throw new ApiError( res.status, payload );
 	}
 	return payload;
