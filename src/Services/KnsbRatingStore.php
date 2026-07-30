@@ -68,6 +68,7 @@ class KnsbRatingStore
 
         if (!rename($tmp, $this->path())) {
             @unlink($tmp);
+
             throw new \RuntimeException('Could not replace the KNSB rating list.');
         }
     }

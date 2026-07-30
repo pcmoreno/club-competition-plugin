@@ -7,16 +7,16 @@ namespace SCS\Controller;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\ScoringSystem;
+use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
-use SCS\Entity\Enum\SeasonStatus;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\PlayerRepository;
-use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\RoundRepository;
+use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Repository\StandingsSnapshotRepository;
 use SCS\Request\AssignCategoriesRequest;
@@ -546,6 +546,7 @@ class SeasonController extends RestController
                     $errors["assignments.$i.category"] = $season->categories === []
                         ? 'This season has no categories.'
                         : sprintf('Category must be one of: %s.', implode(', ', $season->categories));
+
                     continue;
                 }
 

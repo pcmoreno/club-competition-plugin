@@ -273,6 +273,7 @@ class PlayerController extends RestController
             // revoked account → (re-)send a fresh token, which flips a revoked
             // member back to Invited. Already accepted (active) → nothing to send.
             $existing = $this->memberRepository->findByPlayerId($player->id);
+
             try {
                 if ($existing === null) {
                     $member  = $this->authService->inviteMember($player->id, $input->email);
