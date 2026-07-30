@@ -81,7 +81,9 @@ final class StandardScoringSettings implements TournamentScoringSettings
 
     public function buchholzMethod(): BuchholzMethod
     {
-        return BuchholzMethod::tryFrom((string)($this->tiebreakConfig['buchholz']['method'] ?? '')) ?? BuchholzMethod::Baku2023;
+        // Classic, not Baku2023: the fallback must name an implemented variant,
+        // or an unparseable stored value silently disables the metric.
+        return BuchholzMethod::tryFrom((string)($this->tiebreakConfig['buchholz']['method'] ?? '')) ?? BuchholzMethod::Classic;
     }
 
     public function tprMethod(): TprMethod
@@ -158,12 +160,32 @@ final class StandardScoringSettings implements TournamentScoringSettings
             )))
             : $defaults->tiebreakers;
 
+        $tiebreakConfig = array_replace_recursive($defaults->tiebreakConfig, $values['tiebreakConfig'] ?? []);
+
+        // Same defence as rankBy above, for the parametric tiebreakers. Settings
+        // saved before SettingsValidator started rejecting unimplemented methods
+        // still name one, and honouring it makes the calculator skip itself so
+        // the column reads 0 for every player while the UI shows it configured.
+        //
+        // Coercing here rather than migrating repairs the behaviour on read, and
+        // because getSettings() emits this array the settings screen reports the
+        // corrected value too — so the next save persists the repair.
+        $buchholz = BuchholzMethod::tryFrom((string)($tiebreakConfig['buchholz']['method'] ?? ''));
+        if ($buchholz === null || !$buchholz->isImplemented()) {
+            $tiebreakConfig['buchholz']['method'] = $defaults->buchholzMethod()->value;
+        }
+
+        $tpr = TprMethod::tryFrom((string)($tiebreakConfig['performance_rating']['method'] ?? ''));
+        if ($tpr === null || !$tpr->isImplemented()) {
+            $tiebreakConfig['performance_rating']['method'] = $defaults->tprMethod()->value;
+        }
+
         return new self(
             gameOutcomes:   ($values['gameOutcomes'] ?? []) + $defaults->gameOutcomes,
             byeTypes:       $values['byeTypes'] ?? $defaults->byeTypes,
             rankBy:         $rankBy,
             tiebreakers:    $tiebreakers ?: $defaults->tiebreakers,
-            tiebreakConfig: array_replace_recursive($defaults->tiebreakConfig, $values['tiebreakConfig'] ?? []),
+            tiebreakConfig: $tiebreakConfig,
         );
     }
 
