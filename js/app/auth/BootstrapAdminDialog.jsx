@@ -48,7 +48,7 @@ export function BootstrapAdminDialog( { onClose } ) {
 	const {
 		register,
 		handleSubmit,
-		watch,
+		getValues,
 		formState: { errors, isSubmitting },
 	} = useForm();
 	const [ formError, setFormError ] = useState( null );
@@ -122,8 +122,13 @@ export function BootstrapAdminDialog( { onClose } ) {
 						className={ inputClass }
 						autoComplete="new-password"
 						{ ...register( 'confirm', {
+							// deps revalidates this when `password` changes;
+							// getValues reads it without subscribing the form to
+							// every keystroke. Same pair in AuthScreens and
+							// ChangePasswordDialog.
+							deps: [ 'password' ],
 							validate: ( v ) =>
-								v === watch( 'password' ) ||
+								v === getValues( 'password' ) ||
 								'Passwords do not match.',
 						} ) }
 					/>

@@ -46,7 +46,7 @@ export function ChangePasswordDialog( { onClose } ) {
 	const {
 		register,
 		handleSubmit,
-		watch,
+		getValues,
 		formState: { errors, isSubmitting },
 	} = useForm();
 	const [ formError, setFormError ] = useState( null );
@@ -133,8 +133,12 @@ export function ChangePasswordDialog( { onClose } ) {
 								autoComplete="new-password"
 								className={ fieldInput }
 								{ ...register( 'confirm', {
+									// deps revalidates this when `newPassword`
+									// changes; getValues reads it without
+									// subscribing the form to every keystroke.
+									deps: [ 'newPassword' ],
 									validate: ( v ) =>
-										v === watch( 'newPassword' ) ||
+										v === getValues( 'newPassword' ) ||
 										'New passwords do not match.',
 								} ) }
 							/>
