@@ -27,7 +27,9 @@ final class PointsCalculator implements MetricCalculatorInterface
         $settings = $context->settings;
         $points   = [];
 
-        foreach ($context->playerIds as $id) {
+        // scoredPlayerIds, not playerIds: opponents who have left the roster still
+        // need a points total, because the tiebreak metrics read it.
+        foreach ($context->scoredPlayerIds() as $id) {
             $total = 0.0;
 
             foreach ($context->gamesByPlayer[$id] ?? [] as $game) {

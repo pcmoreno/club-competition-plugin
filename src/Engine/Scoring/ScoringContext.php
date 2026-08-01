@@ -60,6 +60,33 @@ final class ScoringContext
         return new self($playerIds, $ratings, $settings, $gamesByPlayer, $byesByPlayer);
     }
 
+    /**
+     * Everyone whose points have to be computed: the roster, plus anyone who
+     * appears in the games without being on it — a player removed from the
+     * season, or merged away. playerIds comes from the roster while
+     * gamesByPlayer comes from the games table, so the two can disagree.
+     *
+     * Buchholz and Sonneborn-Berger sum opponents' points, and a missing entry
+     * reads as an opponent who scored zero. That understates every one of that
+     * player's opponents and reorders the table — quietly, since it's a wrong
+     * number rather than an error. Standings rows still come from playerIds, so
+     * scoring these extra people doesn't put them in the table.
+     *
+     * @return list<int>
+     */
+    public function scoredPlayerIds(): array
+    {
+        $ids = [];
+        foreach ($this->playerIds as $id) {
+            $ids[$id] = true;
+        }
+        foreach (array_keys($this->gamesByPlayer) as $id) {
+            $ids[$id] = true;
+        }
+
+        return array_map('intval', array_keys($ids));
+    }
+
     /** @param array<int,float> $points */
     public function withPoints(array $points): self
     {
