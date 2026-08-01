@@ -529,11 +529,29 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
 	} );
 
+	// Seed the form from the server, but never on top of unsaved edits. `data` is
+	// a new object on every refetch and save invalidates this exact key, so
+	// without the guard a refetch lands mid-edit and the admin's changes vanish
+	// with no feedback — including anything typed while a save was in flight.
+	//
+	// A ref, not state: this must be readable inside the effect below without
+	// re-running it, and re-rendering on the first keystroke would be pointless.
+	const dirty = useRef( false );
+	const editScoring = ( next ) => {
+		dirty.current = true;
+		setScoring( next );
+	};
+	const editDisplay = ( next ) => {
+		dirty.current = true;
+		setDisplay( next );
+	};
+
 	useEffect( () => {
-		if ( data ) {
-			setScoring( data.scoring?.values ?? null );
-			setDisplay( data.display?.values ?? null );
+		if ( ! data || dirty.current ) {
+			return;
 		}
+		setScoring( data.scoring?.values ?? null );
+		setDisplay( data.display?.values ?? null );
 	}, [ data ] );
 
 	const save = useMutation( {
@@ -541,6 +559,11 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 			api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
 			setSaved( true );
+			// Saved state is now the server's, so let the refetch below reseed —
+			// it carries any value the server normalised on the way in. If the
+			// admin edits again before it lands, they're dirty once more and the
+			// reseed backs off.
+			dirty.current = false;
 			queryClient.invalidateQueries( {
 				queryKey: keys.seasonSettings( season.id ),
 			} );
@@ -586,7 +609,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 							key={ group.group }
 							group={ group }
 							values={ scoring }
-							setValues={ setScoring }
+							setValues={ editScoring }
 							disabled={ scoringLocked || save.isPending }
 						/>
 					) )
@@ -607,7 +630,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 							value={ display.columns }
 							disabled={ save.isPending }
 							onChange={ ( columns ) =>
-								setDisplay( { ...display, columns } )
+								editDisplay( { ...display, columns } )
 							}
 						/>
 					</section>
