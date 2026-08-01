@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
-import { Notice } from '../components/ui';
+import { Dialog } from '../components/Dialog';
+import { ConfirmModal, Notice } from '../components/ui';
 import { keys } from '../api/keys';
 
 // ADMIN. Tournament engine settings. The form is rendered entirely from the
@@ -60,8 +61,7 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 	const selected = Array.isArray( value ) ? value : [];
 	const [ dragIndex, setDragIndex ] = useState( null );
 	const [ overIndex, setOverIndex ] = useState( null );
-	const labelOf = ( v ) =>
-		options.find( ( o ) => o.value === v )?.label ?? v;
+	const labelOf = ( v ) => options.find( ( o ) => o.value === v )?.label ?? v;
 	const available = options.filter(
 		( o ) => ! selected.includes( o.value ) && o.implemented !== false
 	);
@@ -209,7 +209,9 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 
 	const patch = ( index, changes ) =>
 		onChange(
-			list.map( ( row, i ) => ( i === index ? { ...row, ...changes } : row ) )
+			list.map( ( row, i ) =>
+				i === index ? { ...row, ...changes } : row
+			)
 		);
 
 	const removeAt = ( index ) => {
@@ -341,7 +343,9 @@ function TiebreakConfig( {
 										className={ inputCls + ' w-56 pr-8' }
 										value={ current }
 										disabled={ disabled }
-										onChange={ ( e ) => set( e.target.value ) }
+										onChange={ ( e ) =>
+											set( e.target.value )
+										}
 									>
 										{ f.options.map( ( o ) => (
 											<option
@@ -362,11 +366,18 @@ function TiebreakConfig( {
 									<input
 										type="number"
 										step={ f.step ?? 1 }
-										className={ inputCls + ' num w-56 text-right' }
+										className={
+											inputCls + ' num w-56 text-right'
+										}
 										value={ current }
 										disabled={ disabled }
 										onChange={ ( e ) =>
-											set( toNumber( e.target.value, f.default ?? 0 ) )
+											set(
+												toNumber(
+													e.target.value,
+													f.default ?? 0
+												)
+											)
 										}
 									/>
 								) }
@@ -526,7 +537,8 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	}, [ data ] );
 
 	const save = useMutation( {
-		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
+		mutationFn: ( payload ) =>
+			api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
 			setSaved( true );
 			queryClient.invalidateQueries( {
@@ -563,8 +575,8 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 				{ scoringLocked && (
 					<Notice>
 						A round has been completed, so scoring settings are
-						locked for this tournament. Display settings can still be
-						changed.
+						locked for this tournament. Display settings can still
+						be changed.
 					</Notice>
 				) }
 
@@ -605,129 +617,87 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	}
 
 	return (
-		<>
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Tournament settings"
+			description={ season.name }
+			size="xl"
+			scroll
+			busy={ save.isPending }
+			onClose={ onClose }
+			headerExtra={
+				<button
+					type="button"
+					className="rounded p-2 text-loss hover:bg-loss/10 disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
+					onClick={ () => setConfirmingDelete( true ) }
+					disabled={ ! canDelete }
+					title={
+						canDelete
+							? 'Delete tournament'
+							: 'Only a tournament in preparation can be deleted.'
+					}
+					aria-label="Delete tournament"
+				>
+					<TrashIcon />
+				</button>
+			}
 		>
-			<div
-				className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<div className="mb-4 flex items-start justify-between gap-4">
-					<div>
-						<h2 className="font-serif text-2xl leading-tight">
-							Tournament settings
-						</h2>
-						<p className="mt-1 text-sm text-ink-3">
-							{ season.name }
-						</p>
-					</div>
-					<button
-						type="button"
-						className="rounded p-2 text-loss hover:bg-loss/10 disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
-						onClick={ () => setConfirmingDelete( true ) }
-						disabled={ ! canDelete }
-						title={
-							canDelete
-								? 'Delete tournament'
-								: 'Only a tournament in preparation can be deleted.'
-						}
-						aria-label="Delete tournament"
-					>
-						<TrashIcon />
-					</button>
-				</div>
+			<div className="mt-4">{ body }</div>
 
-				{ body }
-
-				{ save.isError && (
-					<p className="mt-3 text-sm text-loss">
-						{ errorMessage( save.error ) }
-					</p>
-				) }
-				{ saved && ! save.isError && (
-					<p className="mt-3 text-sm text-win">Settings saved.</p>
-				) }
-
-				{ ! isLoading && ! isError && (
-					<div className="mt-6 flex justify-end gap-2">
-						<button
-							type="button"
-							className={ ghostBtn }
-							disabled={ save.isPending }
-							onClick={ onClose }
-						>
-							Close
-						</button>
-						<button
-							type="button"
-							className={ primaryBtn }
-							disabled={ save.isPending }
-							onClick={ submit }
-						>
-							{ save.isPending ? 'Saving…' : 'Save settings' }
-						</button>
-					</div>
-				) }
-			</div>
-		</div>
-
-		{ confirmingDelete && (
-			<DeleteConfirm
-				season={ season }
-				pending={ remove.isPending }
-				error={ remove.isError ? errorMessage( remove.error ) : null }
-				onCancel={ () => setConfirmingDelete( false ) }
-				onConfirm={ () => remove.mutate() }
-			/>
-		) }
-		</>
-	);
-}
-
-// Confirmation overlay for deleting a tournament, sitting above the settings
-// dialog. Deletion removes the tournament and all its data, so it's irreversible.
-function DeleteConfirm( { season, pending, error, onCancel, onConfirm } ) {
-	return (
-		<div
-			className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onCancel }
-		>
-			<div
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Delete tournament
-				</h2>
-				<p className="mt-2 text-sm text-ink-3">
-					Permanently delete{ ' ' }
-					<strong className="text-ink">{ season.name }</strong> and all
-					its data (enrolled players, rounds, results)? This can’t be
-					undone.
+			{ save.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( save.error ) }
 				</p>
-				{ error && <p className="mt-3 text-sm text-loss">{ error }</p> }
-				<div className="mt-5 flex justify-end gap-2">
+			) }
+			{ saved && ! save.isError && (
+				<p className="mt-3 text-sm text-win">Settings saved.</p>
+			) }
+
+			{ ! isLoading && ! isError && (
+				<div className="mt-6 flex justify-end gap-2">
 					<button
 						type="button"
 						className={ ghostBtn }
-						disabled={ pending }
-						onClick={ onCancel }
+						disabled={ save.isPending }
+						onClick={ onClose }
 					>
-						Cancel
+						Close
 					</button>
 					<button
 						type="button"
-						className="rounded bg-loss px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-60"
-						disabled={ pending }
-						onClick={ onConfirm }
+						className={ primaryBtn }
+						disabled={ save.isPending }
+						onClick={ submit }
 					>
-						{ pending ? 'Deleting…' : 'Delete tournament' }
+						{ save.isPending ? 'Saving…' : 'Save settings' }
 					</button>
 				</div>
-			</div>
-		</div>
+			) }
+
+			{ confirmingDelete && (
+				<ConfirmModal
+					title="Delete tournament"
+					confirmLabel={
+						remove.isPending ? 'Deleting…' : 'Delete tournament'
+					}
+					danger
+					busy={ remove.isPending }
+					onCancel={ () => setConfirmingDelete( false ) }
+					onConfirm={ () => remove.mutate() }
+				>
+					<p>
+						Permanently delete{ ' ' }
+						<strong className="text-ink">{ season.name }</strong>{ ' ' }
+						and all its data (enrolled players, rounds, results)?
+						This can’t be undone.
+					</p>
+					{ remove.isError && (
+						<p className="mt-3 text-loss">
+							{ errorMessage( remove.error ) }
+						</p>
+					) }
+				</ConfirmModal>
+			) }
+		</Dialog>
 	);
 }
 

@@ -678,6 +678,7 @@ export function TournamentPairingsTab( { season, players } ) {
 							: ROUND_ADVANCE_LABELS[ nextStatus ]
 					}
 					danger={ nextStatus === 'complete' }
+					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmAdvance( false ) }
 					onConfirm={ () => setStatus.mutate( nextStatus ) }
 				>
@@ -701,6 +702,7 @@ export function TournamentPairingsTab( { season, players } ) {
 					confirmLabel={
 						setStatus.isPending ? 'Working…' : 'Reopen round'
 					}
+					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmReopen( false ) }
 					onConfirm={ () => setStatus.mutate( 'finalised' ) }
 				>

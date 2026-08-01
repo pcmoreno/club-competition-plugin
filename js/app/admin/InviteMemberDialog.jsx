@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { keys } from '../api/keys';
 
 const primaryBtn =
@@ -52,99 +53,85 @@ export function InviteMemberDialog( { player, onClose } ) {
 	};
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title={
+				isResend
+					? 'Resend invite'
+					: isReinvite
+					? 'Re-invite member'
+					: 'Invite member'
+			}
+			description={
+				isResend ? (
+					<>
+						<strong className="text-ink">{ player.name }</strong>{ ' ' }
+						hasn’t accepted yet. A new email with a fresh link will
+						be sent, and the previous link will stop working.
+					</>
+				) : isReinvite ? (
+					<>
+						<strong className="text-ink">{ player.name }</strong>
+						’s member account was revoked. Re-inviting sends a fresh
+						link so they can set a password and sign in again.
+					</>
+				) : (
+					<>
+						<strong className="text-ink">{ player.name }</strong>{ ' ' }
+						will receive an email with a link to create a password,
+						and can then sign in and start using the website. This
+						gives them a member account — not admin access.
+					</>
+				)
+			}
+			size="sm"
+			busy={ invite.isPending }
+			onClose={ onClose }
+			onSubmit={ submit }
 		>
-			<form
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-				onSubmit={ submit }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					{ isResend
+			<label className="mt-4 block">
+				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+					Email
+				</span>
+				<input
+					type="email"
+					value={ email }
+					onChange={ ( e ) => setEmail( e.target.value ) }
+					required
+					autoFocus
+					placeholder="name@example.com"
+					className={ fieldInput }
+				/>
+			</label>
+
+			{ invite.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( invite.error ) }
+				</p>
+			) }
+
+			<div className="mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+					disabled={ invite.isPending }
+				>
+					Cancel
+				</button>
+				<button
+					type="submit"
+					className={ primaryBtn }
+					disabled={ ! canSubmit }
+				>
+					{ invite.isPending
+						? 'Sending…'
+						: isResend
 						? 'Resend invite'
 						: isReinvite
-						? 'Re-invite member'
-						: 'Invite member' }
-				</h2>
-
-				<p className="mt-2 text-sm text-ink-3">
-					{ isResend ? (
-						<>
-							<strong className="text-ink">
-								{ player.name }
-							</strong>{ ' ' }
-							hasn’t accepted yet. A new email with a fresh link
-							will be sent, and the previous link will stop working.
-						</>
-					) : isReinvite ? (
-						<>
-							<strong className="text-ink">
-								{ player.name }
-							</strong>
-							’s member account was revoked. Re-inviting sends a
-							fresh link so they can set a password and sign in
-							again.
-						</>
-					) : (
-						<>
-							<strong className="text-ink">
-								{ player.name }
-							</strong>{ ' ' }
-							will receive an email with a link to create a
-							password, and can then sign in and start using the
-							website. This gives them a member account — not admin
-							access.
-						</>
-					) }
-				</p>
-
-				<label className="mt-4 block">
-					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-						Email
-					</span>
-					<input
-						type="email"
-						value={ email }
-						onChange={ ( e ) => setEmail( e.target.value ) }
-						required
-						autoFocus
-						placeholder="name@example.com"
-						className={ fieldInput }
-					/>
-				</label>
-
-				{ invite.isError && (
-					<p className="mt-3 text-sm text-loss">
-						{ errorMessage( invite.error ) }
-					</p>
-				) }
-
-				<div className="mt-6 flex justify-end gap-2">
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-						disabled={ invite.isPending }
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						className={ primaryBtn }
-						disabled={ ! canSubmit }
-					>
-						{ invite.isPending
-							? 'Sending…'
-							: isResend
-							? 'Resend invite'
-							: isReinvite
-							? 'Re-invite'
-							: 'Send invite' }
-					</button>
-				</div>
-			</form>
-		</div>
+						? 'Re-invite'
+						: 'Send invite' }
+				</button>
+			</div>
+		</Dialog>
 	);
 }

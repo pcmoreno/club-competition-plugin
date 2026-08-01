@@ -6,7 +6,7 @@
     "build": "wp-scripts build",
     "start": "wp-scripts start",
     "lint": "wp-scripts lint-js js/",
-    "format": "wp-scripts format-js js/"
+    "format": "wp-scripts format js/"
   },
   "dependencies": {
     "react": "^18",

@@ -1,6 +1,7 @@
 import { useState, useId, cloneElement } from '@wordpress/element';
 import { useForm } from 'react-hook-form';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 
 const fieldInput =
 	'w-full rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none';
@@ -65,121 +66,111 @@ export function ChangePasswordDialog( { onClose } ) {
 	};
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Change password"
+			size="sm"
+			busy={ isSubmitting }
+			onClose={ onClose }
 		>
-			<div
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Change password
-				</h2>
+			{ done ? (
+				<>
+					<p className="mt-4 text-sm text-ink-2">
+						Your password has been updated. Any other devices signed
+						in to your account have been signed out.
+					</p>
+					<div className="mt-6 flex justify-end">
+						<button
+							type="button"
+							className={ primaryBtn }
+							onClick={ onClose }
+						>
+							Done
+						</button>
+					</div>
+				</>
+			) : (
+				<form onSubmit={ handleSubmit( onSubmit ) } noValidate>
+					<div className="mt-4 space-y-4">
+						<Field
+							label="Current password"
+							error={ errors.currentPassword?.message }
+						>
+							<input
+								type="password"
+								autoComplete="current-password"
+								autoFocus
+								className={ fieldInput }
+								{ ...register( 'currentPassword', {
+									required: 'Current password is required.',
+								} ) }
+							/>
+						</Field>
 
-				{ done ? (
-					<>
-						<p className="mt-4 text-sm text-ink-2">
-							Your password has been updated. Any other devices
-							signed in to your account have been signed out.
-						</p>
-						<div className="mt-6 flex justify-end">
-							<button
-								type="button"
-								className={ primaryBtn }
-								onClick={ onClose }
-							>
-								Done
-							</button>
-						</div>
-					</>
-				) : (
-					<form onSubmit={ handleSubmit( onSubmit ) } noValidate>
-						<div className="mt-4 space-y-4">
-							<Field
-								label="Current password"
-								error={ errors.currentPassword?.message }
-							>
-								<input
-									type="password"
-									autoComplete="current-password"
-									autoFocus
-									className={ fieldInput }
-									{ ...register( 'currentPassword', {
-										required: 'Current password is required.',
-									} ) }
-								/>
-							</Field>
+						<Field
+							label="New password"
+							error={ errors.newPassword?.message }
+						>
+							<input
+								type="password"
+								autoComplete="new-password"
+								className={ fieldInput }
+								{ ...register( 'newPassword', {
+									required: 'New password is required.',
+									minLength: {
+										value: 8,
+										message: 'Use at least 8 characters.',
+									},
+								} ) }
+							/>
+						</Field>
 
-							<Field
-								label="New password"
-								error={ errors.newPassword?.message }
-							>
-								<input
-									type="password"
-									autoComplete="new-password"
-									className={ fieldInput }
-									{ ...register( 'newPassword', {
-										required: 'New password is required.',
-										minLength: {
-											value: 8,
-											message:
-												'Use at least 8 characters.',
-										},
-									} ) }
-								/>
-							</Field>
+						<Field
+							label="Confirm new password"
+							error={ errors.confirm?.message }
+						>
+							<input
+								type="password"
+								autoComplete="new-password"
+								className={ fieldInput }
+								{ ...register( 'confirm', {
+									validate: ( v ) =>
+										v === watch( 'newPassword' ) ||
+										'New passwords do not match.',
+								} ) }
+							/>
+						</Field>
+					</div>
 
-							<Field
-								label="Confirm new password"
-								error={ errors.confirm?.message }
-							>
-								<input
-									type="password"
-									autoComplete="new-password"
-									className={ fieldInput }
-									{ ...register( 'confirm', {
-										validate: ( v ) =>
-											v === watch( 'newPassword' ) ||
-											'New passwords do not match.',
-									} ) }
-								/>
-							</Field>
-						</div>
+					<p className="mt-4 text-sm text-ink-3">
+						A long passphrase of a few random words is stronger and
+						easier to remember than a short, complex one. We
+						recommend a password manager to generate and store a
+						unique password for this site.
+					</p>
 
-						<p className="mt-4 text-sm text-ink-3">
-							A long passphrase of a few random words is stronger and
-							easier to remember than a short, complex one. We
-							recommend a password manager to generate and store a
-							unique password for this site.
-						</p>
+					{ formError && (
+						<p className="mt-3 text-sm text-loss">{ formError }</p>
+					) }
 
-						{ formError && (
-							<p className="mt-3 text-sm text-loss">
-								{ formError }
-							</p>
-						) }
-
-						<div className="mt-6 flex justify-end gap-2">
-							<button
-								type="button"
-								className={ ghostBtn }
-								onClick={ onClose }
-								disabled={ isSubmitting }
-							>
-								Cancel
-							</button>
-							<button
-								type="submit"
-								className={ primaryBtn }
-								disabled={ isSubmitting }
-							>
-								{ isSubmitting ? 'Saving…' : 'Update password' }
-							</button>
-						</div>
-					</form>
-				) }
-			</div>
-		</div>
+					<div className="mt-6 flex justify-end gap-2">
+						<button
+							type="button"
+							className={ ghostBtn }
+							onClick={ onClose }
+							disabled={ isSubmitting }
+						>
+							Cancel
+						</button>
+						<button
+							type="submit"
+							className={ primaryBtn }
+							disabled={ isSubmitting }
+						>
+							{ isSubmitting ? 'Saving…' : 'Update password' }
+						</button>
+					</div>
+				</form>
+			) }
+		</Dialog>
 	);
 }

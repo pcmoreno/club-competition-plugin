@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from '@wordpress/element';
+import { Dialog } from './Dialog';
 
 // Page-level "Actions" dropdown, sitting left of a search box in admin list
 // headers. items: [{ label, onClick, disabled? }]. Closes on outside-click or
@@ -101,6 +102,11 @@ function ChevronIcon( { className } ) {
 
 // Generic confirmation dialog. `children` is the body copy; `danger` styles the
 // confirm button red for destructive actions. Backdrop click cancels.
+//
+// Pass `busy` while the confirmed action is in flight: it disables both buttons
+// and blocks dismissal, so a second click can't fire the action twice. Confirms
+// that stay open across their mutation (round status, start tournament) need it
+// — without it a double-click advances a round two steps.
 export function ConfirmModal( {
 	title,
 	children,
@@ -108,41 +114,35 @@ export function ConfirmModal( {
 	onConfirm,
 	onCancel,
 	danger = false,
+	busy = false,
 } ) {
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onCancel }
-		>
-			<div
-				className="w-full max-w-md rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">{ title }</h2>
-				<div className="mt-2 text-sm text-ink-3">{ children }</div>
-				<div className="mt-6 flex justify-end gap-2">
-					<button
-						type="button"
-						className="rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink"
-						onClick={ onCancel }
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						className={
-							'rounded px-4 py-2 text-sm font-medium text-paper ' +
-							( danger
-								? 'bg-loss hover:opacity-90'
-								: 'bg-ink hover:bg-ink-2' )
-						}
-						onClick={ onConfirm }
-					>
-						{ confirmLabel }
-					</button>
-				</div>
+		<Dialog title={ title } onClose={ onCancel } busy={ busy }>
+			<div className="mt-2 text-sm text-ink-3">{ children }</div>
+			<div className="mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					className="rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink disabled:opacity-60"
+					onClick={ onCancel }
+					disabled={ busy }
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					className={
+						'rounded px-4 py-2 text-sm font-medium text-paper disabled:opacity-60 ' +
+						( danger
+							? 'bg-loss hover:opacity-90'
+							: 'bg-ink hover:bg-ink-2' )
+					}
+					onClick={ onConfirm }
+					disabled={ busy }
+				>
+					{ confirmLabel }
+				</button>
 			</div>
-		</div>
+		</Dialog>
 	);
 }
 

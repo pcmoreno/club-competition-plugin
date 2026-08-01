@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { Notice } from '../components/ui';
 import { keys } from '../api/keys';
 
@@ -88,32 +89,25 @@ export function ImportSeasonDialog( { onClose } ) {
 	}
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Import season"
+			description="Seed a season from a shipped fixture."
+			size="lg"
+			scroll
+			busy={ load.isPending }
+			onClose={ onClose }
+			headerExtra={
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+					disabled={ load.isPending }
+				>
+					Close
+				</button>
+			}
 		>
-			<div
-				className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<div className="mb-4 flex items-start justify-between gap-4">
-					<div>
-						<h2 className="font-serif text-2xl leading-tight">
-							Import season
-						</h2>
-						<p className="mt-1 text-sm text-ink-3">
-							Seed a season from a shipped fixture.
-						</p>
-					</div>
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-					>
-						Close
-					</button>
-				</div>
-
+			<div className="mt-4">
 				{ result ? (
 					<div className="rounded border border-rule bg-surface p-4">
 						<p className="mb-2 font-medium text-ink">
@@ -189,6 +183,6 @@ export function ImportSeasonDialog( { onClose } ) {
 					</div>
 				) }
 			</div>
-		</div>
+		</Dialog>
 	);
 }
