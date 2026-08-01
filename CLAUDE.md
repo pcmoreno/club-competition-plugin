@@ -7,12 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Club Competition Manager** is a WordPress plugin that replaces desktop-based chess competition management (Sevilla software) with a web application. It manages pairings, standings, and results for Schaakclub Santpoort's internal chess competitions.
 
 ### Key Goals
-- Live competition viewer with standings, cross-tables, player stats
-- Admin interface for round management, pairing generation, result entry
-- Keizer pairing system (automatic + manual override)
-- KNSB rating integration (Dutch chess federation)
-- Member invitations and authentication (no WordPress account required)
-- Email notifications and PDF generation
+
+Goals, not a feature list — several are still unbuilt. Where this file says
+something is missing, believe it and check the code before assuming otherwise.
+
+| Goal | State |
+|---|---|
+| Live viewer: standings, player stats | Built |
+| Admin: rounds, manual pairings, results | Built |
+| Member invitations and auth (no WP account) | Built |
+| KNSB rating integration | Fetch + per-player apply built; no cron |
+| Keizer pairing and scoring | **Not implemented** — manual pairing only |
+| Email notifications | Invites and password resets only |
+| PDF generation | **Not implemented** (dompdf is installed, unused) |
 
 ## Architecture
 
@@ -40,14 +47,23 @@ Database
 |-------|-----------|-------|
 | Plugin Runtime | PHP 8.2+ / WordPress 5.0+ | Entry point: `club-competition-plugin.php` |
 | DI Container | Symfony DependencyInjection | Configured in `src/Container.php` |
-| Database | MySQL 5.7+ via Doctrine DBAL | Custom tables prefixed with `wp_scs_` |
+| Database | MySQL 5.7+ via Doctrine DBAL | Tables built from `SCS_TABLE_PREFIX` — **not** hardcoded `wp_scs_` |
 | REST API | WordPress REST API | Custom endpoints at `/wp-json/scs/v1/` |
-| Authentication | Symfony Security + lcobucci/jwt | JWT in httpOnly cookies, not localStorage |
+| Authentication | lcobucci/jwt + Symfony CSRF | JWT in an httpOnly cookie, never localStorage |
 | Validation | Symfony Validator | Input validation on all DTOs |
 | Serialization | Hand-rolled `SerializerService` | Entity → array; visibility via groups |
-| Frontend | React | Embedded via shortcode `[clubcompetitie]` |
-| PDF Generation | dompdf | Server-side pairing sheet rendering |
-| Email | WordPress wp_mail | Invite notifications, round publishing |
+| Frontend | React 18 via `@wordpress/element` | Embedded via shortcode `[clubcompetitie]` |
+| Data fetching | TanStack Query + raw `fetch` | Query keys come from `js/app/api/keys.js` |
+| Styling | Tailwind v4 | Viewer utilities are deliberately **unlayered** — see below |
+| Email | WordPress `wp_mail` | Invites and password resets only |
+
+Declared but unused today: `dompdf` (PDF pairing sheets are planned, nothing
+renders one yet), `@wordpress/api-fetch` and `dayjs`. Don't take a dependency in
+`composer.json` / `package.json` as evidence a feature exists.
+
+Symfony's full Security component is **not** used — authentication is a
+`permission_callback` per route plus `AuthContextService`. Only the CSRF piece
+of Symfony Security is wired.
 
 ### API Architecture
 
@@ -57,25 +73,41 @@ Database
 
 ```
 src/
-├── Entity/           Data models (Player, Season, Round, Game, etc.)
+├── Entity/           Data models (Player, Season, Round, Game, etc.) + Enum/
 ├── Repository/       Database access layer (queries, CRUD operations)
-├── Services/         Business logic (PairingService, ScoringService, etc.)
-├── Security/Auth/    Authentication (JwtAuthenticator, MemberProvider, AdminProvider)
+├── Services/         Business logic (RoundService, AuthService, SeasonImportService, …)
+├── Engine/           Pluggable pairing + scoring engines, their settings and resolvers
+├── Security/         RequestContext (scheme detection), CookieCsrfTokenStorage
 ├── Controller/       REST API controllers (expose Services to HTTP)
+├── Request/          Request DTOs, validated with Symfony Validator
 ├── Exception/        Custom exceptions (NotFoundException, ConflictException, etc.)
-└── Command/          WP-CLI commands (admin creation, imports, KNSB sync)
+├── Command/          WP-CLI commands (migrate, create-admin, fetch-knsb-ratings)
+└── Container.php     All Symfony DI wiring — there is no config/ directory
 
-includes/            WordPress integration (database schema, REST routes, shortcode)
-js/                  React frontend (viewer/ for public, admin/ for management)
-config/              Symfony DI service definitions
-tests/               Unit and integration tests
+includes/            WordPress integration (schema/migrations, REST routes, shortcode, assets)
+js/app/              The React app — viewer and admin both live here, one bundle
+fixtures/            Shipped season fixtures (JSON), imported via the admin Import dialog
+dev/                 Local Docker env, design/spec notes (page-inventory.md, engine-architecture.md)
 ```
+
+`tests/Unit` and `tests/Integration` exist locally but are empty, so git doesn't
+carry them — a fresh clone has no `tests/` at all. phpunit is installed
+(`composer test`) but **no tests are written yet**; changes are verified by hand
+in the UI.
 
 ## Key Concepts
 
-### Keizer Pairing System
+### Keizer Pairing System — NOT IMPLEMENTED YET
 
-The plugin implements the **Keizer rating system** for Swiss-style pairings:
+The Keizer system is the headline goal, but **no Keizer engine exists**. Of the
+`PairingSystem` cases only `manual` works; `PairingEngineResolver` and
+`ScoringStrategyResolver` throw a `ConflictException` for the rest, and
+`CreateSeasonRequest` only offers the implemented ones. Scoring today is
+`StandardScoring` (classical points + configurable tiebreaks) under
+`src/Engine/Scoring/`.
+
+The seam is in place — implement `ScoringStrategyInterface` and register it in
+the resolver. The intended behaviour, for whoever builds it:
 
 - Players paired by **Keizer score proximity** (not Elo)
 - **Category preference**: same-category pairings before cross-category
@@ -84,7 +116,9 @@ The plugin implements the **Keizer rating system** for Swiss-style pairings:
 - **Odd count**: lowest-ranked player gets bye
 - **Retroactive recalculation**: scores recalculate after every round as opponent rankings shift (this is Keizer's defining feature)
 
-See `src/Round/Pairing/KeizerEngine.php` for implementation.
+Note this conflicts with immutable standings snapshots (see below): a completed
+round's snapshot is published history and is only rewritten by re-completing
+that round.
 
 ### Member Authentication
 
@@ -96,18 +130,37 @@ Members log in via email + password (not WordPress accounts):
 4. System issues JWT cookie (httpOnly, Secure, SameSite=Lax)
 5. JWT carries `ROLE_MEMBER` or `ROLE_ADMIN`
 
-Admins are separate (created via WP-CLI, stored in `wp_scs_admins` table).
+Login sets **two** cookies (`AuthController::setSessionCookies`):
+
+- `scs_token` — httpOnly JWT. The only thing that authorizes anything.
+- `scs_ui` — readable hint (role + player id, no PII) so the frontend knows who
+  it is at first paint. Display only; nothing server-side reads it.
+
+**Never put per-user data in the bootstrap payload** (`Assets::enqueue_frontend`
+→ `window.scsBootstrap`). It is written into the page HTML, and a full-page
+cache stores that HTML keyed by URL and serves it to the next visitor. The usual
+protection doesn't apply here: caches skip logged-in users by spotting
+`wordpress_logged_in_*`, which our members never get. Session data travels by
+cookie for exactly this reason.
+
+Admins are separate (created via WP-CLI, stored in the `admins` table).
 
 ### Database Architecture
 
-All custom tables prefixed `wp_scs_`:
-- `wp_scs_seasons` — competition seasons
-- `wp_scs_season_players` — player enrollment (season + category + player)
-- `wp_scs_rounds` — competition rounds
-- `wp_scs_games` — individual pairings/results
-- `wp_scs_rankings` — score snapshots (recalculated per round)
-- `wp_scs_members` — non-WordPress member accounts
-- `wp_scs_admins` — plugin admins
+Table names are built from `SCS_TABLE_PREFIX` (`$wpdb->prefix . 'scs_'`), so
+they follow the host's WordPress prefix. **Production is not `wp_`** — the live
+site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
+hardcode `wp_scs_`.
+
+- `…scs_seasons` — competition seasons
+- `…scs_season_players` — player enrollment (season + category + player)
+- `…scs_rounds` — competition rounds
+- `…scs_games` — individual pairings/results
+- `…scs_attendance` — per-round presence and bye type
+- `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
+- `…scs_members` — non-WordPress member accounts
+- `…scs_admins` — plugin admins
+- `…scs_players` — the person registry, shared across seasons
 
 **Multiple seasons can be `active` at once** — a season also models a mid-season
 tournament, so a league season and side tournaments run concurrently. There is
@@ -116,7 +169,10 @@ no "single active season" invariant: don't add a unique constraint, and note
 property (`categories` column), optional — a season may run as one undivided
 pool, so `season_players.category` is nullable.
 
-Migrations tracked via `scs_db_version` WordPress option.
+Migrations live in `includes/migrations/` and are tracked per file in the
+`scs_applied_migrations` WordPress option — not a version number. They run on
+`plugins_loaded`, because the deploy flow (git pull / upload-replace) never
+fires the activation hook. The `SCS_DB_VERSION` constant is currently unused.
 
 ## Development Workflow
 
@@ -147,39 +203,48 @@ composer install
 # Install/update Node dependencies (for React build)
 npm install
 
-# Build React frontend (compiles js/ → build/)
+# Build React frontend (compiles js/ → build/). Requires Node 22 (see .nvmrc).
 npm run build
 
 # Watch mode for development
 npm run start
 
-# Run tests
-vendor/bin/phpunit
+# Lint / format the frontend
+npm run lint
+npm run format
 
-# Run single test file
-vendor/bin/phpunit tests/Unit/Services/ScoringServiceTest.php
+# Static analysis and PHP style (run these in the Docker container — see dev/)
+vendor/bin/phpstan analyse --memory-limit=1G
+vendor/bin/php-cs-fixer fix
 
-# Create admin user (WP-CLI)
+# Apply migrations (they also run automatically on plugins_loaded)
+wp scs migrate
+
+# Create admin user
 wp scs create-admin --name="Admin Name" --email="admin@example.com"
 
-# Import data from Sevilla export
-wp scs import path/to/export.csv
-
-# Sync KNSB ratings (manual trigger, also runs via monthly cron)
-wp scs sync-knsb
-
-# Seed test data (scrapes live club website)
-wp scs seed
+# Download the latest KNSB rating list to the server
+wp scs fetch-knsb-ratings
 ```
+
+Those three are the **only** registered WP-CLI commands (see
+`Container::boot`). Production has no convenient CLI, so anything an admin needs
+must also exist in the UI — which is why fetching KNSB ratings and importing a
+season fixture both have admin dialogs.
 
 ### Build Output
 
 `@wordpress/scripts` compiles React to `build/`:
-- `build/viewer.js` — public/member viewer app
-- `build/admin.js` — admin management UI (embedded in viewer)
-- `build/viewer.asset.php` / `build/admin.asset.php` — dependency/version manifests
+- `build/viewer.js` / `build/viewer.css` — **the whole app**, viewer and admin
+  alike (`js/app/admin/**` is part of this bundle)
+- `build/viewer.asset.php` — dependency/version manifest
 
-Enqueued in `club-competition-plugin.php`.
+Enqueued by `Assets::enqueue_frontend`, wired in `src/Container.php`.
+
+`build/admin.*` is a leftover of a second webpack entry (`js/admin/index.js`)
+that renders "not built yet" and is **never enqueued** — nothing emits the
+`#scs-admin` mount point. It still ships ~76 KB of duplicated CSS on every
+deploy. Drop the entry, or give it a real mount; don't treat it as the admin UI.
 
 ## Important Patterns
 
@@ -232,6 +297,23 @@ response and from `GET /auth/csrf-token`). Clients must echo that value in the
 `ROLE_ADMIN` and the CSRF header) — don't add a write endpoint that only checks
 the JWT.
 
+### Frontend Conventions
+
+- **Tailwind utilities are unlayered on purpose.** `css/tailwind.css` imports
+  Tailwind expanded so utilities sit outside `@layer`. Production runs Hello
+  Elementor + Optimizer, whose *unlayered* `h1` / `a` / `button` rules would
+  otherwise beat any layered rule regardless of specificity and render the app
+  half-themed. Preflight stays layered. Read the comment in that file before
+  touching it — this is a real production regression, invisible locally.
+- **Query keys come from `js/app/api/keys.js`.** No inline key arrays: a key
+  written two ways is an invalidation that silently misses.
+- **Modals go through `js/app/components/Dialog.jsx`**, which supplies dialog
+  semantics, focus handling, Escape and the scroll lock. Pass `busy` while a
+  write is in flight so a second confirm can't fire. Don't hand-roll a backdrop.
+- **User-facing error text is authored in the frontend**, keyed on status at the
+  `ApiError` layer. Backend exception messages stay detailed and specific —
+  they're for logging, not for display.
+
 ### Database Access
 
 **Only Repository classes communicate with the database.** All database queries happen in `src/Repository/`. Services, Controllers, and other classes retrieve data through repository methods — never direct DB calls.
@@ -239,15 +321,15 @@ the JWT.
 **Avoid raw SQL queries unless impossible.** Use Doctrine DBAL's query builder and prepared statements. Always bind parameters, never string-interpolate:
 
 ```php
-// Good: prepared statement with parameter binding
+// Good: query builder, with the host's prefix and a bound parameter
+$qb = $conn->createQueryBuilder();
+$qb->select('*')->from(SCS_TABLE_PREFIX . 'players')->where('id = ?')->setParameter(0, $id);
+
+// Bad: hardcoded prefix — production is boa_scs_, not wp_scs_
 $conn->executeQuery('SELECT * FROM wp_scs_players WHERE id = ?', [$id]);
 
-// Good: query builder
-$qb = $conn->createQueryBuilder();
-$qb->select('*')->from('wp_scs_players')->where('id = ?');
-
 // Bad: raw SQL string interpolation (SQL injection risk)
-$conn->executeQuery("SELECT * FROM wp_scs_players WHERE id = $id");
+$conn->executeQuery('SELECT * FROM ' . SCS_TABLE_PREFIX . "players WHERE id = $id");
 ```
 
 Example:
@@ -294,14 +376,14 @@ git add build/
 git commit -m "Build frontend"   # on a branch, then merge per Git Workflow
 
 # 2. Push to GitHub
-git push origin main
+git push origin master
 
 # 3. SSH into SiteGround
 ssh user@domain.com
 
 # 4. Pull and install PHP deps (no npm on host)
 cd /wp-content/plugins/club-competition-plugin
-git pull origin main
+git pull origin master
 composer install
 
 # 5. Run migrations
@@ -318,37 +400,45 @@ ships stale (or missing) frontend assets.
 ### Database Backups
 
 SiteGround provides automated backups. Always verify deployments don't break existing data:
-- Test Keizer recalculation after scoring changes
+- Re-complete a round and check the standings snapshot after scoring changes
 - Verify migration scripts with test data
 - Check member invites still work
 
 ## Testing
 
-- **Unit tests**: `tests/Unit/` (test Services, Repositories in isolation)
-- **Integration tests**: `tests/Integration/` (test with real database)
-- Database fixtures in `tests/fixtures/`
+**There is no test suite yet.** phpunit is installed (`composer test`) and
+`tests/Unit` / `tests/Integration` exist locally, but they are empty — and since
+git can't track empty directories, a fresh clone has no `tests/` at all.
 
-Run with `vendor/bin/phpunit`.
+Until that changes, verification is: `npm run lint`, `vendor/bin/phpstan`,
+`vendor/bin/php-cs-fixer`, and hands-on testing in the UI. Don't write throwaway
+CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
 ## External APIs
 
 ### KNSB Rating Sync
 
 - **Source**: `https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip`
-- **Schedule**: Monthly via WordPress cron (runs on the 2nd)
-- **Manual trigger**: `wp scs sync-knsb`
-- **Update**: Matches players by `knsb_id` field, updates `knsb_elo`
+- **Trigger**: manual only — `wp scs fetch-knsb-ratings`, or the "Fetch KNSB
+  ratings" dialog in the admin roster. **No cron is registered**, despite the
+  monthly schedule this file used to claim.
+- **Storage**: `KnsbRatingStore` writes the parsed list under
+  `uploads/scs-knsb-<random>/`, hardened with `.htaccess` + `index.php`. It is
+  personal data for ~20k non-users, so it must not sit in a web-reachable plugin
+  directory.
+- **Applying it**: per player, from their Sync action — matched on `knsb_id`,
+  overwriting name, birth year and rating. Fetching never changes a player.
 
-See `src/Knsb/Service/KnsbSyncService.php`.
+See `src/Services/KnsbRatingListFetcher.php`, `KnsbRatingStore.php` and
+`KnsbNameNormalizer.php`.
 
 ### Email Notifications
 
 Via `wp_mail()` (uses WP Mail SMTP plugin on production):
 - Member invites
-- Round pairings published
 - Password resets
 
-Template rendering in `src/Shared/Notification/WpMailNotificationService.php`.
+Sent from `src/Services/EmailNotificationService.php`.
 
 ## Important Files
 
@@ -381,6 +471,12 @@ $container->register( 'service', MyClass::class );
 
 ## References
 
-- Implementation Plan: `/documents/club-competition-plugin-plan (1).md`
-- WordPress Hosting: SiteGround (WP-CLI + Composer available)
-- REST API Docs: See implementation plan for full endpoint list
+- Frontend spec / page inventory: `dev/page-inventory.md`
+- Engine architecture notes: `dev/engine-architecture.md`
+- Local Docker environment: `dev/docker-compose.yml` (run phpstan, php-cs-fixer
+  and composer **in the container** — it has the PHP version production runs)
+- Design bundle and Sevilla exports live outside the repo, in `../documents/`
+- WordPress hosting: SiteGround, `schaakclubsantpoort.nl`, table prefix `boa_`.
+  Composer runs on the host; a CLI session is not conveniently available, so
+  don't design a workflow that depends on WP-CLI.
+- REST routes: `includes/RestApi.php` is the authoritative list
