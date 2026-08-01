@@ -11,9 +11,13 @@ export function record( games ) {
 	let draws = 0;
 	let losses = 0;
 	for ( const g of games ) {
-		if ( g.result === 'win' ) wins++;
-		else if ( g.result === 'draw' ) draws++;
-		else if ( g.result === 'loss' ) losses++;
+		if ( g.result === 'win' ) {
+			wins++;
+		} else if ( g.result === 'draw' ) {
+			draws++;
+		} else if ( g.result === 'loss' ) {
+			losses++;
+		}
 	}
 	return { wins, draws, losses, decided: wins + draws + losses };
 }
@@ -29,8 +33,11 @@ export function performance( games ) {
 		rated.reduce( ( s, g ) => s + g.opponent.rating, 0 ) / rated.length;
 	let net = 0;
 	for ( const g of rated ) {
-		if ( g.result === 'win' ) net++;
-		else if ( g.result === 'loss' ) net--;
+		if ( g.result === 'win' ) {
+			net++;
+		} else if ( g.result === 'loss' ) {
+			net--;
+		}
 	}
 	return Math.round( avg + ( 400 * net ) / rated.length );
 }
@@ -121,7 +128,9 @@ export function extremes( games ) {
 	let bestWin = null;
 	let worstLoss = null;
 	for ( const g of games ) {
-		if ( ! g.opponent || ! ( g.opponent.rating > 0 ) ) continue;
+		if ( ! g.opponent || ! ( g.opponent.rating > 0 ) ) {
+			continue;
+		}
 		if (
 			g.result === 'win' &&
 			( ! bestWin || g.opponent.rating > bestWin.opponent.rating )

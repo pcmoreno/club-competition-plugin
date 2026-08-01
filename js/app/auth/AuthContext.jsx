@@ -7,7 +7,8 @@ import {
 } from '@wordpress/element';
 import { useQueryClient } from '@tanstack/react-query';
 import { bootstrap } from '../bootstrap';
-import { api, setCsrfToken } from '../api/client';
+import { api, setCsrfToken, setUnauthenticatedHandler } from '../api/client';
+import { navigate } from '../router/router';
 
 const AuthContext = createContext( null );
 
@@ -48,6 +49,29 @@ export function AuthProvider( { children } ) {
 	useEffect( () => {
 		refreshCsrf();
 	}, [ refreshCsrf ] );
+
+	// The JWT can expire mid-session. Role is seeded from the server bootstrap
+	// and never revisited, so without this the chrome keeps offering a session
+	// that no longer exists while every query fails on its own.
+	useEffect( () => {
+		setUnauthenticatedHandler( () => {
+			// Read through the setter: a 401 for someone who was never signed in
+			// is just a public view touching a gated route, and bouncing an
+			// anonymous visitor to /login would be wrong.
+			setRole( ( current ) => {
+				if ( current === null ) {
+					return current;
+				}
+				setPlayerId( null );
+				setEmail( null );
+				queryClient.clear();
+				refreshCsrf();
+				navigate( '/login' );
+				return null;
+			} );
+		} );
+		return () => setUnauthenticatedHandler( null );
+	}, [ queryClient, refreshCsrf ] );
 
 	const login = useCallback( async ( emailInput, password ) => {
 		const {

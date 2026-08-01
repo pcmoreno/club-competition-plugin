@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
+use SCS\Entity\Player;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
-use SCS\Entity\Player;
 use SCS\Repository\MemberRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\SeasonPlayerRepository;

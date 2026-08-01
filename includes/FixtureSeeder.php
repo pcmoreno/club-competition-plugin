@@ -52,6 +52,7 @@ class FixtureSeeder
                 // A malformed fixture must not fatal the whole site. Skip it
                 // (it'll be retried next load) and carry on with the rest.
                 error_log('[scs] fixture seed failed for "' . $name . '": ' . $e->getMessage());
+
                 continue;
             }
 

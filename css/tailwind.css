@@ -19,10 +19,24 @@
    globally and is NOT scoped to #scs-app, so unlayering it would reset the whole
    surrounding WordPress page. Layered preflight only affects what the host
    doesn't already style, which is what we want. */
+/* Sources are declared HERE, not by `content` in tailwind.config.js. v4 runs
+   automatic source detection over the whole non-gitignored project *in addition*
+   to that glob, and treats every word in every scanned file as a class
+   candidate — so prose in markdown, PHP and comments silently emitted real
+   utilities (.container, .blur, .contents, .lowercase, .static, .collapse were
+   all shipping, used by nothing). Worse, the output then depends on which
+   untracked files happen to be present, so `git diff build/` showed phantom
+   changes and two machines built different CSS from the same commit — on a
+   deploy flow that decides what to ship by reading that diff.
+
+   `source(none)` disables the automatic scan; @source then names the only place
+   class names actually come from. The `content` key in tailwind.config.js is
+   inert under v4 and kept only for reference. */
 @layer theme, base, components;
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/preflight.css' layer(base);
-@import 'tailwindcss/utilities.css';
+@import 'tailwindcss/utilities.css' source(none);
+@source '../js/**/*.{js,jsx}';
 @config '../tailwind.config.js';
 
 /* Break out of block themes' constrained content width (e.g. Twenty

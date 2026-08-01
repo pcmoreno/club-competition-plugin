@@ -16,7 +16,8 @@
 // Ids may arrive as a number (API payload), a string (route param) or as
 // null/undefined while a parent query is still loading. Missing stays missing —
 // coercing it would produce NaN, which is not a stable key.
-const id = ( value ) => ( value === null || value === undefined ? null : Number( value ) );
+const id = ( value ) =>
+	value === null || value === undefined ? null : Number( value );
 
 export const keys = {
 	// Season / tournament

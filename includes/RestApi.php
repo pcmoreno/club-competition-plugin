@@ -37,7 +37,13 @@ class RestApi
             $requireRole = function (array $roles, string $message) use ($claims) {
                 return function () use ($claims, $roles, $message) {
                     $c = $claims();
-                    if (!$c || !in_array($c['role'], $roles, true)) {
+
+                    // 401 (not signed in) is distinct from 403 (signed in, wrong
+                    // role): only the former means the client should re-login.
+                    if (!$c) {
+                        return new \WP_Error('not_authenticated', 'Not authenticated.', ['status' => 401]);
+                    }
+                    if (!in_array($c['role'], $roles, true)) {
                         return new \WP_Error('forbidden', $message, ['status' => 403]);
                     }
 
@@ -62,8 +68,10 @@ class RestApi
             // user is signed in.
             $requiresCsrf = function (\WP_REST_Request $request) use ($csrfManager) {
                 $csrfHeader = $request->get_header('X-SCS-CSRF-Token');
+                // Own code, so the client can tell a stale token (refresh and
+                // retry) from a genuine permission denial.
                 if (!$csrfHeader || !$csrfManager->isTokenValid(new CsrfToken(AuthController::CSRF_TOKEN_ID, $csrfHeader))) {
-                    return new \WP_Error('forbidden', 'Invalid CSRF token.', ['status' => 403]);
+                    return new \WP_Error('invalid_csrf_token', 'Invalid CSRF token.', ['status' => 403]);
                 }
 
                 return true;

@@ -45,18 +45,32 @@ register_deactivation_hook(__FILE__, [ \SCS\includes\Database::class, 'deactivat
  * duplicates exist), and the deploy path is a git pull straight to production
  * with no staging, so this is the most likely way to take the club site down.
  *
+ * The steps are ordered — migrate, then boot the container, then seed — and each
+ * assumes the previous one succeeded. So the first failure halts the rest rather
+ * than letting the container compile and RestApi register against a schema that
+ * was never migrated, which would serve requests that fail one query at a time
+ * instead of stopping cleanly.
+ *
  * The CLI keeps the loud failure: `wp scs migrate` still throws, which is
  * correct where someone is watching the output.
  */
 function scs_boot_step(string $label, callable $step): void
 {
+    static $failed = false;
+
+    if ($failed) {
+        return;
+    }
+
     try {
         $step();
     } catch (\Throwable $e) {
+        $failed = true;
+
         error_log(sprintf('[SCS] %s failed: %s', $label, $e->getMessage()));
 
         $notice = sprintf(
-            'Club Competition Manager: %s failed — %s. The plugin is inactive until this is resolved; see the PHP error log.',
+            'Club Competition Manager: %s failed — %s. The plugin has stopped loading, so its pages and API will not work until this is resolved; the rest of the site is unaffected. See the PHP error log.',
             $label,
             $e->getMessage()
         );
