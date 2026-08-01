@@ -21,6 +21,7 @@ final class PointsCalculator implements MetricCalculatorInterface
         return true;
     }
 
+    /** @return array<int,float> every player has points, so this one never returns null */
     public function calculate(ScoringContext $context): array
     {
         $settings = $context->settings;
