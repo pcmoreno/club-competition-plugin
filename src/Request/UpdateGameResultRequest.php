@@ -12,18 +12,35 @@ class UpdateGameResultRequest
     #[Assert\Choice(callback: [self::class, 'resultChoices'], message: 'Result is not valid.')]
     public ?string $result = null;
 
+    // Whether the caller sent the field at all. Absent and null have to stay
+    // distinct here: null is a deliberate "clear this result", while absent is a
+    // malformed request — and treating the two alike made a bodyless PATCH erase
+    // a recorded result instead of being rejected.
+    public bool $resultProvided = false;
+
     /** @return list<string> */
     public static function resultChoices(): array
     {
         return array_column(GameResult::cases(), 'value');
     }
 
+    #[Assert\IsTrue(message: 'A result is required. Send result: null to clear one.')]
+    public function hasResultField(): bool
+    {
+        return $this->resultProvided;
+    }
+
     public static function fromRequest(\WP_REST_Request $request): self
     {
         $dto = new self();
 
-        if ($request->get_param('result') !== null) {
-            $dto->result = (string)$request->get_param('result');
+        // has_param, not a null check on the value: WP_REST_Request::has_param
+        // tests key presence, so an explicit null is still reported as sent.
+        $dto->resultProvided = $request->has_param('result');
+
+        $raw = $request->get_param('result');
+        if ($raw !== null) {
+            $dto->result = (string)$raw;
         }
 
         return $dto;
