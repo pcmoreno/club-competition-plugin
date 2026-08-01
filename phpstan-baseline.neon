@@ -73,24 +73,6 @@ parameters:
 			path: src/Command/MigrateCommand.php
 
 		-
-			message: '#^Parameter \#1 \$jwt of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Services\\JwtService, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Container.php
-
-		-
-			message: '#^Parameter \#2 \$members of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Repository\\MemberRepository, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Container.php
-
-		-
-			message: '#^Parameter \#3 \$admins of static method SCS\\includes\\Assets\:\:enqueue_frontend\(\) expects SCS\\Repository\\AdminRepository, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Container.php
-
-		-
 			message: '#^Parameter \#1 \$entity of method SCS\\Services\\SerializerService\:\:serialize\(\) expects object, SCS\\Entity\\Player\|null given\.$#'
 			identifier: argument.type
 			count: 2

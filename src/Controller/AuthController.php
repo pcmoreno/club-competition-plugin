@@ -27,6 +27,9 @@ class AuthController extends RestController
 {
     public const CSRF_TOKEN_ID = 'scs_admin_write';
 
+    // Readable (non-httpOnly) session hint for the frontend — see setSessionCookies().
+    private const HINT_COOKIE = 'scs_ui';
+
     public function __construct(
         ValidatorInterface $validator,
         private readonly AuthService $authService,
@@ -49,7 +52,7 @@ class AuthController extends RestController
             $result    = $this->authService->login($input->email, $input->password, $this->clientIp());
             $csrfToken = $this->csrfTokenManager->refreshToken(self::CSRF_TOKEN_ID)->getValue();
 
-            $this->setTokenCookie($result['token']);
+            $this->setSessionCookies($result['token'], (string)$result['role'], $result['player_id'] ?? null);
 
             return $this->ok([
                 'role'       => $result['role'],
@@ -62,7 +65,7 @@ class AuthController extends RestController
 
     public function logout(\WP_REST_Request $request): \WP_REST_Response
     {
-        $this->clearTokenCookie();
+        $this->clearSessionCookies();
         $this->csrfTokenManager->removeToken(self::CSRF_TOKEN_ID);
 
         return $this->noContent();
@@ -217,7 +220,7 @@ class AuthController extends RestController
                 $input->currentPassword,
                 $input->newPassword,
             );
-            $this->setTokenCookie($token);
+            $this->setSessionCookies($token, (string)$claims['role'], $claims['pid'] ?? null);
 
             return $this->ok(['message' => 'Password updated.']);
         });
@@ -256,7 +259,20 @@ class AuthController extends RestController
         return (string)($_SERVER['REMOTE_ADDR'] ?? '');
     }
 
-    private function setTokenCookie(string $token): void
+    /**
+     * Two cookies: the httpOnly JWT that authorizes everything, and a readable
+     * hint the frontend uses to know who it is at first paint.
+     *
+     * The hint exists because the session can't be inlined into the page HTML —
+     * a full-page cache would store one member's identity and serve it to every
+     * later visitor (see Assets::enqueue_frontend). A cookie is per-browser, so
+     * no cache can copy it across visitors.
+     *
+     * It carries no PII, and it is NOT a credential: nothing server-side reads
+     * it, so editing it to ROLE_ADMIN buys admin-shaped chrome whose every
+     * request the JWT check still refuses.
+     */
+    private function setSessionCookies(string $token, string $role, ?int $playerId): void
     {
         setcookie('scs_token', $token, [
             'expires'  => time() + JwtService::TOKEN_TTL_SECONDS,
@@ -265,16 +281,28 @@ class AuthController extends RestController
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
-    }
 
-    private function clearTokenCookie(): void
-    {
-        setcookie('scs_token', '', [
-            'expires'  => time() - 3600,
+        // Same lifetime as the token, so the two expire together and the app
+        // doesn't start out believing in a session that has already lapsed.
+        setcookie(self::HINT_COOKIE, (string)json_encode(['role' => $role, 'pid' => $playerId]), [
+            'expires'  => time() + JwtService::TOKEN_TTL_SECONDS,
             'path'     => '/',
             'secure'   => RequestContext::isSecure(),
-            'httponly' => true,
+            'httponly' => false,
             'samesite' => 'Lax',
         ]);
+    }
+
+    private function clearSessionCookies(): void
+    {
+        foreach (['scs_token' => true, self::HINT_COOKIE => false] as $name => $httpOnly) {
+            setcookie((string)$name, '', [
+                'expires'  => time() - 3600,
+                'path'     => '/',
+                'secure'   => RequestContext::isSecure(),
+                'httponly' => $httpOnly,
+                'samesite' => 'Lax',
+            ]);
+        }
     }
 }
