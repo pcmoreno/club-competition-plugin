@@ -15,6 +15,6 @@ interface MetricCalculatorInterface
 
     public function isImplemented(StandardScoringSettings $settings): bool;
 
-    /** @return array<int,float> */
+    /** @return array<int,float|null> null = the metric doesn't apply to that player */
     public function calculate(ScoringContext $context): array;
 }

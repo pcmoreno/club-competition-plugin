@@ -24,12 +24,7 @@ class Container
 
             $container = self::$instance;
             includes\RestApi::register($container);
-            $jwtService = $container->get('jwt_service');
-            $memberRepository = $container->get('member_repository');
-            $adminRepository  = $container->get('admin_repository');
-            add_action('wp_enqueue_scripts', function () use ($jwtService, $memberRepository, $adminRepository) {
-                includes\Assets::enqueue_frontend($jwtService, $memberRepository, $adminRepository);
-            });
+            add_action('wp_enqueue_scripts', [includes\Assets::class, 'enqueue_frontend']);
             add_shortcode('clubcompetitie', [includes\Shortcode::class, 'render']);
 
             if (defined('WP_CLI') && WP_CLI) {

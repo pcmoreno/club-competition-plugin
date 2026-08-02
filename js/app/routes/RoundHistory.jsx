@@ -1,4 +1,4 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useMemo } from '@wordpress/element';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Page } from '../layout/Page';
@@ -58,22 +58,26 @@ export function RoundHistory( { seasonId } ) {
 
 	// History is for played rounds only — a published/finalised round whose
 	// results aren't in yet belongs on Pairings, not here.
-	const rounds = ( roundsQuery.data ?? [] )
-		.filter( ( r ) => r.status === 'complete' )
-		.sort( ( a, b ) => a.round_number - b.round_number );
+	const rounds = useMemo(
+		() =>
+			( roundsQuery.data ?? [] )
+				.filter( ( r ) => r.status === 'complete' )
+				.sort( ( a, b ) => a.round_number - b.round_number ),
+		[ roundsQuery.data ]
+	);
 
-	const [ selectedId, setSelectedId ] = useState( null );
+	// What the user clicked, which may belong to a tournament they've since
+	// switched away from.
+	const [ picked, setPicked ] = useState( null );
 
-	// Default to the latest played round; re-default if the selection isn't in
-	// the current list (e.g. after switching tournaments).
-	useEffect( () => {
-		if ( rounds.length === 0 ) {
-			return;
-		}
-		if ( ! rounds.some( ( r ) => r.id === selectedId ) ) {
-			setSelectedId( rounds[ rounds.length - 1 ].id );
-		}
-	}, [ rounds, selectedId ] );
+	// Derived, not stored via an effect. An effect would leave one render where
+	// `picked` still held the previous tournament's round id while `rounds` was
+	// already the new tournament's — and the round query below runs in that same
+	// render, so it would fetch that stale id and (usually straight from cache)
+	// paint the previous tournament's games under the new tournament.
+	const selectedId = rounds.some( ( r ) => r.id === picked )
+		? picked
+		: rounds[ rounds.length - 1 ]?.id ?? null;
 
 	const roundQuery = useQuery( {
 		queryKey: keys.round( selectedId ),
@@ -108,13 +112,13 @@ export function RoundHistory( { seasonId } ) {
 				<RoundNavigator
 					rounds={ rounds }
 					selectedId={ selectedId }
-					onSelect={ setSelectedId }
+					onSelect={ setPicked }
 					onPrev={ () =>
-						index > 0 && setSelectedId( rounds[ index - 1 ].id )
+						index > 0 && setPicked( rounds[ index - 1 ].id )
 					}
 					onNext={ () =>
 						index < rounds.length - 1 &&
-						setSelectedId( rounds[ index + 1 ].id )
+						setPicked( rounds[ index + 1 ].id )
 					}
 					canPrev={ index > 0 }
 					canNext={ index < rounds.length - 1 }

@@ -45,8 +45,13 @@ export function TournamentPairingsTab( { season, players } ) {
 			),
 		[ rounds ]
 	);
-	const currentRoundId =
-		selectedRoundId ?? ( ordered.length ? ordered[ ordered.length - 1 ].id : null );
+	// Fall back to the latest round unless the selection is actually in this
+	// tournament's list. Today this tab remounts per tournament so a selection
+	// can't outlive its season, but the `??` alone would happily keep one and
+	// fetch a round belonging to a tournament no longer on screen.
+	const currentRoundId = ordered.some( ( r ) => r.id === selectedRoundId )
+		? selectedRoundId
+		: ordered[ ordered.length - 1 ]?.id ?? null;
 
 	// The round immediately before the selected one — its frozen snapshot is the
 	// score each player carries *into* this round.
@@ -164,7 +169,9 @@ export function TournamentPairingsTab( { season, players } ) {
 			setConfirmReopen( false );
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
-			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( season.id ),
+			} );
 			// Completing a round rewrites its snapshot; refresh any entering-round
 			// scores that read it (prefix covers all ['standings', …] keys).
 			queryClient.invalidateQueries( { queryKey: keys.standings() } );
@@ -178,7 +185,8 @@ export function TournamentPairingsTab( { season, players } ) {
 			const entry = byeType
 				? {
 						season_player_id: seasonPlayerId,
-						status: byeType === 'pairing_bye' ? 'present' : 'absent',
+						status:
+							byeType === 'pairing_bye' ? 'present' : 'absent',
 						bye_type: byeType,
 				  }
 				: { season_player_id: seasonPlayerId, status: 'present' };
@@ -259,7 +267,8 @@ export function TournamentPairingsTab( { season, players } ) {
 	// Still to pair: not on a board and not sitting out on a bye.
 	const unpaired = pool.filter(
 		( p ) =>
-			! pairedIds.has( p.season_player_id ) && ! byeOf[ p.season_player_id ]
+			! pairedIds.has( p.season_player_id ) &&
+			! byeOf[ p.season_player_id ]
 	);
 
 	const dropToSlot = ( slot ) => {
@@ -329,7 +338,9 @@ export function TournamentPairingsTab( { season, players } ) {
 					disabled={ createRound.isPending }
 					className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
 				>
-					{ createRound.isPending ? 'Creating…' : 'Create first round' }
+					{ createRound.isPending
+						? 'Creating…'
+						: 'Create first round' }
 				</button>
 				{ createRound.isError && (
 					<p className="text-sm text-loss">
@@ -390,7 +401,8 @@ export function TournamentPairingsTab( { season, players } ) {
 						</button>
 					) }
 					<span className="text-xs uppercase tracking-wide text-muted">
-						{ ROUND_STATUS_LABELS[ round?.status ] ?? round?.status }
+						{ ROUND_STATUS_LABELS[ round?.status ] ??
+							round?.status }
 					</span>
 					{ nextStatus && (
 						<button
@@ -424,16 +436,16 @@ export function TournamentPairingsTab( { season, players } ) {
 						? 'a full-schedule'
 						: 'a per-round' }{ ' ' }
 					pairing system. Automatic generation and the manual-override
-					setting aren’t available yet — pairings can be entered by hand
-					below in the meantime.
+					setting aren’t available yet — pairings can be entered by
+					hand below in the meantime.
 				</Notice>
 			) }
 
 			{ ! editable && round && (
 				<Notice>
 					Round { round.round_number } is{ ' ' }
-					{ ROUND_STATUS_LABELS[ round.status ]?.toLowerCase() }, so its
-					pairings are locked.
+					{ ROUND_STATUS_LABELS[ round.status ]?.toLowerCase() }, so
+					its pairings are locked.
 					{ resultsOpen ? ' Results can still be entered.' : '' }
 				</Notice>
 			) }
@@ -442,8 +454,8 @@ export function TournamentPairingsTab( { season, players } ) {
 			<div className="space-y-2">
 				{ games.length === 0 && ! builder.white && ! builder.black && (
 					<p className="text-sm text-muted">
-						No pairings yet. Drag players from the list below into the
-						White and Black slots.
+						No pairings yet. Drag players from the list below into
+						the White and Black slots.
 					</p>
 				) }
 
@@ -464,7 +476,11 @@ export function TournamentPairingsTab( { season, players } ) {
 						onSwap={ () => swapGame.mutate( g ) }
 						onRemove={ () => deleteGame.mutate( g.id ) }
 						onDragOut={ ( player ) => {
-							drag.current = { from: 'board', player, gameId: g.id };
+							drag.current = {
+								from: 'board',
+								player,
+								gameId: g.id,
+							};
 						} }
 					/>
 				) ) }
@@ -485,21 +501,28 @@ export function TournamentPairingsTab( { season, players } ) {
 				) ) }
 
 				{ editable &&
-					( unpaired.length > 0 || builder.white || builder.black ) && (
-					<BuilderBoard
-						board={ nextBoardNumber }
-						builder={ builder }
-						overSlot={ overSlot }
-						onOver={ setOverSlot }
-						onDrop={ dropToSlot }
-						onClear={ ( slot ) =>
-							setBuilder( ( prev ) => ( { ...prev, [ slot ]: null } ) )
-						}
-					/>
-				) }
+					( unpaired.length > 0 ||
+						builder.white ||
+						builder.black ) && (
+						<BuilderBoard
+							board={ nextBoardNumber }
+							builder={ builder }
+							overSlot={ overSlot }
+							onOver={ setOverSlot }
+							onDrop={ dropToSlot }
+							onClear={ ( slot ) =>
+								setBuilder( ( prev ) => ( {
+									...prev,
+									[ slot ]: null,
+								} ) )
+							}
+						/>
+					) }
 			</div>
 
-			{ ( createGame.isError || setResult.isError || deleteGame.isError ) && (
+			{ ( createGame.isError ||
+				setResult.isError ||
+				deleteGame.isError ) && (
 				<p className="text-sm text-loss">
 					{ errorMessage(
 						createGame.error || setResult.error || deleteGame.error
@@ -513,7 +536,9 @@ export function TournamentPairingsTab( { season, players } ) {
 			<div
 				className={
 					'rounded border-t pt-4 ' +
-					( poolOver ? 'border-accent bg-accent-soft/40' : 'border-rule' )
+					( poolOver
+						? 'border-accent bg-accent-soft/40'
+						: 'border-rule' )
 				}
 				onDragOver={ ( e ) => {
 					const from = drag.current?.from;
@@ -582,7 +607,8 @@ export function TournamentPairingsTab( { season, players } ) {
 								<span className="ml-2 flex shrink-0 items-center gap-2">
 									{ onBoard && (
 										<span className="text-[11px] text-muted">
-											board { boardOf[ p.season_player_id ] }
+											board{ ' ' }
+											{ boardOf[ p.season_player_id ] }
 										</span>
 									) }
 									{ ! onBoard && bye && (
@@ -607,9 +633,9 @@ export function TournamentPairingsTab( { season, players } ) {
 							Byes
 						</h4>
 						<p className="mb-3 text-xs text-muted">
-							Drag a player into a bye to sit them out this round; drag
-							them back to the list to clear it. The odd player out is
-							given the pairing bye automatically.
+							Drag a player into a bye to sit them out this round;
+							drag them back to the list to clear it. The odd
+							player out is given the pairing bye automatically.
 						</p>
 						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 							{ byeTypes.map( ( b ) => (
@@ -618,7 +644,8 @@ export function TournamentPairingsTab( { season, players } ) {
 									type={ b }
 									players={ pool.filter(
 										( p ) =>
-											byeOf[ p.season_player_id ] === b.key
+											byeOf[ p.season_player_id ] ===
+											b.key
 									) }
 									editable={ editable }
 									remaining={ unpaired.length }
@@ -678,6 +705,7 @@ export function TournamentPairingsTab( { season, players } ) {
 							: ROUND_ADVANCE_LABELS[ nextStatus ]
 					}
 					danger={ nextStatus === 'complete' }
+					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmAdvance( false ) }
 					onConfirm={ () => setStatus.mutate( nextStatus ) }
 				>
@@ -701,6 +729,7 @@ export function TournamentPairingsTab( { season, players } ) {
 					confirmLabel={
 						setStatus.isPending ? 'Working…' : 'Reopen round'
 					}
+					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmReopen( false ) }
 					onConfirm={ () => setStatus.mutate( 'finalised' ) }
 				>
@@ -722,7 +751,9 @@ export function TournamentPairingsTab( { season, players } ) {
 // steps, Keizer decimals) trim to at most two places.
 function formatScore( value ) {
 	const n = Number( value ) || 0;
-	return Number.isInteger( n ) ? String( n ) : String( Math.round( n * 100 ) / 100 );
+	return Number.isInteger( n )
+		? String( n )
+		: String( Math.round( n * 100 ) / 100 );
 }
 
 // A persisted pairing: White vs Black, with a result control, colour swap and

@@ -36,23 +36,35 @@ final class PerformanceRatingCalculator implements MetricCalculatorInterface
         $tpr = [];
 
         foreach ($context->playerIds as $id) {
-            $games        = $context->gamesByPlayer[$id] ?? [];
-            $played       = count($games);
-            $tpr[$id]     = 0.0;
-
-            if ($played === 0) {
-                continue;
-            }
+            // Null, not 0.0: a TPR that can't be computed is unknown, and the
+            // standings render null as an em dash rather than a bottom rank.
+            $tpr[$id] = null;
 
             $score  = 0.0;
             $sumOpp = 0;
-            foreach ($games as $game) {
+            $rated  = 0;
+            foreach ($context->gamesByPlayer[$id] ?? [] as $game) {
+                // elo_rating is NOT NULL DEFAULT 0, so an unrated player is stored as 0,
+                // and a missing key is an opponent outside this season's roster. Counting
+                // either as a 0-rated opponent drags the average down by hundreds of points.
+                $rating = $context->ratings[$game['opponent']] ?? 0;
+                if ($rating <= 0) {
+                    continue;
+                }
+
                 $score  += $this->gamePoints($game['outcome']);
-                $sumOpp += $context->ratings[$game['opponent']] ?? 0;
+                $sumOpp += $rating;
+                $rated++;
             }
 
-            $avgOpp  = $sumOpp / $played;
-            $percent = (int)round(($score / $played) * 100);
+            if ($rated === 0) {
+                continue;
+            }
+
+            // Both halves count rated games only — FIDE computes the performance
+            // against rated opposition, so a win over an unrated player can't lift p either.
+            $avgOpp  = $sumOpp / $rated;
+            $percent = (int)round(($score / $rated) * 100);
 
             $tpr[$id] = $avgOpp + $this->dp($percent);
         }

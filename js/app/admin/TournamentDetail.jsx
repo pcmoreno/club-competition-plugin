@@ -148,6 +148,7 @@ export function TournamentDetail( { seasonId } ) {
 				<ConfirmModal
 					title="Start tournament"
 					confirmLabel={ start.isPending ? 'Starting…' : 'Start' }
+					busy={ start.isPending }
 					onCancel={ () => setConfirmingStart( false ) }
 					onConfirm={ () => start.mutate() }
 				>

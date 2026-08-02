@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { navigate } from '../router/router';
 import { keys } from '../api/keys';
 
@@ -47,7 +48,7 @@ export function BootstrapAdminDialog( { onClose } ) {
 	const {
 		register,
 		handleSubmit,
-		watch,
+		getValues,
 		formState: { errors, isSubmitting },
 	} = useForm();
 	const [ formError, setFormError ] = useState( null );
@@ -77,88 +78,84 @@ export function BootstrapAdminDialog( { onClose } ) {
 	};
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="New admin"
+			description="Create the first admin account for this site. This is only available while no admin exists yet."
+			busy={ isSubmitting }
+			onClose={ onClose }
 		>
-			<div
-				className="w-full max-w-md rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
+			<form
+				onSubmit={ handleSubmit( onSubmit ) }
+				noValidate
+				className="mt-5 space-y-4"
 			>
-				<h2 className="font-serif text-2xl leading-tight">New admin</h2>
-				<p className="mt-2 text-sm text-ink-3">
-					Create the first admin account for this site. This is only
-					available while no admin exists yet.
-				</p>
-
-				<form
-					onSubmit={ handleSubmit( onSubmit ) }
-					noValidate
-					className="mt-5 space-y-4"
+				<Field label="Email" error={ errors.email?.message }>
+					<input
+						type="email"
+						className={ inputClass }
+						autoComplete="email"
+						{ ...register( 'email', {
+							required: 'Email is required.',
+						} ) }
+					/>
+				</Field>
+				<Field label="Password" error={ errors.password?.message }>
+					<input
+						type="password"
+						className={ inputClass }
+						autoComplete="new-password"
+						{ ...register( 'password', {
+							required: 'Password is required.',
+							minLength: {
+								value: 8,
+								message: 'Use at least 8 characters.',
+							},
+						} ) }
+					/>
+				</Field>
+				<Field
+					label="Confirm password"
+					error={ errors.confirm?.message }
 				>
-					<Field label="Email" error={ errors.email?.message }>
-						<input
-							type="email"
-							className={ inputClass }
-							autoComplete="email"
-							{ ...register( 'email', {
-								required: 'Email is required.',
-							} ) }
-						/>
-					</Field>
-					<Field label="Password" error={ errors.password?.message }>
-						<input
-							type="password"
-							className={ inputClass }
-							autoComplete="new-password"
-							{ ...register( 'password', {
-								required: 'Password is required.',
-								minLength: {
-									value: 8,
-									message: 'Use at least 8 characters.',
-								},
-							} ) }
-						/>
-					</Field>
-					<Field
-						label="Confirm password"
-						error={ errors.confirm?.message }
+					<input
+						type="password"
+						className={ inputClass }
+						autoComplete="new-password"
+						{ ...register( 'confirm', {
+							// deps revalidates this when `password` changes;
+							// getValues reads it without subscribing the form to
+							// every keystroke. Same pair in AuthScreens and
+							// ChangePasswordDialog.
+							deps: [ 'password' ],
+							validate: ( v ) =>
+								v === getValues( 'password' ) ||
+								'Passwords do not match.',
+						} ) }
+					/>
+				</Field>
+
+				{ formError && (
+					<p className="text-sm text-loss">{ formError }</p>
+				) }
+
+				<div className="flex justify-end gap-2 border-t border-rule-soft pt-4">
+					<button
+						type="button"
+						className={ ghostBtn }
+						onClick={ onClose }
+						disabled={ isSubmitting }
 					>
-						<input
-							type="password"
-							className={ inputClass }
-							autoComplete="new-password"
-							{ ...register( 'confirm', {
-								validate: ( v ) =>
-									v === watch( 'password' ) ||
-									'Passwords do not match.',
-							} ) }
-						/>
-					</Field>
-
-					{ formError && (
-						<p className="text-sm text-loss">{ formError }</p>
-					) }
-
-					<div className="flex justify-end gap-2 border-t border-rule-soft pt-4">
-						<button
-							type="button"
-							className={ ghostBtn }
-							onClick={ onClose }
-							disabled={ isSubmitting }
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							className={ primaryBtn }
-							disabled={ isSubmitting }
-						>
-							{ isSubmitting ? 'Creating…' : 'Create admin' }
-						</button>
-					</div>
-				</form>
-			</div>
-		</div>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						className={ primaryBtn }
+						disabled={ isSubmitting }
+					>
+						{ isSubmitting ? 'Creating…' : 'Create admin' }
+					</button>
+				</div>
+			</form>
+		</Dialog>
 	);
 }

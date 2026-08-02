@@ -36,7 +36,9 @@ final class PlayerScoreCalculator
 
             $metrics = [];
             foreach ($columns as $metric => $values) {
-                $metrics[$metric] = $values[$id] ?? 0.0;
+                // array_key_exists, not ??: a calculator that returns null means "no value"
+                // (TPR with no rated opponent), which must survive as null for the snapshot.
+                $metrics[$metric] = array_key_exists($id, $values) ? $values[$id] : 0.0;
             }
 
             // Points always present even if not a registered calculator; keep the classical field aligned.

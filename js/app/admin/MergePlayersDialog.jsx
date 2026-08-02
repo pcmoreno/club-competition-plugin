@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { Notice } from '../components/ui';
 import { keys } from '../api/keys';
 
@@ -59,38 +60,26 @@ export function MergePlayersDialog( { players, onClose } ) {
 	const remove = players.find( ( p ) => String( p.id ) === removeId ) ?? null;
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
-		>
-			<div
-				className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Merge players
-				</h2>
-
-				{ step === 'select' ? (
-					<SelectStep
-						players={ byName }
-						keepId={ keepId }
-						removeId={ removeId }
-						onKeep={ setKeepId }
-						onRemove={ setRemoveId }
-						onCancel={ onClose }
-						onNext={ () => setStep( 'review' ) }
-					/>
-				) : (
-					<ReviewStep
-						keep={ keep }
-						remove={ remove }
-						onBack={ () => setStep( 'select' ) }
-						onDone={ onClose }
-					/>
-				) }
-			</div>
-		</div>
+		<Dialog title="Merge players" size="xl" scroll onClose={ onClose }>
+			{ step === 'select' ? (
+				<SelectStep
+					players={ byName }
+					keepId={ keepId }
+					removeId={ removeId }
+					onKeep={ setKeepId }
+					onRemove={ setRemoveId }
+					onCancel={ onClose }
+					onNext={ () => setStep( 'review' ) }
+				/>
+			) : (
+				<ReviewStep
+					keep={ keep }
+					remove={ remove }
+					onBack={ () => setStep( 'select' ) }
+					onDone={ onClose }
+				/>
+			) }
+		</Dialog>
 	);
 }
 
@@ -109,11 +98,11 @@ function SelectStep( {
 	return (
 		<>
 			<p className="mt-2 text-sm text-ink-3">
-				Everything from the player to remove moves to the player to keep:
-				their full competition history, plus any detail the kept player
-				is missing (KNSB id, Elo, birth year, gender). Their member
-				account moves too, unless the kept player already has one — in
-				which case it’s removed.
+				Everything from the player to remove moves to the player to
+				keep: their full competition history, plus any detail the kept
+				player is missing (KNSB id, Elo, birth year, gender). Their
+				member account moves too, unless the kept player already has one
+				— in which case it’s removed.
 			</p>
 
 			<div className="mt-5 space-y-4">
@@ -140,7 +129,11 @@ function SelectStep( {
 			) }
 
 			<div className="mt-6 flex justify-end gap-2 border-t border-rule-soft pt-4">
-				<button type="button" className={ ghostBtn } onClick={ onCancel }>
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onCancel }
+				>
 					Cancel
 				</button>
 				<button
@@ -239,16 +232,14 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 		Boolean( remove.knsb_id ) &&
 		keep.knsb_id !== remove.knsb_id;
 
-	const canMerge =
-		bothLoaded && overlap.length === 0 && ! merge.isPending;
+	const canMerge = bothLoaded && overlap.length === 0 && ! merge.isPending;
 
 	return (
 		<>
 			<p className="mt-2 text-sm text-ink-3">
 				<strong className="text-ink">{ remove.name }</strong> will be
-				merged into{ ' ' }
-				<strong className="text-ink">{ keep.name }</strong> and then
-				removed. Check these are the same person.
+				merged into <strong className="text-ink">{ keep.name }</strong>{ ' ' }
+				and then removed. Check these are the same person.
 			</p>
 
 			{ loading ? (
@@ -257,7 +248,9 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 				</div>
 			) : failed ? (
 				<div className="mt-4">
-					<Notice>Couldn’t load tournaments. Please try again.</Notice>
+					<Notice>
+						Couldn’t load tournaments. Please try again.
+					</Notice>
 				</div>
 			) : (
 				<div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -290,7 +283,8 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 			{ overlap.length === 0 && knsbMismatch && (
 				<p className="mt-4 rounded border border-rule bg-surface px-4 py-3 text-sm text-ink-3">
 					These players have different KNSB ids ({ keep.knsb_id } vs{ ' ' }
-					{ remove.knsb_id }). Make sure they’re really the same person.
+					{ remove.knsb_id }). Make sure they’re really the same
+					person.
 				</p>
 			) }
 
@@ -482,10 +476,19 @@ function MemberRow( { status, inheritStatus = null, inheritFrom = null } ) {
 	);
 }
 
-function Row( { label, value, mono = false, inherited = null, inheritFrom = null } ) {
+function Row( {
+	label,
+	value,
+	mono = false,
+	inherited = null,
+	inheritFrom = null,
+} ) {
 	const empty = value === null || value === undefined || value === '';
 	const willInherit =
-		empty && inherited !== null && inherited !== undefined && inherited !== '';
+		empty &&
+		inherited !== null &&
+		inherited !== undefined &&
+		inherited !== '';
 
 	return (
 		<div className="flex items-baseline justify-between gap-3">

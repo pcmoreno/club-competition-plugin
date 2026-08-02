@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { keys } from '../api/keys';
 
 const primaryBtn =
@@ -40,95 +41,81 @@ export function FetchKnsbDialog( { onClose } ) {
 		mutationFn: () => api.post( 'knsb/fetch' ),
 		// The fetch endpoint returns the fresh status, so seed the query with it
 		// — the card below updates without a refetch.
-		onSuccess: ( data ) => queryClient.setQueryData( [ 'knsb-status' ], data ),
+		onSuccess: ( data ) =>
+			queryClient.setQueryData( keys.knsbStatus(), data ),
 	} );
 
 	const s = status.data;
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Fetch KNSB ratings"
+			description="Downloads the latest KNSB classical rating list from schaakbond.nl and stores it on the server. This doesn’t change any player’s rating — apply it per player from their Sync action."
+			busy={ fetchList.isPending }
+			onClose={ onClose }
 		>
-			<div
-				className="w-full max-w-md rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Fetch KNSB ratings
-				</h2>
-				<p className="mt-2 text-sm text-ink-3">
-					Downloads the latest KNSB classical rating list from
-					schaakbond.nl and stores it on the server. This doesn’t change
-					any player’s rating — apply it per player from their Sync
-					action.
-				</p>
-
-				<div className="mt-4 rounded border border-rule bg-surface p-4">
-					{ status.isLoading ? (
-						<p className="text-sm text-muted">
-							Checking the stored list…
-						</p>
-					) : status.isError ? (
-						<p className="text-sm text-loss">
-							Couldn’t read the current list.
-						</p>
-					) : s?.available ? (
-						<dl className="space-y-1">
-							<Row
-								label="List date"
-								value={ s.list_date ?? 'unknown' }
-							/>
-							<Row
-								label="Downloaded"
-								value={ s.fetched_at ?? 'unknown' }
-							/>
-							<Row
-								label="Players"
-								value={ ( s.count ?? 0 ).toLocaleString() }
-							/>
-						</dl>
-					) : (
-						<p className="text-sm text-ink-3">
-							No list has been downloaded yet.
-						</p>
-					) }
-				</div>
-
-				{ fetchList.isError && (
-					<p className="mt-3 text-sm text-loss">
-						{ errorMessage( fetchList.error ) }
+			<div className="mt-4 rounded border border-rule bg-surface p-4">
+				{ status.isLoading ? (
+					<p className="text-sm text-muted">
+						Checking the stored list…
+					</p>
+				) : status.isError ? (
+					<p className="text-sm text-loss">
+						Couldn’t read the current list.
+					</p>
+				) : s?.available ? (
+					<dl className="space-y-1">
+						<Row
+							label="List date"
+							value={ s.list_date ?? 'unknown' }
+						/>
+						<Row
+							label="Downloaded"
+							value={ s.fetched_at ?? 'unknown' }
+						/>
+						<Row
+							label="Players"
+							value={ ( s.count ?? 0 ).toLocaleString() }
+						/>
+					</dl>
+				) : (
+					<p className="text-sm text-ink-3">
+						No list has been downloaded yet.
 					</p>
 				) }
-				{ fetchList.isSuccess && (
-					<p className="mt-3 text-sm text-win">
-						Rating list updated.
-					</p>
-				) }
-
-				<div className="mt-5 flex justify-end gap-2">
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-						disabled={ fetchList.isPending }
-					>
-						Close
-					</button>
-					<button
-						type="button"
-						className={ primaryBtn }
-						onClick={ () => fetchList.mutate() }
-						disabled={ fetchList.isPending }
-					>
-						{ fetchList.isPending
-							? 'Fetching…'
-							: s?.available
-							? 'Fetch again'
-							: 'Fetch now' }
-					</button>
-				</div>
 			</div>
-		</div>
+
+			{ fetchList.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( fetchList.error ) }
+				</p>
+			) }
+			{ fetchList.isSuccess && (
+				<p className="mt-3 text-sm text-win">Rating list updated.</p>
+			) }
+
+			<div className="mt-5 flex justify-end gap-2">
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+					disabled={ fetchList.isPending }
+				>
+					Close
+				</button>
+				<button
+					type="button"
+					className={ primaryBtn }
+					onClick={ () => fetchList.mutate() }
+					disabled={ fetchList.isPending }
+				>
+					{ fetchList.isPending
+						? 'Fetching…'
+						: s?.available
+						? 'Fetch again'
+						: 'Fetch now' }
+				</button>
+			</div>
+		</Dialog>
 	);
 }

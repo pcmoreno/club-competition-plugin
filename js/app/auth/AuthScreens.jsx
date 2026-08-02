@@ -210,12 +210,18 @@ export function ForgotPassword() {
 // shape (token + new password), different endpoint and copy. When `checkEndpoint`
 // is given, the token is verified on arrival so an invalid/expired link lands on
 // a friendly message instead of failing only after the user fills in a password.
-function SetPasswordForm( { title, intro, endpoint, successText, checkEndpoint } ) {
+function SetPasswordForm( {
+	title,
+	intro,
+	endpoint,
+	successText,
+	checkEndpoint,
+} ) {
 	const token = getQueryParam( 'token' );
 	const {
 		register,
 		handleSubmit,
-		watch,
+		getValues,
 		formState: { errors, isSubmitting },
 	} = useForm();
 	const [ formError, setFormError ] = useState( null );
@@ -334,8 +340,15 @@ function SetPasswordForm( { title, intro, endpoint, successText, checkEndpoint }
 						className={ inputClass }
 						autoComplete="new-password"
 						{ ...register( 'confirm', {
+							// getValues, not watch: watch subscribes the whole
+							// form and re-renders on every keystroke in every
+							// field. deps re-runs this check when `password`
+							// changes — without it, correcting the password
+							// after filling confirm leaves the mismatch error
+							// showing, or hides a real one.
+							deps: [ 'password' ],
 							validate: ( v ) =>
-								v === watch( 'password' ) ||
+								v === getValues( 'password' ) ||
 								'Passwords do not match.',
 						} ) }
 					/>

@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { Dialog } from '../components/Dialog';
 import { keys } from '../api/keys';
 
 const primaryBtn =
@@ -44,7 +45,8 @@ export function EditPlayerDialog( { player, onClose } ) {
 	const [ gender, setGender ] = useState( player.gender ?? '' );
 
 	const save = useMutation( {
-		mutationFn: ( payload ) => api.patch( `players/${ player.id }`, payload ),
+		mutationFn: ( payload ) =>
+			api.patch( `players/${ player.id }`, payload ),
 		onSuccess: () => {
 			queryClient.invalidateQueries( { queryKey: keys.adminPlayers() } );
 			onClose();
@@ -73,106 +75,99 @@ export function EditPlayerDialog( { player, onClose } ) {
 	};
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Edit player"
+			size="sm"
+			busy={ save.isPending }
+			onClose={ onClose }
+			onSubmit={ submit }
 		>
-			<form
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-				onSubmit={ submit }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Edit player
-				</h2>
+			<div className="mt-4 space-y-4">
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Name
+					</span>
+					<input
+						type="text"
+						value={ name }
+						onChange={ ( e ) => setName( e.target.value ) }
+						required
+						autoFocus
+						className={ fieldInput }
+					/>
+				</label>
 
-				<div className="mt-4 space-y-4">
-					<label className="block">
-						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							Name
-						</span>
-						<input
-							type="text"
-							value={ name }
-							onChange={ ( e ) => setName( e.target.value ) }
-							required
-							autoFocus
-							className={ fieldInput }
-						/>
-					</label>
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						KNSB ID
+					</span>
+					<input
+						type="text"
+						value={ knsbId }
+						onChange={ ( e ) => setKnsbId( e.target.value ) }
+						placeholder="e.g. 7970886"
+						className={ `${ fieldInput } font-mono` }
+					/>
+				</label>
 
-					<label className="block">
-						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							KNSB ID
-						</span>
-						<input
-							type="text"
-							value={ knsbId }
-							onChange={ ( e ) => setKnsbId( e.target.value ) }
-							placeholder="e.g. 7970886"
-							className={ `${ fieldInput } font-mono` }
-						/>
-					</label>
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Birth year
+					</span>
+					<input
+						type="number"
+						inputMode="numeric"
+						min="1900"
+						max="2100"
+						step="1"
+						value={ birthYear }
+						onChange={ ( e ) => setBirthYear( e.target.value ) }
+						placeholder="e.g. 1985"
+						className={ `${ fieldInput } font-mono` }
+					/>
+				</label>
 
-					<label className="block">
-						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							Birth year
-						</span>
-						<input
-							type="number"
-							inputMode="numeric"
-							min="1900"
-							max="2100"
-							step="1"
-							value={ birthYear }
-							onChange={ ( e ) => setBirthYear( e.target.value ) }
-							placeholder="e.g. 1985"
-							className={ `${ fieldInput } font-mono` }
-						/>
-					</label>
-
-					<label className="block">
-						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							Gender
-						</span>
-						<select
-							value={ gender }
-							onChange={ ( e ) => setGender( e.target.value ) }
-							className={ fieldInput }
-						>
-							{ GENDER_OPTIONS.map( ( o ) => (
-								<option key={ o.value } value={ o.value }>
-									{ o.label }
-								</option>
-							) ) }
-						</select>
-					</label>
-				</div>
-
-				{ save.isError && (
-					<p className="mt-3 text-sm text-loss">
-						{ errorMessage( save.error ) }
-					</p>
-				) }
-
-				<div className="mt-6 flex justify-end gap-2">
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-						disabled={ save.isPending }
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Gender
+					</span>
+					<select
+						value={ gender }
+						onChange={ ( e ) => setGender( e.target.value ) }
+						className={ fieldInput }
 					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						className={ primaryBtn }
-						disabled={ ! canSave }
-					>
-						{ save.isPending ? 'Saving…' : 'Save' }
-					</button>
-				</div>
-			</form>
-		</div>
+						{ GENDER_OPTIONS.map( ( o ) => (
+							<option key={ o.value } value={ o.value }>
+								{ o.label }
+							</option>
+						) ) }
+					</select>
+				</label>
+			</div>
+
+			{ save.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( save.error ) }
+				</p>
+			) }
+
+			<div className="mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+					disabled={ save.isPending }
+				>
+					Cancel
+				</button>
+				<button
+					type="submit"
+					className={ primaryBtn }
+					disabled={ ! canSave }
+				>
+					{ save.isPending ? 'Saving…' : 'Save' }
+				</button>
+			</div>
+		</Dialog>
 	);
 }

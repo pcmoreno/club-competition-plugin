@@ -7,6 +7,7 @@ import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
 import { FetchKnsbDialog } from './FetchKnsbDialog';
+import { Dialog } from '../components/Dialog';
 import { Notice, ActionsMenu, SearchInput } from '../components/ui';
 import { keys } from '../api/keys';
 
@@ -57,8 +58,7 @@ function isCurrentMonth( d ) {
 	}
 	const now = new Date();
 	return (
-		d.getFullYear() === now.getFullYear() &&
-		d.getMonth() === now.getMonth()
+		d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
 	);
 }
 
@@ -362,7 +362,8 @@ function RosterTable( { players, sort, onSort, onSync, onOpen, onInvite } ) {
 // One "before → after" row in the sync result. Unchanged values render muted
 // without an arrow; changed values highlight the new value in ink.
 function SyncChange( { label, before, after, mono = false } ) {
-	const fmt = ( v ) => ( v === null || v === undefined || v === '' ? '—' : v );
+	const fmt = ( v ) =>
+		v === null || v === undefined || v === '' ? '—' : v;
 	const changed = String( before ?? '' ) !== String( after ?? '' );
 	const numCls = mono ? 'num font-mono' : '';
 	return (
@@ -403,89 +404,80 @@ function SyncDialog( { player, onClose } ) {
 	const updated = sync.data;
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title="Sync from KNSB"
+			size="sm"
+			busy={ sync.isPending }
+			onClose={ onClose }
 		>
-			<div
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<h2 className="font-serif text-2xl leading-tight">
-					Sync from KNSB
-				</h2>
-
-				{ updated ? (
-					<>
-						<p className="mt-2 text-sm text-ink-3">
-							Synced from the KNSB list:
+			{ updated ? (
+				<>
+					<p className="mt-2 text-sm text-ink-3">
+						Synced from the KNSB list:
+					</p>
+					<dl className="mt-3 space-y-1.5 text-sm">
+						<SyncChange
+							label="Name"
+							before={ player.name }
+							after={ updated.name }
+						/>
+						<SyncChange
+							label="Birth year"
+							before={ player.birth_year }
+							after={ updated.birth_year }
+							mono
+						/>
+						<SyncChange
+							label="Rating"
+							before={ player.knsb_elo }
+							after={ updated.knsb_elo }
+							mono
+						/>
+					</dl>
+					<div className="mt-5 flex justify-end">
+						<button
+							type="button"
+							className={ primaryBtn }
+							onClick={ onClose }
+						>
+							Done
+						</button>
+					</div>
+				</>
+			) : (
+				<>
+					<p className="mt-2 text-sm text-ink-3">
+						Sync{ ' ' }
+						<strong className="text-ink">{ player.name }</strong>{ ' ' }
+						from the latest KNSB list? This overwrites their name,
+						birth year, and rating with the official KNSB values.
+					</p>
+					{ sync.isError && (
+						<p className="mt-3 text-sm text-loss">
+							{ errorMessage( sync.error ) }
 						</p>
-						<dl className="mt-3 space-y-1.5 text-sm">
-							<SyncChange
-								label="Name"
-								before={ player.name }
-								after={ updated.name }
-							/>
-							<SyncChange
-								label="Birth year"
-								before={ player.birth_year }
-								after={ updated.birth_year }
-								mono
-							/>
-							<SyncChange
-								label="Rating"
-								before={ player.knsb_elo }
-								after={ updated.knsb_elo }
-								mono
-							/>
-						</dl>
-						<div className="mt-5 flex justify-end">
-							<button
-								type="button"
-								className={ primaryBtn }
-								onClick={ onClose }
-							>
-								Done
-							</button>
-						</div>
-					</>
-				) : (
-					<>
-						<p className="mt-2 text-sm text-ink-3">
-							Sync{ ' ' }
-							<strong className="text-ink">
-								{ player.name }
-							</strong>{ ' ' }
-							from the latest KNSB list? This overwrites their name,
-							birth year, and rating with the official KNSB values.
-						</p>
-						{ sync.isError && (
-							<p className="mt-3 text-sm text-loss">
-								{ errorMessage( sync.error ) }
-							</p>
-						) }
-						<div className="mt-5 flex justify-end gap-2">
-							<button
-								type="button"
-								className={ ghostBtn }
-								onClick={ onClose }
-								disabled={ sync.isPending }
-							>
-								Back
-							</button>
-							<button
-								type="button"
-								className={ primaryBtn }
-								onClick={ () => sync.mutate() }
-								disabled={ sync.isPending }
-							>
-								{ sync.isPending ? 'Syncing…' : 'Yes' }
-							</button>
-						</div>
-					</>
-				) }
-			</div>
-		</div>
+					) }
+					<div className="mt-5 flex justify-end gap-2">
+						<button
+							type="button"
+							className={ ghostBtn }
+							onClick={ onClose }
+							disabled={ sync.isPending }
+						>
+							Back
+						</button>
+						<button
+							type="button"
+							className={ primaryBtn }
+							onClick={ () => sync.mutate() }
+							disabled={ sync.isPending }
+						>
+							{ sync.isPending ? 'Syncing…' : 'Yes' }
+						</button>
+					</div>
+				</>
+			) }
+		</Dialog>
 	);
 }
 

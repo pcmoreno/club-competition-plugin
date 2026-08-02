@@ -1,15 +1,12 @@
 import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
-import { Notice } from '../components/ui';
+import { Dialog } from '../components/Dialog';
+import { ConfirmModal, Notice } from '../components/ui';
 import { keys } from '../api/keys';
 
-const primaryBtn =
-	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
 const ghostBtn =
 	'rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink';
-const dangerBtn =
-	'rounded border border-loss/40 px-3 py-1.5 text-sm font-medium text-loss hover:bg-loss/10';
 
 // Equal-width action buttons that sit two-to-a-row and fill the section width
 // (flex-1). Used for Edit/Activate in the Player section and Invite/Revoke in
@@ -72,59 +69,54 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 	}
 
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-			onClick={ onClose }
+		<Dialog
+			title={ player.name }
+			scroll
+			onClose={ onClose }
+			headerExtra={
+				<>
+					{ ! player.active && (
+						<span className="mt-1 rounded bg-loss/10 px-2 py-0.5 text-xs font-medium text-loss">
+							Inactive
+						</span>
+					) }
+					{ canDelete && (
+						<button
+							type="button"
+							className="rounded p-1.5 text-loss hover:bg-loss/10"
+							onClick={ () => setConfirm( 'delete' ) }
+							aria-label={ `Delete ${ player.name }` }
+							title="Delete player"
+						>
+							<TrashIcon className="h-6 w-6" />
+						</button>
+					) }
+				</>
+			}
 		>
-			<div
-				className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				<div className="flex items-start justify-between gap-4">
-					<h2 className="font-serif text-2xl leading-tight">
-						{ player.name }
-					</h2>
-					<div className="flex shrink-0 items-center gap-2">
-						{ ! player.active && (
-							<span className="mt-1 rounded bg-loss/10 px-2 py-0.5 text-xs font-medium text-loss">
-								Inactive
-							</span>
-						) }
-						{ canDelete && (
-							<button
-								type="button"
-								className="rounded p-1.5 text-loss hover:bg-loss/10"
-								onClick={ () => setConfirm( 'delete' ) }
-								aria-label={ `Delete ${ player.name }` }
-								title="Delete player"
-							>
-								<TrashIcon className="h-6 w-6" />
-							</button>
-						) }
-					</div>
-				</div>
+			<PlayerSection
+				player={ player }
+				onEdit={ () => onEdit( player ) }
+				onToggleActive={ () => setConfirm( 'active' ) }
+			/>
+			<TournamentsSection
+				query={ tournamentsQuery }
+				playerId={ player.id }
+			/>
+			<MemberSection
+				player={ player }
+				onInvite={ () => onInvite( player ) }
+				onRevoke={ () => setConfirm( 'revoke' ) }
+			/>
 
-				<PlayerSection
-					player={ player }
-					onEdit={ () => onEdit( player ) }
-					onToggleActive={ () => setConfirm( 'active' ) }
-				/>
-				<TournamentsSection query={ tournamentsQuery } playerId={ player.id } />
-				<MemberSection
-					player={ player }
-					onInvite={ () => onInvite( player ) }
-					onRevoke={ () => setConfirm( 'revoke' ) }
-				/>
-
-				<div className="mt-6 flex justify-end border-t border-rule-soft pt-4">
-					<button
-						type="button"
-						className={ ghostBtn }
-						onClick={ onClose }
-					>
-						Close
-					</button>
-				</div>
+			<div className="mt-6 flex justify-end border-t border-rule-soft pt-4">
+				<button
+					type="button"
+					className={ ghostBtn }
+					onClick={ onClose }
+				>
+					Close
+				</button>
 			</div>
 
 			{ confirm === 'active' && (
@@ -146,7 +138,7 @@ export function PlayerDetailDialog( { playerId, onClose, onEdit, onInvite } ) {
 					onDeleted={ onClose }
 				/>
 			) }
-		</div>
+		</Dialog>
 	);
 }
 
@@ -183,7 +175,11 @@ function PlayerSection( { player, onEdit, onToggleActive } ) {
 			<dl className="rounded border border-rule bg-surface px-4 py-2">
 				<DetailRow label="KNSB Elo" value={ player.knsb_elo } mono />
 				<DetailRow label="KNSB ID" value={ player.knsb_id } mono />
-				<DetailRow label="Birth year" value={ player.birth_year } mono />
+				<DetailRow
+					label="Birth year"
+					value={ player.birth_year }
+					mono
+				/>
 				<DetailRow label="Gender" value={ player.gender } />
 			</dl>
 			<div className="mt-2 flex gap-2">
@@ -196,7 +192,9 @@ function PlayerSection( { player, onEdit, onToggleActive } ) {
 				</button>
 				<button
 					type="button"
-					className={ player.active ? splitDangerBtn : splitSubtleBtn }
+					className={
+						player.active ? splitDangerBtn : splitSubtleBtn
+					}
 					onClick={ onToggleActive }
 				>
 					{ player.active ? 'Deactivate' : 'Activate' }
@@ -328,31 +326,6 @@ function MemberSection( { player, onInvite, onRevoke } ) {
 	);
 }
 
-// Small confirmation overlay stacked above the detail dialog. Renders its own
-// backdrop (clicking it, or Cancel, closes only the confirmation); z above the
-// detail modal so it captures the interaction.
-function ConfirmOverlay( { children, onClose } ) {
-	return (
-		<div
-			className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4"
-			onClick={ ( e ) => {
-				// Stop the click from bubbling to the detail modal's backdrop
-				// below, which would close the whole modal — dismiss only the
-				// confirmation.
-				e.stopPropagation();
-				onClose();
-			} }
-		>
-			<div
-				className="w-full max-w-sm rounded-lg bg-paper p-6 shadow-md"
-				onClick={ ( e ) => e.stopPropagation() }
-			>
-				{ children }
-			</div>
-		</div>
-	);
-}
-
 function ToggleActiveConfirm( { player, onClose } ) {
 	const queryClient = useQueryClient();
 	const deactivating = player.active;
@@ -366,17 +339,26 @@ function ToggleActiveConfirm( { player, onClose } ) {
 	} );
 
 	return (
-		<ConfirmOverlay onClose={ onClose }>
-			<h2 className="font-serif text-2xl leading-tight">
-				{ deactivating ? 'Deactivate player' : 'Activate player' }
-			</h2>
-			<p className="mt-2 text-sm text-ink-3">
+		<ConfirmModal
+			title={ deactivating ? 'Deactivate player' : 'Activate player' }
+			confirmLabel={
+				toggle.isPending
+					? 'Saving…'
+					: deactivating
+					? 'Deactivate'
+					: 'Activate'
+			}
+			busy={ toggle.isPending }
+			onCancel={ onClose }
+			onConfirm={ () => toggle.mutate() }
+		>
+			<p>
 				{ deactivating ? (
 					<>
 						Deactivate{ ' ' }
-						<strong className="text-ink">{ player.name }</strong>? They
-						stay in the roster and their history is kept, but they
-						won’t be offered for new pairings.
+						<strong className="text-ink">{ player.name }</strong>?
+						They stay in the roster and their history is kept, but
+						they won’t be offered for new pairings.
 					</>
 				) : (
 					<>
@@ -387,33 +369,11 @@ function ToggleActiveConfirm( { player, onClose } ) {
 				) }
 			</p>
 			{ toggle.isError && (
-				<p className="mt-3 text-sm text-loss">
+				<p className="mt-3 text-loss">
 					{ errorMessage( toggle.error ) }
 				</p>
 			) }
-			<div className="mt-5 flex justify-end gap-2">
-				<button
-					type="button"
-					className={ ghostBtn }
-					onClick={ onClose }
-					disabled={ toggle.isPending }
-				>
-					Cancel
-				</button>
-				<button
-					type="button"
-					className={ primaryBtn }
-					onClick={ () => toggle.mutate() }
-					disabled={ toggle.isPending }
-				>
-					{ toggle.isPending
-						? 'Saving…'
-						: deactivating
-						? 'Deactivate'
-						: 'Activate' }
-				</button>
-			</div>
-		</ConfirmOverlay>
+		</ConfirmModal>
 	);
 }
 
@@ -428,40 +388,26 @@ function RevokeConfirm( { player, onClose } ) {
 	} );
 
 	return (
-		<ConfirmOverlay onClose={ onClose }>
-			<h2 className="font-serif text-2xl leading-tight">
-				Revoke member access
-			</h2>
-			<p className="mt-2 text-sm text-ink-3">
+		<ConfirmModal
+			title="Revoke member access"
+			confirmLabel={ revoke.isPending ? 'Revoking…' : 'Revoke' }
+			danger
+			busy={ revoke.isPending }
+			onCancel={ onClose }
+			onConfirm={ () => revoke.mutate() }
+		>
+			<p>
 				Revoke the member account for{ ' ' }
 				<strong className="text-ink">{ player.name }</strong>? They’re
 				logged out immediately and can’t sign in again until re-invited.
 				The player and their history are kept.
 			</p>
 			{ revoke.isError && (
-				<p className="mt-3 text-sm text-loss">
+				<p className="mt-3 text-loss">
 					{ errorMessage( revoke.error ) }
 				</p>
 			) }
-			<div className="mt-5 flex justify-end gap-2">
-				<button
-					type="button"
-					className={ ghostBtn }
-					onClick={ onClose }
-					disabled={ revoke.isPending }
-				>
-					Cancel
-				</button>
-				<button
-					type="button"
-					className={ dangerBtn }
-					onClick={ () => revoke.mutate() }
-					disabled={ revoke.isPending }
-				>
-					{ revoke.isPending ? 'Revoking…' : 'Revoke' }
-				</button>
-			</div>
-		</ConfirmOverlay>
+		</ConfirmModal>
 	);
 }
 
@@ -480,37 +426,23 @@ function DeleteConfirm( { player, onClose, onDeleted } ) {
 	} );
 
 	return (
-		<ConfirmOverlay onClose={ onClose }>
-			<h2 className="font-serif text-2xl leading-tight">Delete player</h2>
-			<p className="mt-2 text-sm text-ink-3">
+		<ConfirmModal
+			title="Delete player"
+			confirmLabel={ del.isPending ? 'Deleting…' : 'Delete' }
+			danger
+			busy={ del.isPending }
+			onCancel={ onClose }
+			onConfirm={ () => del.mutate() }
+		>
+			<p>
 				Permanently delete{ ' ' }
 				<strong className="text-ink">{ player.name }</strong>? This also
 				removes their member account and login. This can’t be undone.
 			</p>
 			{ del.isError && (
-				<p className="mt-3 text-sm text-loss">
-					{ errorMessage( del.error ) }
-				</p>
+				<p className="mt-3 text-loss">{ errorMessage( del.error ) }</p>
 			) }
-			<div className="mt-5 flex justify-end gap-2">
-				<button
-					type="button"
-					className={ ghostBtn }
-					onClick={ onClose }
-					disabled={ del.isPending }
-				>
-					Cancel
-				</button>
-				<button
-					type="button"
-					className={ dangerBtn }
-					onClick={ () => del.mutate() }
-					disabled={ del.isPending }
-				>
-					{ del.isPending ? 'Deleting…' : 'Delete' }
-				</button>
-			</div>
-		</ConfirmOverlay>
+		</ConfirmModal>
 	);
 }
 
