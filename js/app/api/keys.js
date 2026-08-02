@@ -46,6 +46,9 @@ export const keys = {
 		id( playerId ),
 	],
 
+	// The signed-in member's own view (GET /me/home).
+	home: () => [ 'me-home' ],
+
 	// Account / setup
 	account: () => [ 'account' ],
 	adminBootstrapStatus: () => [ 'admin-bootstrap-status' ],

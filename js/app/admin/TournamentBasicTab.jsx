@@ -3,12 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
 	PAIRING_OPTIONS,
-	TIME_CONTROL_OPTIONS,
-	DEFAULT_TIME_CONTROL,
 	fieldInput,
 	primaryBtn,
 	errorMessage,
 } from './tournamentShared';
+import { TIME_CONTROL_OPTIONS, DEFAULT_TIME_CONTROL } from '../components/game';
 import { keys } from '../api/keys';
 
 // ADMIN. Basic-details tab of the tournament detail page. Edits the same fields

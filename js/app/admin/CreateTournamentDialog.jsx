@@ -5,13 +5,12 @@ import { Dialog } from '../components/Dialog';
 import {
 	PAIRING_OPTIONS,
 	DEFAULT_PAIRING_SYSTEM,
-	TIME_CONTROL_OPTIONS,
-	DEFAULT_TIME_CONTROL,
 	fieldInput,
 	primaryBtn,
 	ghostBtn,
 	errorMessage,
 } from './tournamentShared';
+import { TIME_CONTROL_OPTIONS, DEFAULT_TIME_CONTROL } from '../components/game';
 import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics

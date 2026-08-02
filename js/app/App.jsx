@@ -6,6 +6,7 @@ import { TopBar } from './layout/TopBar';
 import { SubNav } from './layout/SubNav';
 import { Placeholder } from './layout/Page';
 
+import { Home } from './routes/Home';
 import { Pairings } from './routes/Pairings';
 import { Standings } from './routes/Standings';
 import { RoundHistory } from './routes/RoundHistory';
@@ -76,6 +77,8 @@ function resolveView( path, ctx ) {
 	}
 
 	switch ( path ) {
+		case '/home':
+			return { need: 'member', node: <Home /> };
 		case '/':
 		case '/pairings':
 			return {
@@ -129,7 +132,10 @@ function Shell() {
 	const isPlayerDetail =
 		matchPath( '/players/:id', path ) !== null ||
 		matchPath( '/seasons/:seasonId/players/:id', path ) !== null;
-	const showTournamentSwitcher = ! isAdminMode && ! isPlayerDetail;
+	// Home spans every tournament the member is in, so scoping it to one would
+	// be meaningless.
+	const showTournamentSwitcher =
+		! isAdminMode && ! isPlayerDetail && path !== '/home';
 
 	let body;
 	if ( AuthView ) {
