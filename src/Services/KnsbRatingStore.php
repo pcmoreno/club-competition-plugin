@@ -29,6 +29,12 @@ class KnsbRatingStore
 
     private ?string $resolvedDir = null;
 
+    /** @var array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}|null */
+    private ?array $cache = null;
+
+    // Separate flag: null is also a legitimate result (nothing fetched yet).
+    private bool $cacheLoaded = false;
+
     /**
      * @param string $legacyDir pre-0.3.3 location inside the plugin, migrated on first use
      */
@@ -69,15 +75,26 @@ class KnsbRatingStore
 
             throw new \RuntimeException('Could not replace the KNSB rating list.');
         }
+
+        $this->cache       = null;
+        $this->cacheLoaded = false;
     }
 
     /**
-     * The whole stored list, or null when nothing has been fetched yet.
+     * The whole stored list, or null when nothing has been fetched yet. Held for
+     * the rest of the request: the file carries ~20k rows, and a bulk sync asks
+     * for it once per player.
      *
      * @return array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}|null
      */
     public function read(): ?array
     {
+        if ($this->cacheLoaded) {
+            return $this->cache;
+        }
+
+        $this->cacheLoaded = true;
+
         $path = $this->path();
         if (!is_file($path)) {
             return null;
@@ -88,6 +105,8 @@ class KnsbRatingStore
         }
 
         /** @var array{list_date: ?string, fetched_at: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>} $data */
+        $this->cache = $data;
+
         return $data;
     }
 

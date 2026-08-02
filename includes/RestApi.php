@@ -189,6 +189,17 @@ class RestApi
                 ],
             ]);
 
+            // Sync the whole roster against the last-fetched KNSB list (admin).
+            // Registered before /players/{id} so the literal path is matched
+            // first; the id route is digits-only, so they can't collide anyway.
+            register_rest_route('scs/v1', '/players/knsb-sync', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$players, 'syncKnsbRatings'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             register_rest_route('scs/v1', '/players/(?P<id>\d+)', [
                 [
                     'methods'             => 'GET',

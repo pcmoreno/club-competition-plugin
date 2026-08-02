@@ -7,8 +7,9 @@ import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
 import { FetchKnsbDialog } from './FetchKnsbDialog';
+import { SyncKnsbDialog } from './SyncKnsbDialog';
 import { Dialog } from '../components/Dialog';
-import { Notice, ActionsMenu, SearchInput } from '../components/ui';
+import { Notice, ActionsMenu, SearchInput, ChangeRow } from '../components/ui';
 import { keys } from '../api/keys';
 
 function errorMessage( err ) {
@@ -27,7 +28,8 @@ function errorMessage( err ) {
 // name, sortable by name/Elo. The "Synced" column shows when the KNSB rating
 // sync last refreshed each player (NULL → "never"); anything not from the
 // current month is flagged red (the sync runs monthly), and a player with a
-// KNSB id can be (eventually) re-synced from there.
+// KNSB id can be re-synced from there. The Actions menu syncs the whole roster
+// in one go (SyncKnsbDialog).
 //
 // Clicking the name cell opens PlayerDetailDialog — a read-first overview with
 // three sections (Player details + activate/deactivate, Tournaments, Member
@@ -87,6 +89,7 @@ export function Players() {
 	const [ inviteTarget, setInviteTarget ] = useState( null );
 	const [ mergeOpen, setMergeOpen ] = useState( false );
 	const [ fetchKnsbOpen, setFetchKnsbOpen ] = useState( false );
+	const [ syncKnsbOpen, setSyncKnsbOpen ] = useState( false );
 
 	// The merge picker needs at least two players to choose between.
 	const canMerge = Array.isArray( data ) && data.length >= 2;
@@ -150,6 +153,10 @@ export function Players() {
 									label: 'Fetch KNSB ratings',
 									onClick: () => setFetchKnsbOpen( true ),
 								},
+								{
+									label: 'Sync KNSB ratings',
+									onClick: () => setSyncKnsbOpen( true ),
+								},
 							] }
 						/>
 						<SearchInput
@@ -195,6 +202,9 @@ export function Players() {
 			) }
 			{ fetchKnsbOpen && (
 				<FetchKnsbDialog onClose={ () => setFetchKnsbOpen( false ) } />
+			) }
+			{ syncKnsbOpen && (
+				<SyncKnsbDialog onClose={ () => setSyncKnsbOpen( false ) } />
 			) }
 		</>
 	);
@@ -359,35 +369,6 @@ function RosterTable( { players, sort, onSort, onSync, onOpen, onInvite } ) {
 	);
 }
 
-// One "before → after" row in the sync result. Unchanged values render muted
-// without an arrow; changed values highlight the new value in ink.
-function SyncChange( { label, before, after, mono = false } ) {
-	const fmt = ( v ) =>
-		v === null || v === undefined || v === '' ? '—' : v;
-	const changed = String( before ?? '' ) !== String( after ?? '' );
-	const numCls = mono ? 'num font-mono' : '';
-	return (
-		<div className="flex items-baseline justify-between gap-3">
-			<dt className="text-xs uppercase tracking-wide text-muted">
-				{ label }
-			</dt>
-			<dd className={ `text-right ${ numCls }` }>
-				{ changed ? (
-					<>
-						<span className="text-ink-3">{ fmt( before ) }</span>
-						<span className="text-ink-3"> → </span>
-						<span className="font-medium text-ink">
-							{ fmt( after ) }
-						</span>
-					</>
-				) : (
-					<span className="text-ink-3">{ fmt( after ) }</span>
-				) }
-			</dd>
-		</div>
-	);
-}
-
 // Confirm dialog that applies the player's authoritative KNSB data — name,
 // birth year, and rating — from the last-fetched list (POST
 // /players/{id}/knsb-rating). KNSB is the source of truth, so name (normalised
@@ -416,18 +397,18 @@ function SyncDialog( { player, onClose } ) {
 						Synced from the KNSB list:
 					</p>
 					<dl className="mt-3 space-y-1.5 text-sm">
-						<SyncChange
+						<ChangeRow
 							label="Name"
 							before={ player.name }
 							after={ updated.name }
 						/>
-						<SyncChange
+						<ChangeRow
 							label="Birth year"
 							before={ player.birth_year }
 							after={ updated.birth_year }
 							mono
 						/>
-						<SyncChange
+						<ChangeRow
 							label="Rating"
 							before={ player.knsb_elo }
 							after={ updated.knsb_elo }

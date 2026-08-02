@@ -146,6 +146,35 @@ export function ConfirmModal( {
 	);
 }
 
+// One "before → after" row, used by the KNSB sync reports. An unchanged value
+// renders muted without an arrow; a changed one highlights the new value in ink.
+// `mono` for numbers, so digits line up down a column.
+export function ChangeRow( { label, before, after, mono = false } ) {
+	const fmt = ( v ) =>
+		v === null || v === undefined || v === '' ? '—' : v;
+	const changed = String( before ?? '' ) !== String( after ?? '' );
+	return (
+		<div className="flex items-baseline justify-between gap-3">
+			<dt className="text-xs uppercase tracking-wide text-muted">
+				{ label }
+			</dt>
+			<dd className={ `text-right ${ mono ? 'num font-mono' : '' }` }>
+				{ changed ? (
+					<>
+						<span className="text-ink-3">{ fmt( before ) }</span>
+						<span className="text-ink-3"> → </span>
+						<span className="font-medium text-ink">
+							{ fmt( after ) }
+						</span>
+					</>
+				) : (
+					<span className="text-ink-3">{ fmt( after ) }</span>
+				) }
+			</dd>
+		</div>
+	);
+}
+
 // Dashed-border card for loading / error / empty / "coming later" states.
 export function Notice( { children } ) {
 	return (
