@@ -125,6 +125,7 @@ class SerializerService
             'white_season_player_id' => $g->white_season_player_id,
             'black_season_player_id' => $g->black_season_player_id,
             'result'                 => $g->result?->value,
+            'time_control'           => $g->time_control->value,
         ];
     }
 
