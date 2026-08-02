@@ -6,8 +6,10 @@ namespace SCS\Controller;
 
 use SCS\Exception\NotFoundException;
 use SCS\Repository\PlayerRepository;
+use SCS\Request\DeclareAbsenceRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerHomeService;
+use SCS\Services\RoundAbsenceService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -23,6 +25,7 @@ class MeController extends RestController
         private readonly AuthContextService $authContext,
         private readonly PlayerRepository $playerRepository,
         private readonly PlayerHomeService $playerHomeService,
+        private readonly RoundAbsenceService $roundAbsenceService,
         private readonly SerializerService $serializer,
     ) {
         parent::__construct($validator);
@@ -38,8 +41,41 @@ class MeController extends RestController
             $player = $this->currentPlayer();
 
             return $this->ok([
-                'player' => $this->serializer->serialize($player),
+                'player'     => $this->serializer->serialize($player),
+                'declinable' => $this->roundAbsenceService->declinableRounds($player->id),
             ] + $this->playerHomeService->home($player->id));
+        });
+    }
+
+    /**
+     * "I can't play this round." What happens depends on the round: while it's
+     * still draft the absence is recorded, once pairings are out it only reaches
+     * the admin — see RoundAbsenceService. The reason is emailed, never stored.
+     */
+    public function declareAbsence(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->currentPlayer();
+            $input  = DeclareAbsenceRequest::fromRequest($request);
+            $this->validate($input);
+
+            return $this->ok($this->roundAbsenceService->declare(
+                $player->id,
+                (int)$request->get_param('id'),
+                $input->reason,
+            ));
+        });
+    }
+
+    /** "I can play after all." Only while the round is still draft. */
+    public function withdrawAbsence(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $player = $this->currentPlayer();
+
+            $this->roundAbsenceService->withdraw($player->id, (int)$request->get_param('id'));
+
+            return $this->noContent();
         });
     }
 

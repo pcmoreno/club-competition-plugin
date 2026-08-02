@@ -4,6 +4,7 @@ import { Page } from '../layout/Page';
 import { Link } from '../router/router';
 import { Notice, formatDate } from '../components/ui';
 import { Square, TIME_CONTROL_LABELS } from '../components/game';
+import { AbsenceCard } from './AbsenceCard';
 import { keys } from '../api/keys';
 
 // MEMBER. The signed-in member's home page, and where signing in lands you.
@@ -14,8 +15,7 @@ import { keys } from '../api/keys';
 // are both plural by nature. Backed by a single GET /me/home, which composes it
 // server-side; the client never fans out per season.
 //
-// Declining a round ("I can't come") is phase 2 and lands under the next-pairing
-// cards.
+// "I can't play this round" sits under the next-game cards (AbsenceCard).
 
 function Card( { children, className = '' } ) {
 	return (
@@ -181,7 +181,13 @@ export function Home() {
 		);
 	}
 
-	const { player, next_pairings: nextPairings, current, past } = data;
+	const {
+		player,
+		next_pairings: nextPairings,
+		current,
+		past,
+		declinable,
+	} = data;
 
 	return (
 		<Page>
@@ -203,6 +209,8 @@ export function Home() {
 					) ) }
 				</div>
 			) }
+
+			<AbsenceCard declinable={ declinable ?? [] } />
 
 			{ current.length > 0 && (
 				<>

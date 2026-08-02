@@ -186,6 +186,21 @@ class RestApi
                 'permission_callback' => $isMember,
             ]);
 
+            // "I can't play this round" / "I can after all". Which of the two
+            // this does depends on the round's status — see RoundAbsenceService.
+            register_rest_route('scs/v1', '/me/rounds/(?P<id>\d+)/absence', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$me, 'declareAbsence'],
+                    'permission_callback' => $isMemberWrite,
+                ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$me, 'withdrawAbsence'],
+                    'permission_callback' => $isMemberWrite,
+                ],
+            ]);
+
             // ── Players ───────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/players', [
                 [
