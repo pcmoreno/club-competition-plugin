@@ -14,11 +14,14 @@ something is missing, believe it and check the code before assuming otherwise.
 | Goal | State |
 |---|---|
 | Live viewer: standings, player stats | Built |
+| Member home page (`/home`) | Built |
 | Admin: rounds, manual pairings, results | Built |
 | Member invitations and auth (no WP account) | Built |
-| KNSB rating integration | Fetch + per-player apply built; no cron |
+| Member self-report absence | Built — see below |
+| KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | **Not implemented** — manual pairing only |
-| Email notifications | Invites and password resets only |
+| Email notifications | Invites, password resets, absence notices |
+| Round dates in the admin UI | **Not implemented** — `rounds.date` exists, nothing writes it |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
 
 ## Architecture
@@ -55,7 +58,7 @@ Database
 | Frontend | React 18 via `@wordpress/element` | Embedded via shortcode `[clubcompetitie]` |
 | Data fetching | TanStack Query + raw `fetch` | Query keys come from `js/app/api/keys.js` |
 | Styling | Tailwind v4 | Viewer utilities are deliberately **unlayered** — see below |
-| Email | WordPress `wp_mail` | Invites and password resets only |
+| Email | WordPress `wp_mail` | Plain text, built inline in `EmailNotificationService` — no templates |
 
 Declared but unused today: `dompdf` (PDF pairing sheets are planned, nothing
 renders one yet), `@wordpress/api-fetch` and `dayjs`. Don't take a dependency in
@@ -145,6 +148,49 @@ cookie for exactly this reason.
 
 Admins are separate (created via WP-CLI, stored in the `admins` table).
 
+### Time Control
+
+Both `seasons` and `games` carry a `time_control` (`TimeControl` enum: blitz /
+rapid / classical, `NOT NULL DEFAULT 'classical'`). A game takes the season's
+value **at the moment it is paired** (`RoundService::addPairing`) rather than
+reading through to the season on display, so changing a running tournament's
+tempo doesn't rewrite games already played under the old one.
+
+Nothing can set a game's tempo independently of its season yet — a single blitz
+board inside a classical evening isn't expressible.
+
+### Member Home and Absence Self-Report
+
+`/home` (member-only, `GET /me/home`) is the member's landing page after login
+and **the only view that spans seasons** — every other viewer route is scoped by
+the tournament switcher, which is hidden here. It shows the next pairing per
+running tournament, tournaments in progress, and recently finished ones.
+
+Everything under `/me/*` derives the player from the JWT (`pid` claim) and never
+from the request; there is no `/me/{id}`. Admin accounts pass the member gate but
+have no player record, so `/me/home` 404s for them and the Home tab is only
+offered to accounts with a linked player.
+
+**"I can't play this round"** (`POST`/`DELETE /me/rounds/{id}/absence`,
+`RoundAbsenceService`) has two modes, decided by round status:
+
+- `draft` — no pairings yet, so the absence is recorded outright
+  (`Absent` + `ByeType::Personal`, **not** a scored bye) and can be withdrawn.
+- `published` — the member is already on a board, so **nothing is written**; the
+  admins are emailed with the board and opponent and re-pair themselves. A member
+  action must never mutate a pairing: the opponent's board would change under
+  them.
+- `finalised` / `complete` — closed to both.
+
+Classical seasons only: a rapid or blitz evening is turn-up-or-don't, whereas a
+classical season turns the absence into a bye that affects scoring. The reason is
+**notify-only** — it rides in the email and is never stored, so there is no column
+for it. Withdrawal removes only an `Absent` + `Personal` row; an admin
+re-classification is theirs to reverse.
+
+The picker is meant to read "Round 12 · Tue 9 Dec", but nothing in the admin UI
+writes `rounds.date` yet, so it currently degrades to the round number alone.
+
 ### Database Architecture
 
 Table names are built from `SCS_TABLE_PREFIX` (`$wpdb->prefix . 'scs_'`), so
@@ -152,10 +198,10 @@ they follow the host's WordPress prefix. **Production is not `wp_`** — the liv
 site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
 hardcode `wp_scs_`.
 
-- `…scs_seasons` — competition seasons
+- `…scs_seasons` — competition seasons (name, dates, pairing system, `time_control`)
 - `…scs_season_players` — player enrollment (season + category + player)
 - `…scs_rounds` — competition rounds
-- `…scs_games` — individual pairings/results
+- `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type
 - `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
 - `…scs_members` — non-WordPress member accounts
@@ -310,6 +356,9 @@ the JWT.
 - **Modals go through `js/app/components/Dialog.jsx`**, which supplies dialog
   semantics, focus handling, Escape and the scroll lock. Pass `busy` while a
   write is in flight so a second confirm can't fire. Don't hand-roll a backdrop.
+- **The viewer never imports from `js/app/admin/`.** It's one bundle, so it
+  would work — but shared domain constants belong in `js/app/components/`
+  (`game.jsx` holds the time-control labels for exactly this reason).
 - **User-facing error text is authored in the frontend**, keyed on status at the
   `ApiError` layer. Backend exception messages stay detailed and specific —
   they're for logging, not for display.
@@ -426,19 +475,31 @@ CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
   `uploads/scs-knsb-<random>/`, hardened with `.htaccess` + `index.php`. It is
   personal data for ~20k non-users, so it must not sit in a web-reachable plugin
   directory.
-- **Applying it**: per player, from their Sync action — matched on `knsb_id`,
-  overwriting name, birth year and rating. Fetching never changes a player.
+- **Applying it**: matched on `knsb_id`, overwriting name, birth year and
+  rating. Two entry points, both in `KnsbRatingSyncService`: one player from
+  their Sync action, or the whole roster from the roster's "Sync KNSB ratings"
+  action (`POST /players/knsb-sync`). Fetching never changes a player.
+- The bulk run returns an **outcome per player** rather than throwing, so one
+  name collision can't cost the admin the batch. Deliberately not transactional.
+  `KnsbRatingStore::read()` memoises for the request — the list is ~20k rows and
+  the loop asks for it once per player.
 
-See `src/Services/KnsbRatingListFetcher.php`, `KnsbRatingStore.php` and
-`KnsbNameNormalizer.php`.
+See `src/Services/KnsbRatingListFetcher.php`, `KnsbRatingStore.php`,
+`KnsbRatingSyncService.php` and `KnsbNameNormalizer.php`.
 
 ### Email Notifications
 
 Via `wp_mail()` (uses WP Mail SMTP plugin on production):
 - Member invites
 - Password resets
+- Absence notices — a member saying they can't play a round
 
-Sent from `src/Services/EmailNotificationService.php`.
+All sent from `src/Services/EmailNotificationService.php`. **There are no email
+templates**: every body is a plain-text string built inline in that service.
+Absence notices go to every *active* admin (`AdminRepository::findAllActive`),
+all in one `To:`. Known gap: with no active admin, or if `wp_mail` fails, the
+send is skipped silently — and for an already-published round the email is the
+feature's only effect.
 
 ## Important Files
 
