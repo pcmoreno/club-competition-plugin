@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
 	PAIRING_OPTIONS,
+	TIME_CONTROL_OPTIONS,
+	DEFAULT_TIME_CONTROL,
 	fieldInput,
 	primaryBtn,
 	errorMessage,
@@ -10,7 +12,7 @@ import {
 import { keys } from '../api/keys';
 
 // ADMIN. Basic-details tab of the tournament detail page. Edits the same fields
-// as the Create dialog (name, pairing system, dates, location) via
+// as the Create dialog (name, pairing system, dates, time control, location) via
 // PATCH /seasons/{id}. Changing the pairing system is guarded server-side (it
 // resets pairing settings and is blocked after the first completed round); any
 // such error surfaces inline. Blank dates are left untouched — like the player
@@ -23,6 +25,9 @@ export function TournamentBasicTab( { season } ) {
 	const [ startDate, setStartDate ] = useState( season.start_date ?? '' );
 	const [ endDate, setEndDate ] = useState( season.end_date ?? '' );
 	const [ location, setLocation ] = useState( season.location ?? '' );
+	const [ timeControl, setTimeControl ] = useState(
+		season.time_control ?? DEFAULT_TIME_CONTROL
+	);
 
 	// The pairing system can only change while the tournament is in preparation;
 	// once it's active the games are already keyed to that system. (Pairing
@@ -30,9 +35,12 @@ export function TournamentBasicTab( { season } ) {
 	const pairingLocked = season.status !== 'preparation';
 
 	const save = useMutation( {
-		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
+		mutationFn: ( payload ) =>
+			api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( season.id ),
+			} );
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
@@ -44,7 +52,8 @@ export function TournamentBasicTab( { season } ) {
 		pairing !== season.pairing_system ||
 		startDate !== ( season.start_date ?? '' ) ||
 		endDate !== ( season.end_date ?? '' ) ||
-		trimmedLocation !== ( season.location ?? '' );
+		trimmedLocation !== ( season.location ?? '' ) ||
+		timeControl !== ( season.time_control ?? DEFAULT_TIME_CONTROL );
 	const canSave = trimmedName !== '' && dirty && ! save.isPending;
 
 	const submit = ( e ) => {
@@ -55,6 +64,7 @@ export function TournamentBasicTab( { season } ) {
 		const payload = {
 			name: trimmedName,
 			pairing_system: pairing,
+			time_control: timeControl,
 			location: trimmedLocation,
 		};
 		// Dates can't be cleared this pass (empty fails Date validation and a
@@ -91,7 +101,12 @@ export function TournamentBasicTab( { season } ) {
 					value={ pairing }
 					onChange={ ( e ) => setPairing( e.target.value ) }
 					disabled={ pairingLocked }
-					className={ fieldInput + ( pairingLocked ? ' cursor-not-allowed opacity-60' : '' ) }
+					className={
+						fieldInput +
+						( pairingLocked
+							? ' cursor-not-allowed opacity-60'
+							: '' )
+					}
 				>
 					{ PAIRING_OPTIONS.map( ( o ) => (
 						<option
@@ -143,6 +158,27 @@ export function TournamentBasicTab( { season } ) {
 					/>
 				</label>
 			</div>
+
+			<label className="block">
+				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+					Time control
+				</span>
+				<select
+					value={ timeControl }
+					onChange={ ( e ) => setTimeControl( e.target.value ) }
+					className={ fieldInput }
+				>
+					{ TIME_CONTROL_OPTIONS.map( ( o ) => (
+						<option key={ o.value } value={ o.value }>
+							{ o.label }
+						</option>
+					) ) }
+				</select>
+				<span className="mt-1 block text-xs text-muted">
+					Games take the tournament&rsquo;s time control when they are
+					paired; changing it here leaves existing pairings alone.
+				</span>
+			</label>
 
 			<label className="block">
 				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">

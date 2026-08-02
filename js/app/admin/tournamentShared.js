@@ -27,6 +27,22 @@ export const PAIRING_LABELS = Object.fromEntries(
 	PAIRING_OPTIONS.map( ( o ) => [ o.value, o.label ] )
 );
 
+// TimeControl enum (src/Entity/Enum/TimeControl.php). The tournament's tempo;
+// each game takes it from the season when it's paired, so changing it here only
+// affects pairings made from then on.
+export const TIME_CONTROL_OPTIONS = [
+	{ value: 'classical', label: 'Classical' },
+	{ value: 'rapid', label: 'Rapid' },
+	{ value: 'blitz', label: 'Blitz' },
+];
+
+// The internal competition is classical, so that's where a new tournament starts.
+export const DEFAULT_TIME_CONTROL = 'classical';
+
+export const TIME_CONTROL_LABELS = Object.fromEntries(
+	TIME_CONTROL_OPTIONS.map( ( o ) => [ o.value, o.label ] )
+);
+
 // SeasonStatus enum (src/Entity/Enum/SeasonStatus.php).
 export const STATUS_LABELS = {
 	preparation: 'Preparation',

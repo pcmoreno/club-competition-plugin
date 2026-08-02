@@ -7,6 +7,7 @@ namespace SCS\Repository;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
 
 class SeasonRepository
@@ -69,11 +70,12 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories): Season
+    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control = TimeControl::Classical): Season
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'seasons', [
             'name'           => $name,
             'location'       => $location,
+            'time_control'   => $time_control->value,
             'start_date'     => $start_date,
             'end_date'       => $end_date,
             'pairing_system' => $pairing_system->value,
@@ -115,6 +117,7 @@ class SeasonRepository
             pairing_settings: $this->decodeSettings($row['pairing_settings'] ?? null),
             scoring_settings: $this->decodeSettings($row['scoring_settings'] ?? null),
             display_settings: $this->decodeSettings($row['display_settings'] ?? null),
+            time_control:     TimeControl::from($row['time_control']),
         );
     }
 

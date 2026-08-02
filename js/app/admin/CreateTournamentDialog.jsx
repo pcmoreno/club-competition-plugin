@@ -5,6 +5,8 @@ import { Dialog } from '../components/Dialog';
 import {
 	PAIRING_OPTIONS,
 	DEFAULT_PAIRING_SYSTEM,
+	TIME_CONTROL_OPTIONS,
+	DEFAULT_TIME_CONTROL,
 	fieldInput,
 	primaryBtn,
 	ghostBtn,
@@ -13,7 +15,7 @@ import {
 import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
-// only — name, location, dates, pairing system. The tournament is created in
+// only — name, pairing system, dates, time control, location. The tournament is created in
 // Preparation; scoring/display settings and player enrolment are done afterward
 // through their own flows. Categories are deferred.
 export function CreateTournamentDialog( { onClose } ) {
@@ -23,6 +25,7 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ startDate, setStartDate ] = useState( '' );
 	const [ endDate, setEndDate ] = useState( '' );
 	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
+	const [ timeControl, setTimeControl ] = useState( DEFAULT_TIME_CONTROL );
 
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
@@ -40,7 +43,11 @@ export function CreateTournamentDialog( { onClose } ) {
 		if ( ! canSave ) {
 			return;
 		}
-		const payload = { name: trimmedName, pairing_system: pairing };
+		const payload = {
+			name: trimmedName,
+			pairing_system: pairing,
+			time_control: timeControl,
+		};
 		if ( location.trim() !== '' ) {
 			payload.location = location.trim();
 		}
@@ -125,6 +132,23 @@ export function CreateTournamentDialog( { onClose } ) {
 						/>
 					</label>
 				</div>
+
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Time control
+					</span>
+					<select
+						value={ timeControl }
+						onChange={ ( e ) => setTimeControl( e.target.value ) }
+						className={ fieldInput }
+					>
+						{ TIME_CONTROL_OPTIONS.map( ( o ) => (
+							<option key={ o.value } value={ o.value }>
+								{ o.label }
+							</option>
+						) ) }
+					</select>
+				</label>
 
 				<label className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
