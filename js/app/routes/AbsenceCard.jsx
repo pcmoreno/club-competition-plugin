@@ -1,7 +1,7 @@
 import { useState } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
-import { formatDate } from '../components/ui';
+import { formatDate, ConfirmModal } from '../components/ui';
 import { keys } from '../api/keys';
 
 const fieldInput =
@@ -42,6 +42,8 @@ export function AbsenceCard( { declinable } ) {
 	const [ reason, setReason ] = useState( '' );
 	// The round just submitted, so the confirmation can name it.
 	const [ sent, setSent ] = useState( null );
+	// Set while the confirm dialog is open, holding the entry being confirmed.
+	const [ confirming, setConfirming ] = useState( null );
 
 	const refresh = () =>
 		queryClient.invalidateQueries( { queryKey: keys.home() } );
@@ -51,6 +53,7 @@ export function AbsenceCard( { declinable } ) {
 			api.post( `me/rounds/${ id }/absence`, { reason: text } ),
 		onSuccess: ( result ) => {
 			setSent( result );
+			setConfirming( null );
 			setRoundId( '' );
 			setReason( '' );
 			refresh();
@@ -74,12 +77,15 @@ export function AbsenceCard( { declinable } ) {
 	const selected = open.find( ( e ) => String( e.round.id ) === roundId );
 	const busy = declare.isPending || withdraw.isPending;
 
+	// Submitting opens the confirm rather than firing: saying you'll miss a round
+	// reaches the admin either way, so it's worth one deliberate step.
 	const submit = ( e ) => {
 		e.preventDefault();
 		if ( ! selected || busy ) {
 			return;
 		}
-		declare.mutate( { id: selected.round.id, text: reason.trim() } );
+		setSent( null );
+		setConfirming( selected );
 	};
 
 	return (
@@ -192,6 +198,33 @@ export function AbsenceCard( { declinable } ) {
 						{ declare.isPending ? 'Sending…' : 'I can’t play' }
 					</button>
 				</form>
+			) }
+
+			{ confirming && (
+				<ConfirmModal
+					title="Can’t play this round?"
+					confirmLabel="Yes, I can’t play"
+					busy={ declare.isPending }
+					onCancel={ () => setConfirming( null ) }
+					onConfirm={ () =>
+						declare.mutate( {
+							id: confirming.round.id,
+							text: reason.trim(),
+						} )
+					}
+				>
+					<p>{ optionLabel( confirming ) }</p>
+					<p className="mt-2">
+						{ confirming.mode === 'request'
+							? 'Pairings are already out, so nothing changes yet — the admin gets an email and will re-pair your board.'
+							: 'You’ll be marked absent for this round. It doesn’t score you a bye, and you can undo it here while the pairings are still to come.' }
+					</p>
+					{ reason.trim() !== '' && (
+						<p className="mt-2">
+							The admin will see your reason: “{ reason.trim() }”
+						</p>
+					) }
+				</ConfirmModal>
 			) }
 		</div>
 	);
