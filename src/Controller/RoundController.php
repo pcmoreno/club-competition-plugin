@@ -82,11 +82,12 @@ class RoundController extends RestController
             $display = $this->playerDisplay->mapForSeason($round->season_id);
 
             $games = array_map(fn ($g) => [
-                'id'     => $g->id,
-                'board'  => $g->board,
-                'result' => $g->result?->value,
-                'white'  => $display[$g->white_season_player_id] ?? null,
-                'black'  => $display[$g->black_season_player_id] ?? null,
+                'id'           => $g->id,
+                'board'        => $g->board,
+                'result'       => $g->result?->value,
+                'time_control' => $g->time_control->value,
+                'white'        => $display[$g->white_season_player_id] ?? null,
+                'black'        => $display[$g->black_season_player_id] ?? null,
             ], $games);
 
             // The pairing sheet's "Bye" line lists only *pairing* byes — the

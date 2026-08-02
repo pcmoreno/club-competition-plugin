@@ -6,6 +6,7 @@ namespace SCS\Entity;
 
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Enum\TimeControl;
 
 class Season
 {
@@ -27,6 +28,8 @@ class Season
         public readonly ?array $pairing_settings = null,
         public readonly ?array $scoring_settings = null,
         public readonly ?array $display_settings = null,
+        // The tempo this tournament is played at; its games inherit it.
+        public readonly TimeControl $time_control = TimeControl::Classical,
     ) {
     }
 }

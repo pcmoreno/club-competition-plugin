@@ -75,6 +75,7 @@ class SerializerService
             'start_date'     => $s->start_date?->format('Y-m-d'),
             'end_date'       => $s->end_date?->format('Y-m-d'),
             'pairing_system' => $s->pairing_system->value,
+            'time_control'   => $s->time_control->value,
             'cadence'        => $s->pairing_system->cadence(),
             'status'         => $s->status->value,
             'categories'     => $s->categories,
@@ -125,6 +126,7 @@ class SerializerService
             'white_season_player_id' => $g->white_season_player_id,
             'black_season_player_id' => $g->black_season_player_id,
             'result'                 => $g->result?->value,
+            'time_control'           => $g->time_control->value,
         ];
     }
 

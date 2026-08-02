@@ -41,7 +41,21 @@ final class RoundService
         $round = $this->requireEditableRound($this->rounds->findById($roundId));
         $this->assertPairingValid($round, $white, $black, null);
 
-        return $this->games->create($round->id, $white, $black, $board ?? $this->nextBoard($round->id));
+        // The game inherits the tournament's tempo, fixed at the moment it is
+        // paired: changing the season's time control later must not rewrite the
+        // games already played under the old one.
+        $season = $this->seasons->findById($round->season_id);
+        if ($season === null) {
+            throw new NotFoundException('Season not found for round.');
+        }
+
+        return $this->games->create(
+            $round->id,
+            $white,
+            $black,
+            $board ?? $this->nextBoard($round->id),
+            time_control: $season->time_control,
+        );
     }
 
     public function updatePairing(int $gameId, ?int $white, ?int $black, ?int $board): Game

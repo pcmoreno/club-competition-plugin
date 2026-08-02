@@ -6,6 +6,7 @@ namespace SCS\Repository;
 
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Enum\GameResult;
+use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Game;
 
 class GameRepository
@@ -56,7 +57,7 @@ class GameRepository
         return array_map($this->hydrate(...), $rows);
     }
 
-    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null, ?GameResult $result = null): Game
+    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null, ?GameResult $result = null, TimeControl $time_control = TimeControl::Classical): Game
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'games', [
             'round_id'               => $round_id,
@@ -64,6 +65,7 @@ class GameRepository
             'white_season_player_id' => $white_season_player_id,
             'black_season_player_id' => $black_season_player_id,
             'result'                 => $result?->value,
+            'time_control'           => $time_control->value,
         ]);
 
         return $this->findById((int)$this->connection->lastInsertId());
@@ -112,6 +114,7 @@ class GameRepository
             white_season_player_id:  (int)$row['white_season_player_id'],
             black_season_player_id:  (int)$row['black_season_player_id'],
             result:                  $row['result'] !== null ? GameResult::from($row['result']) : null,
+            time_control:            TimeControl::from($row['time_control']),
         );
     }
 }

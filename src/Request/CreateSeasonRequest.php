@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Request;
 
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\TimeControl;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class CreateSeasonRequest
@@ -25,6 +26,10 @@ class CreateSeasonRequest
     #[Assert\Choice(callback: [self::class, 'pairingSystemChoices'], message: 'Pairing system is not valid.')]
     public string $pairing_system = PairingSystem::Manual->value;
 
+    // The tempo the tournament is played at; its games inherit it.
+    #[Assert\Choice(callback: [self::class, 'timeControlChoices'], message: 'Time control is not valid.')]
+    public string $time_control = TimeControl::Classical->value;
+
     /** @var list<string> */
     public array $categories = [];
 
@@ -32,6 +37,12 @@ class CreateSeasonRequest
     public static function pairingSystemChoices(): array
     {
         return PairingSystem::implementedValues();
+    }
+
+    /** @return list<string> */
+    public static function timeControlChoices(): array
+    {
+        return array_column(TimeControl::cases(), 'value');
     }
 
     public static function fromRequest(\WP_REST_Request $request): self
@@ -50,6 +61,9 @@ class CreateSeasonRequest
         }
         if ($request->get_param('pairing_system') !== null) {
             $dto->pairing_system = (string)$request->get_param('pairing_system');
+        }
+        if ($request->get_param('time_control') !== null) {
+            $dto->time_control = (string)$request->get_param('time_control');
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));

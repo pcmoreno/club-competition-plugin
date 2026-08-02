@@ -6,6 +6,7 @@ namespace SCS\Request;
 
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Enum\TimeControl;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class UpdateSeasonRequest
@@ -21,6 +22,9 @@ class UpdateSeasonRequest
 
     #[Assert\Choice(callback: [self::class, 'pairingSystemChoices'], message: 'Pairing system is not valid.')]
     public ?string $pairing_system = null;
+
+    #[Assert\Choice(callback: [self::class, 'timeControlChoices'], message: 'Time control is not valid.')]
+    public ?string $time_control = null;
 
     #[Assert\Choice(callback: [self::class, 'statusChoices'], message: 'Status is not valid.')]
     public ?string $status = null;
@@ -40,6 +44,12 @@ class UpdateSeasonRequest
     public static function pairingSystemChoices(): array
     {
         return PairingSystem::implementedValues();
+    }
+
+    /** @return list<string> */
+    public static function timeControlChoices(): array
+    {
+        return array_column(TimeControl::cases(), 'value');
     }
 
     /** @return list<string> */
@@ -66,6 +76,9 @@ class UpdateSeasonRequest
         }
         if ($request->get_param('pairing_system') !== null) {
             $dto->pairing_system = (string)$request->get_param('pairing_system');
+        }
+        if ($request->get_param('time_control') !== null) {
+            $dto->time_control = (string)$request->get_param('time_control');
         }
         if ($request->get_param('status') !== null) {
             $dto->status = (string)$request->get_param('status');
@@ -104,6 +117,9 @@ class UpdateSeasonRequest
         }
         if ($this->pairing_system !== null) {
             $data['pairing_system'] = $this->pairing_system;
+        }
+        if ($this->time_control !== null) {
+            $data['time_control'] = $this->time_control;
         }
         if ($this->status !== null) {
             $data['status'] = $this->status;

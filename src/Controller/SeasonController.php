@@ -8,6 +8,7 @@ use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\ScoringSystem;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
@@ -191,6 +192,7 @@ class SeasonController extends RestController
                 end_date:       $input->end_date,
                 pairing_system: PairingSystem::from($input->pairing_system),
                 categories:     $input->categories,
+                time_control:   TimeControl::from($input->time_control),
             );
 
             return $this->created($this->serializer->serialize($season, SerializerService::GROUP_ADMIN));
