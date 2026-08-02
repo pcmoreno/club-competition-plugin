@@ -137,6 +137,11 @@ class Container
 
         $container->register('knsb_name_normalizer', Services\KnsbNameNormalizer::class);
 
+        $container->register('knsb_rating_sync_service', Services\KnsbRatingSyncService::class)
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('knsb_rating_store'))
+            ->addArgument(new Reference('knsb_name_normalizer'));
+
         $container->register('season_import_service', Services\SeasonImportService::class)
             ->setPublic(true)
             ->addArgument(new Reference('transaction_manager'))
@@ -209,8 +214,7 @@ class Container
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('member_repository'))
-            ->addArgument(new Reference('knsb_rating_store'))
-            ->addArgument(new Reference('knsb_name_normalizer'))
+            ->addArgument(new Reference('knsb_rating_sync_service'))
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('serializer_service'))
             ->addArgument(new Reference('player_tournament_service'))

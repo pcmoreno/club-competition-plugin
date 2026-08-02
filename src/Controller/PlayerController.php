@@ -15,8 +15,7 @@ use SCS\Request\CreatePlayerRequest;
 use SCS\Request\InviteMemberRequest;
 use SCS\Request\UpdatePlayerRequest;
 use SCS\Services\AuthService;
-use SCS\Services\KnsbNameNormalizer;
-use SCS\Services\KnsbRatingStore;
+use SCS\Services\KnsbRatingSyncService;
 use SCS\Services\PlayerMergeService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SerializerService;
@@ -29,8 +28,7 @@ class PlayerController extends RestController
         ValidatorInterface $validator,
         private readonly PlayerRepository $playerRepository,
         private readonly MemberRepository $memberRepository,
-        private readonly KnsbRatingStore $knsbRatingStore,
-        private readonly KnsbNameNormalizer $knsbNameNormalizer,
+        private readonly KnsbRatingSyncService $knsbSync,
         private readonly AuthService $authService,
         private readonly SerializerService $serializer,
         private readonly PlayerTournamentService $playerTournamentService,
@@ -210,45 +208,48 @@ class PlayerController extends RestController
             if ($player === null) {
                 throw new NotFoundException('Player not found.');
             }
-            if ($player->knsb_id === null || $player->knsb_id === '') {
-                throw new ValidationException(['knsb_id' => 'This player has no KNSB id to sync.']);
-            }
-            if ($this->knsbRatingStore->read() === null) {
+            if (!$this->knsbSync->listAvailable()) {
                 throw new ConflictException('No KNSB rating list has been fetched yet.');
             }
 
-            $row = $this->knsbRatingStore->findRating($player->knsb_id);
-            if ($row === null) {
-                throw new NotFoundException('This KNSB id is not in the current rating list.');
-            }
+            // One player, so every per-player outcome the bulk run merely records
+            // is a failed request here.
+            $result = $this->knsbSync->sync($player);
 
-            $name = $this->knsbNameNormalizer->normalize((string)$row['name']);
-            if ($name === '') {
-                $name = $player->name;
-            }
-
-            try {
-                $this->playerRepository->applyKnsbData(
-                    $player->id,
-                    $name,
-                    $row['birth_year'] ?? null,
-                    (int)$row['rating'],
-                    current_time('mysql'),
-                );
-            } catch (UniqueConstraintViolationException) {
-                throw new ConflictException(sprintf(
-                    'Another player is already named "%s"; resolve the duplicate before syncing.',
-                    $name,
-                ));
+            switch ($result['outcome']) {
+                case KnsbRatingSyncService::OUTCOME_NO_KNSB_ID:
+                    throw new ValidationException(['knsb_id' => 'This player has no KNSB id to sync.']);
+                case KnsbRatingSyncService::OUTCOME_NOT_LISTED:
+                    throw new NotFoundException('This KNSB id is not in the current rating list.');
+                case KnsbRatingSyncService::OUTCOME_NAME_CONFLICT:
+                    throw new ConflictException(sprintf(
+                        'Another player is already named "%s"; resolve the duplicate before syncing.',
+                        $result['name'],
+                    ));
             }
 
             // The client invalidates and refetches the roster, so returning the
             // updated player (name + birth_year + knsb_elo + knsb_synced_at)
             // suffices here.
-            return $this->ok($this->serializer->serialize(
-                $this->playerRepository->findById($player->id),
-                SerializerService::GROUP_ADMIN
-            ));
+            return $this->ok($this->serializer->serialize($result['player'], SerializerService::GROUP_ADMIN));
+        });
+    }
+
+    /**
+     * Sync the whole roster against the last-fetched KNSB list (admin) — every
+     * player with a KNSB id, active or not. Players without one are skipped, and
+     * a player whose id is missing from the list (or whose KNSB name collides
+     * with another player) is reported rather than aborting the run. Returns the
+     * report the admin sees: counts, what changed per player, and what failed.
+     */
+    public function syncKnsbRatings(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () {
+            if (!$this->knsbSync->listAvailable()) {
+                throw new ConflictException('No KNSB rating list has been fetched yet.');
+            }
+
+            return $this->ok($this->knsbSync->syncAll());
         });
     }
 
