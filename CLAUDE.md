@@ -172,15 +172,30 @@ have no player record, so `/me/home` 404s for them and the Home tab is only
 offered to accounts with a linked player.
 
 **"I can't play this round"** (`POST`/`DELETE /me/rounds/{id}/absence`,
-`RoundAbsenceService`) has two modes, decided by round status:
+`RoundAbsenceService`) has two modes, decided by **whether the member is already
+paired** — not by round status:
 
-- `draft` — no pairings yet, so the absence is recorded outright
-  (`Absent` + `ByeType::Personal`, **not** a scored bye) and can be withdrawn.
-- `published` — the member is already on a board, so **nothing is written**; the
-  admins are emailed with the board and opponent and re-pair themselves. A member
-  action must never mutate a pairing: the opponent's board would change under
-  them.
-- `finalised` / `complete` — closed to both.
+- not on a board — the absence is recorded outright (`Absent` +
+  `ByeType::Personal`, **not** a scored bye) and can be withdrawn.
+- already paired — **nothing is written**; the admins are emailed with the board
+  and opponent and re-pair themselves. A member action must never mutate a
+  pairing: the opponent's board would change under them.
+- `finalised` / `complete` rounds are closed to both.
+
+Status is the wrong key here: `requireEditableRound` lets pairings be edited
+until a round is finalised, so a `draft` round routinely *has* pairings — draft
+is when the admin builds the board. Keying off status marked paired players
+absent and told the admin there was nothing to do.
+
+A member write never overwrites an attendance row that carries a `bye_type` the
+admin set (that's scored competition data); a bare status row stays overwritable.
+`declinableRounds()` returns a per-round `state` — `open` / `declared` /
+`notified` / `locked` — and the frontend renders from that rather than inferring
+one, so the withdraw affordance can't promise what the write path will refuse.
+
+Both writes are throttled through `RateLimiterService` (they mail every active
+admin), and the paired-member path carries a one-notice-per-round marker so a
+resubmit can't mail the admins again.
 
 Classical seasons only: a rapid or blitz evening is turn-up-or-don't, whereas a
 classical season turns the absence into a bye that affects scoring. The reason is

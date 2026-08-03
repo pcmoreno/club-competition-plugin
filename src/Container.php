@@ -141,7 +141,8 @@ class Container
             ->addArgument(new Reference('player_repository'))
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('player_display_service'))
-            ->addArgument(new Reference('email_notification_service'));
+            ->addArgument(new Reference('email_notification_service'))
+            ->addArgument(new Reference('rate_limiter_service'));
 
         $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
 

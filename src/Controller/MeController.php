@@ -48,8 +48,8 @@ class MeController extends RestController
     }
 
     /**
-     * "I can't play this round." What happens depends on the round: while it's
-     * still draft the absence is recorded, once pairings are out it only reaches
+     * "I can't play this round." What happens depends on whether they're already
+     * on a board: if not, the absence is recorded; if they are, it only reaches
      * the admin — see RoundAbsenceService. The reason is emailed, never stored.
      */
     public function declareAbsence(\WP_REST_Request $request): \WP_REST_Response
@@ -67,7 +67,7 @@ class MeController extends RestController
         });
     }
 
-    /** "I can play after all." Only while the round is still draft. */
+    /** "I can play after all." Only while they're still unpaired. */
     public function withdrawAbsence(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {

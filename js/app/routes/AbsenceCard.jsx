@@ -32,10 +32,13 @@ function optionLabel( entry ) {
 // MEMBER. "I can't play this round", under the next-game cards.
 //
 // One round per submission — miss two evenings, say so twice. What submitting
-// does depends on the round: while it's still draft the absence is recorded and
-// can be withdrawn here; once pairings are out it only emails the admin, who
-// marks it and re-pairs (the app never puts an absent player on a board). Only
-// classical tournaments offer it at all — see RoundAbsenceService.
+// does depends on whether you're already on a board: if you aren't, the absence
+// is recorded here and can be withdrawn; once you're paired it only emails the
+// admin, who marks it and re-pairs (the app never puts an absent player on a
+// board). Only classical tournaments offer it at all — see RoundAbsenceService.
+//
+// Every entry carries the server's `state`, which is what decides where it
+// renders — the client never infers it from the round's status.
 export function AbsenceCard( { declinable } ) {
 	const queryClient = useQueryClient();
 	const [ roundId, setRoundId ] = useState( '' );
@@ -72,8 +75,13 @@ export function AbsenceCard( { declinable } ) {
 		return null;
 	}
 
-	const open = declinable.filter( ( e ) => ! e.declared );
-	const declared = declinable.filter( ( e ) => e.declared );
+	const open = declinable.filter( ( e ) => e.state === 'open' );
+	const declared = declinable.filter( ( e ) => e.state === 'declared' );
+	// Already with the admin, or recorded by them: shown so the round doesn't
+	// silently vanish from the picker, but there's nothing to submit.
+	const withAdmin = declinable.filter(
+		( e ) => e.state === 'notified' || e.state === 'locked'
+	);
 	const selected = open.find( ( e ) => String( e.round.id ) === roundId );
 	const busy = declare.isPending || withdraw.isPending;
 
@@ -85,6 +93,7 @@ export function AbsenceCard( { declinable } ) {
 			return;
 		}
 		setSent( null );
+		declare.reset();
 		setConfirming( selected );
 	};
 
@@ -117,6 +126,25 @@ export function AbsenceCard( { declinable } ) {
 							>
 								I can play after all
 							</button>
+						</li>
+					) ) }
+				</ul>
+			) }
+
+			{ withAdmin.length > 0 && (
+				<ul className="mt-4 space-y-2">
+					{ withAdmin.map( ( entry ) => (
+						<li
+							key={ entry.round.id }
+							className="rounded border border-rule-soft px-3 py-2 text-sm text-ink-3"
+						>
+							{ entry.state === 'notified'
+								? `The admin has been told about ${ optionLabel(
+										entry
+								  ) } — they'll confirm it.`
+								: `${ optionLabel(
+										entry
+								  ) } is already recorded by the admin — talk to them to change it.` }
 						</li>
 					) ) }
 				</ul>
@@ -172,24 +200,6 @@ export function AbsenceCard( { declinable } ) {
 						</p>
 					) }
 
-					{ declare.isError && (
-						<p className="text-sm text-loss">
-							{ errorMessage( declare.error ) }
-						</p>
-					) }
-					{ withdraw.isError && (
-						<p className="text-sm text-loss">
-							{ errorMessage( withdraw.error ) }
-						</p>
-					) }
-					{ sent && (
-						<p className="text-sm text-win">
-							{ sent.declared
-								? 'Noted — you’re down as absent for that round.'
-								: 'Sent — the admin will confirm. You’ll see it here once they do.' }
-						</p>
-					) }
-
 					<button
 						type="submit"
 						className={ primaryBtn }
@@ -199,6 +209,28 @@ export function AbsenceCard( { declinable } ) {
 					</button>
 				</form>
 			) }
+
+			{ /* Outside the form: a withdraw can fail when every round is
+			     already declared and the form isn't rendered at all. */ }
+			{ withdraw.isError && (
+				<p className="mt-3 text-sm text-loss">
+					{ errorMessage( withdraw.error ) }
+				</p>
+			) }
+			{ sent &&
+				( sent.notified ? (
+					<p className="mt-3 text-sm text-win">
+						{ sent.declared
+							? 'Noted — you’re down as absent for that round.'
+							: 'Sent — the admin will confirm. You’ll see it here once they do.' }
+					</p>
+				) : (
+					<p className="mt-3 text-sm text-loss">
+						{ sent.declared
+							? 'You’re down as absent, but the admin couldn’t be emailed — please tell them another way.'
+							: 'The admin couldn’t be emailed and nothing has been recorded — please tell them another way.' }
+					</p>
+				) ) }
 
 			{ confirming && (
 				<ConfirmModal
@@ -222,6 +254,13 @@ export function AbsenceCard( { declinable } ) {
 					{ reason.trim() !== '' && (
 						<p className="mt-2">
 							The admin will see your reason: “{ reason.trim() }”
+						</p>
+					) }
+					{ /* In here, not in the page: the dialog stays open on
+					     failure, so anything behind it is unreachable. */ }
+					{ declare.isError && (
+						<p className="mt-2 text-loss">
+							{ errorMessage( declare.error ) }
 						</p>
 					) }
 				</ConfirmModal>

@@ -7,6 +7,7 @@ namespace SCS\Services;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Game;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Entity\SeasonPlayer;
@@ -127,7 +128,7 @@ class PlayerHomeService
             'category'   => $enrolment->category,
             'rating'     => $enrolment->elo_rating,
             'rank'       => $latest?->rank,
-            'field_size' => $latest === null ? null : count($this->snapshots->findLatestForSeason($season->id)),
+            'field_size' => $latest === null ? null : $this->snapshots->countLatestForSeason($season->id),
             'points'     => $latest?->classical_points,
             'wins'       => $latest?->wins,
             'draws'      => $latest?->draws,
@@ -167,15 +168,15 @@ class PlayerHomeService
             ],
         ];
 
-        foreach ($this->games->findByRound($round->id) as $game) {
-            $isWhite = $game->white_season_player_id === $enrolment->id;
-            if (!$isWhite && $game->black_season_player_id !== $enrolment->id) {
-                continue;
-            }
+        $game = $this->gameFor($round->id, $enrolment->id);
 
-            $display      = $this->playerDisplay->mapForSeason($season->id);
+        if ($game !== null) {
+            $isWhite = $game->white_season_player_id === $enrolment->id;
+
+            // Outside the search loop on purpose: mapForSeason reads the whole
+            // player table, so it must run once per pairing, never per game.
             $opponentSpId = $isWhite ? $game->black_season_player_id : $game->white_season_player_id;
-            $opponent     = $display[$opponentSpId] ?? null;
+            $opponent     = $this->playerDisplay->mapForSeason($season->id)[$opponentSpId] ?? null;
 
             return $base + [
                 'is_bye'   => false,
@@ -195,6 +196,19 @@ class PlayerHomeService
         $attendance = $this->attendance->findByRoundAndSeasonPlayer($round->id, $enrolment->id);
         if ($attendance?->bye_type === ByeType::PairingBye) {
             return $base + ['is_bye' => true, 'board' => null, 'color' => null, 'opponent' => null];
+        }
+
+        return null;
+    }
+
+    /** This player's game in the round, or null when they aren't paired. */
+    private function gameFor(int $roundId, int $seasonPlayerId): ?Game
+    {
+        foreach ($this->games->findByRound($roundId) as $game) {
+            if ($game->white_season_player_id === $seasonPlayerId
+                || $game->black_season_player_id === $seasonPlayerId) {
+                return $game;
+            }
         }
 
         return null;

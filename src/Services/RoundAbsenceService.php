@@ -11,11 +11,13 @@ use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
+use SCS\Entity\Game;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Entity\SeasonPlayer;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
+use SCS\Exception\TooManyRequestsException;
 use SCS\Repository\AdminRepository;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
@@ -27,16 +29,22 @@ use SCS\Repository\SeasonRepository;
 /**
  * A member telling the club they can't play a round.
  *
- * Two modes, decided by the round's status, because the app must never hold an
- * absent player who still occupies a board:
+ * Two modes, decided by whether the member is actually paired, because the app
+ * must never hold an absent player who still occupies a board:
  *
- *  - SELF (round is `draft`, no pairings yet) — we record the absence
- *    ourselves: AttendanceStatus::Absent + ByeType::Personal, which is *not* a
- *    scored bye. Withdrawable while the round is still draft.
- *  - REQUEST (round is `published`, the member is already paired) — we record
- *    nothing and only email the admins, including the board they're on. The
- *    admin marks the absence and re-pairs. A member action never mutates a
- *    pairing: the opponent's board would change under them.
+ *  - SELF (not on a board) — we record the absence ourselves:
+ *    AttendanceStatus::Absent + ByeType::Personal, which is *not* a scored bye.
+ *    Withdrawable while they stay unpaired.
+ *  - REQUEST (already paired) — we record nothing and only email the admins,
+ *    including the board they're on. The admin marks the absence and re-pairs.
+ *    A member action never mutates a pairing: the opponent's board would change
+ *    under them.
+ *
+ * Pairing presence decides this, not round status: `draft` is exactly the phase
+ * in which the admin builds the board (RoundService::requireEditableRound lets
+ * pairings be edited until the round is finalised), so a draft round routinely
+ * has pairings on it. Keying off the status would mark a paired player absent
+ * and tell the admin there was nothing to do.
  *
  * Finalised and complete rounds are closed to both.
  *
@@ -49,11 +57,34 @@ use SCS\Repository\SeasonRepository;
  */
 class RoundAbsenceService
 {
-    /** The round is still draft: we write the absence ourselves. */
+    /** Not on a board: we write the absence ourselves. */
     public const MODE_SELF = 'self';
 
-    /** Pairings are out: we only ask the admin to handle it. */
+    /** Already paired: we only ask the admin to handle it. */
     public const MODE_REQUEST = 'request';
+
+    /** Nothing recorded — declaring is offered. */
+    public const STATE_OPEN = 'open';
+
+    /** Our own Absent + Personal row, and still ours to withdraw. */
+    public const STATE_DECLARED = 'declared';
+
+    /** The admin has been told; nothing more for the member to do. */
+    public const STATE_NOTIFIED = 'notified';
+
+    /** Recorded, but not the member's to change — talk to the admin. */
+    public const STATE_LOCKED = 'locked';
+
+    // Every declaration mails every active admin, so the endpoint is a mail
+    // trigger and is throttled like the other two (login, password reset).
+    private const NOTICE_MAX_PER_WINDOW = 10;
+    private const NOTICE_DECAY_SECONDS  = 3600;
+
+    // A request against a paired round writes nothing, so nothing else can stop
+    // a repeat submission from mailing the admins again. This marker is the
+    // idempotency record: one notice per member per round, for long enough to
+    // outlive the round.
+    private const NOTICE_ONCE_SECONDS = 2592000;
 
     public function __construct(
         private readonly SeasonRepository $seasons,
@@ -65,6 +96,7 @@ class RoundAbsenceService
         private readonly AdminRepository $admins,
         private readonly PlayerDisplayService $playerDisplay,
         private readonly EmailNotificationService $email,
+        private readonly RateLimiterService $rateLimiter,
     ) {
     }
 
@@ -78,7 +110,7 @@ class RoundAbsenceService
      *     season: array{id: int, name: string},
      *     round: array{id: int, number: int, date: ?string, status: string},
      *     mode: string,
-     *     declared: bool
+     *     state: string
      * }>
      */
     public function declinableRounds(int $playerId): array
@@ -95,22 +127,27 @@ class RoundAbsenceService
                 continue;
             }
 
+            // One query each rather than one per round: this feeds /me/home,
+            // the view every member lands on after login.
+            $attendanceByRound = $this->attendance->findBySeasonPlayer($enrolment->id);
+            $pairedRounds      = $this->pairedRoundIds($enrolment->id);
+
             foreach ($this->rounds->findBySeason($season->id) as $round) {
-                $mode = $this->modeFor($round);
+                $mode = $this->modeFor($round, isset($pairedRounds[$round->id]));
                 if ($mode === null) {
                     continue;
                 }
 
                 $entries[] = [
-                    'season'   => ['id' => $season->id, 'name' => $season->name],
-                    'round'    => [
+                    'season' => ['id' => $season->id, 'name' => $season->name],
+                    'round'  => [
                         'id'     => $round->id,
                         'number' => $round->round_number,
                         'date'   => $round->date?->format('Y-m-d'),
                         'status' => $round->status->value,
                     ],
-                    'mode'     => $mode,
-                    'declared' => $this->declaredAbsence($round->id, $enrolment->id) !== null,
+                    'mode'   => $mode,
+                    'state'  => $this->stateFor($mode, $attendanceByRound[$round->id] ?? null, $round->id, $enrolment->id),
                 ];
             }
         }
@@ -126,51 +163,82 @@ class RoundAbsenceService
     /**
      * Declare that this player can't play the round. Returns the mode that was
      * applied, so the caller can tell the member whether it's recorded or with
-     * the admin.
+     * the admin, and whether the mail actually went out.
      *
-     * @return array{mode: string, declared: bool}
+     * @return array{mode: string, declared: bool, notified: bool}
      */
     public function declare(int $playerId, int $roundId, ?string $reason): array
     {
         [$round, $season, $enrolment] = $this->resolve($playerId, $roundId);
 
-        $mode = $this->modeFor($round);
+        $game = $this->pairedGame($round->id, $enrolment->id);
+        $mode = $this->modeFor($round, $game !== null);
         if ($mode === null) {
             throw new ConflictException('This round is closed — talk to the admin.');
         }
 
+        $this->requireNoticeAllowance($playerId);
+
+        // A bye the admin classified is competition data that scores: overwriting
+        // it here would let a member rewrite the standings. A bare status row
+        // (no bye_type) carries no such decision and stays overwritable, so the
+        // normal path is untouched.
+        $existing = $this->attendance->findByRoundAndSeasonPlayer($round->id, $enrolment->id);
+        if ($existing !== null && $existing->bye_type !== null) {
+            throw new ConflictException($this->isOwnDeclaration($existing)
+                ? 'You have already said you can\'t play this round.'
+                : 'The admin has already recorded your attendance for this round — talk to them.');
+        }
+
+        if ($mode === self::MODE_REQUEST && $this->alreadyNotified($round->id, $enrolment->id)) {
+            throw new ConflictException('You have already told the admin about this round.');
+        }
+
         if ($mode === self::MODE_SELF) {
-            if ($this->declaredAbsence($round->id, $enrolment->id) !== null) {
-                throw new ConflictException('You have already said you can\'t play this round.');
-            }
             $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal);
         }
 
-        $this->notify($mode, 'declared', $playerId, $round, $season, $enrolment, $reason);
+        $notified = $this->notify($mode, 'declared', $playerId, $round, $season, $enrolment, $reason, $game);
 
-        return ['mode' => $mode, 'declared' => $mode === self::MODE_SELF];
+        // Only once the mail actually went out: a request writes nothing, so
+        // marking a failed send as "already told them" would leave the member
+        // with no way to tell them at all.
+        if ($mode === self::MODE_REQUEST && $notified) {
+            $this->rateLimiter->hit($this->noticeOnceKey($round->id, $enrolment->id), self::NOTICE_ONCE_SECONDS);
+        }
+
+        return ['mode' => $mode, 'declared' => $mode === self::MODE_SELF, 'notified' => $notified];
     }
 
     /**
      * Withdraw a declared absence ("I can play after all"). Only the row this
      * service wrote is removed — an admin re-classification (a club-duty bye,
-     * say) is their decision to reverse, not the member's.
+     * say) is their decision to reverse, not the member's. Once they're on a
+     * board it stops being theirs to undo either: the admin paired them knowing
+     * the absence, and unpicking that is the admin's call.
      */
     public function withdraw(int $playerId, int $roundId): void
     {
         [$round, $season, $enrolment] = $this->resolve($playerId, $roundId);
 
-        if ($this->modeFor($round) !== self::MODE_SELF) {
-            throw new ConflictException('Pairings are already out for this round — talk to the admin.');
+        $mode = $this->modeFor($round, $this->pairedGame($round->id, $enrolment->id) !== null);
+        if ($mode === null) {
+            throw new ConflictException('This round is closed — talk to the admin.');
+        }
+        if ($mode !== self::MODE_SELF) {
+            throw new ConflictException('You\'re already paired for this round — talk to the admin.');
         }
 
-        if ($this->declaredAbsence($round->id, $enrolment->id) === null) {
+        $existing = $this->attendance->findByRoundAndSeasonPlayer($round->id, $enrolment->id);
+        if ($existing === null || !$this->isOwnDeclaration($existing)) {
             throw new NotFoundException('You have nothing to withdraw for this round.');
         }
 
+        $this->requireNoticeAllowance($playerId);
+
         $this->attendance->delete($round->id, $enrolment->id);
 
-        $this->notify(self::MODE_SELF, 'withdrawn', $playerId, $round, $season, $enrolment, null);
+        $this->notify(self::MODE_SELF, 'withdrawn', $playerId, $round, $season, $enrolment, null, null);
     }
 
     /**
@@ -209,37 +277,103 @@ class RoundAbsenceService
             && $season->time_control === TimeControl::Classical;
     }
 
-    /** Which mode this round's status allows, or null when it's closed. */
-    private function modeFor(Round $round): ?string
-    {
-        return match ($round->status) {
-            RoundStatus::Draft     => self::MODE_SELF,
-            RoundStatus::Published => self::MODE_REQUEST,
-            default                => null,
-        };
-    }
-
     /**
-     * This player's own declaration for the round, if any. Deliberately narrow:
-     * only Absent + Personal is ours to report as declared or to withdraw.
+     * Which mode applies, or null when the round is closed to both. Being on a
+     * board is what decides it — see the class docblock.
      */
-    private function declaredAbsence(int $roundId, int $seasonPlayerId): ?Attendance
+    private function modeFor(Round $round, bool $paired): ?string
     {
-        $attendance = $this->attendance->findByRoundAndSeasonPlayer($roundId, $seasonPlayerId);
-
-        if ($attendance === null
-            || $attendance->status !== AttendanceStatus::Absent
-            || $attendance->bye_type !== ByeType::Personal) {
+        if ($round->status !== RoundStatus::Draft && $round->status !== RoundStatus::Published) {
             return null;
         }
 
-        return $attendance;
+        return $paired ? self::MODE_REQUEST : self::MODE_SELF;
     }
 
     /**
-     * Tell the admins. For a request against a published round this carries the
-     * board the member is currently on, which is the whole point — that's what
-     * has to be re-paired.
+     * What the member may do with this round, so the card copy and the withdraw
+     * affordance can't promise something the write path will refuse.
+     */
+    private function stateFor(string $mode, ?Attendance $attendance, int $roundId, int $seasonPlayerId): string
+    {
+        if ($attendance !== null && $attendance->bye_type !== null) {
+            return $this->isOwnDeclaration($attendance) && $mode === self::MODE_SELF
+                ? self::STATE_DECLARED
+                : self::STATE_LOCKED;
+        }
+
+        if ($mode === self::MODE_REQUEST && $this->alreadyNotified($roundId, $seasonPlayerId)) {
+            return self::STATE_NOTIFIED;
+        }
+
+        return self::STATE_OPEN;
+    }
+
+    /**
+     * Whether this row is the one this service wrote. Deliberately narrow: only
+     * Absent + Personal is ours to report as declared or to withdraw.
+     */
+    private function isOwnDeclaration(Attendance $attendance): bool
+    {
+        return $attendance->status === AttendanceStatus::Absent
+            && $attendance->bye_type === ByeType::Personal;
+    }
+
+    /** @throws TooManyRequestsException when this member is mailing too fast. */
+    private function requireNoticeAllowance(int $playerId): void
+    {
+        if ($this->rateLimiter->tooManyAttempts($this->noticeKey($playerId), self::NOTICE_MAX_PER_WINDOW)) {
+            throw new TooManyRequestsException('You\'ve sent a lot of absence notices — please try again later.');
+        }
+    }
+
+    private function alreadyNotified(int $roundId, int $seasonPlayerId): bool
+    {
+        return $this->rateLimiter->tooManyAttempts($this->noticeOnceKey($roundId, $seasonPlayerId), 1);
+    }
+
+    private function noticeKey(int $playerId): string
+    {
+        return 'absence_player_' . $playerId;
+    }
+
+    private function noticeOnceKey(int $roundId, int $seasonPlayerId): string
+    {
+        return 'absence_notice_' . $roundId . '_' . $seasonPlayerId;
+    }
+
+    /** The member's game in this round, or null when they aren't paired. */
+    private function pairedGame(int $roundId, int $seasonPlayerId): ?Game
+    {
+        foreach ($this->games->findByRound($roundId) as $game) {
+            if ($game->white_season_player_id === $seasonPlayerId
+                || $game->black_season_player_id === $seasonPlayerId) {
+                return $game;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Every round of this season the player is already paired in.
+     *
+     * @return array<int, true> keyed by round_id
+     */
+    private function pairedRoundIds(int $seasonPlayerId): array
+    {
+        $rounds = [];
+        foreach ($this->games->findBySeasonPlayer($seasonPlayerId) as $game) {
+            $rounds[$game->round_id] = true;
+        }
+
+        return $rounds;
+    }
+
+    /**
+     * Tell the admins, and say whether the mail went out. When the member is on
+     * a board this carries it, which is the whole point — that's what has to be
+     * re-paired.
      */
     private function notify(
         string $mode,
@@ -249,14 +383,17 @@ class RoundAbsenceService
         Season $season,
         SeasonPlayer $enrolment,
         ?string $reason,
-    ): void {
+        ?Game $game,
+    ): bool {
         $player = $this->players->findById($playerId);
         if ($player === null) {
             throw new NotFoundException('Player not found.');
         }
 
-        $this->email->sendAbsenceNotice(
-            $this->adminEmails(),
+        $recipients = $this->adminEmails();
+
+        $sent = $this->email->sendAbsenceNotice(
+            $recipients,
             $player->name,
             $season->name,
             $round->round_number,
@@ -264,8 +401,24 @@ class RoundAbsenceService
             $mode,
             $action,
             $reason,
-            $mode === self::MODE_REQUEST ? $this->pairingLine($season->id, $round->id, $enrolment->id) : null,
+            $game === null ? null : $this->pairingLine($game, $season->id, $enrolment->id),
         );
+
+        $this->rateLimiter->hit($this->noticeKey($playerId), self::NOTICE_DECAY_SECONDS);
+
+        // For a request nothing is written, so this line is the only trace the
+        // event happened at all. Ids only — no names, no reason.
+        error_log(sprintf(
+            '[SCS] absence %s player=%d round=%d mode=%s recipients=%d sent=%s',
+            $action,
+            $playerId,
+            $round->id,
+            $mode,
+            count($recipients),
+            $sent ? 'yes' : 'no',
+        ));
+
+        return $sent;
     }
 
     /** @return list<string> */
@@ -277,26 +430,18 @@ class RoundAbsenceService
         );
     }
 
-    /** e.g. "board 12 as Black against Jan Burggraaf", or null when unpaired. */
-    private function pairingLine(int $seasonId, int $roundId, int $seasonPlayerId): ?string
+    /** e.g. "board 12 as Black against Jan Burggraaf". */
+    private function pairingLine(Game $game, int $seasonId, int $seasonPlayerId): string
     {
-        foreach ($this->games->findByRound($roundId) as $game) {
-            $isWhite = $game->white_season_player_id === $seasonPlayerId;
-            if (!$isWhite && $game->black_season_player_id !== $seasonPlayerId) {
-                continue;
-            }
+        $isWhite  = $game->white_season_player_id === $seasonPlayerId;
+        $display  = $this->playerDisplay->mapForSeason($seasonId);
+        $opponent = $display[$isWhite ? $game->black_season_player_id : $game->white_season_player_id] ?? null;
 
-            $display  = $this->playerDisplay->mapForSeason($seasonId);
-            $opponent = $display[$isWhite ? $game->black_season_player_id : $game->white_season_player_id] ?? null;
-
-            return sprintf(
-                'board %s as %s against %s',
-                $game->board ?? '?',
-                $isWhite ? 'White' : 'Black',
-                $opponent['name'] ?? 'an unknown opponent',
-            );
-        }
-
-        return null;
+        return sprintf(
+            'board %s as %s against %s',
+            $game->board ?? '?',
+            $isWhite ? 'White' : 'Black',
+            $opponent['name'] ?? 'an unknown opponent',
+        );
     }
 }
