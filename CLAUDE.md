@@ -102,12 +102,19 @@ in the UI.
 
 ### Keizer Pairing System — NOT IMPLEMENTED YET
 
-The Keizer system is the headline goal, but **no Keizer engine exists**. Of the
-`PairingSystem` cases only `manual` works; `PairingEngineResolver` and
-`ScoringStrategyResolver` throw a `ConflictException` for the rest, and
-`CreateSeasonRequest` only offers the implemented ones. Scoring today is
+The Keizer system is the headline goal, but **no Keizer engine exists**. What
+gates a season is whether its *scoring* can be computed, and **Keizer is the only
+system that can't**: `ScoringStrategyResolver` throws a `ConflictException` for
+it alone, and `PairingSystem::implementedValues()` excludes it, so neither
+`CreateSeasonRequest` nor `UpdateSeasonRequest` accepts it. `swiss`,
+`round-robin-full` and `round-robin-groups` *are* selectable and score fine as
 `StandardScoring` (classical points + configurable tiebreaks) under
 `src/Engine/Scoring/`.
+
+No pairing **generator** exists for any system — `PairingEngineResolver` throws
+for everything except `manual`, so boards are hand-built whatever the season
+says. Pairing system and scoring system are separate axes here; don't read
+"Swiss is selectable" as "Swiss pairs itself".
 
 The seam is in place — implement `ScoringStrategyInterface` and register it in
 the resolver. The intended behaviour, for whoever builds it:

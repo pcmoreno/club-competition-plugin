@@ -57,7 +57,9 @@ class GameRepository
         return array_map($this->hydrate(...), $rows);
     }
 
-    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board = null, ?GameResult $result = null, TimeControl $time_control = TimeControl::Classical): Game
+    // time_control is required, not defaulted: a silent Classical default let the
+    // import path create games under the wrong tempo without any caller noticing.
+    public function create(int $round_id, int $white_season_player_id, int $black_season_player_id, ?int $board, ?GameResult $result, TimeControl $time_control): Game
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'games', [
             'round_id'               => $round_id,

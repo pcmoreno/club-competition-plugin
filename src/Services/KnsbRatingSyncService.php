@@ -24,19 +24,17 @@ use SCS\Repository\PlayerRepository;
  */
 class KnsbRatingSyncService
 {
-    /** The list was applied and at least one field changed. */
     public const OUTCOME_UPDATED = 'updated';
 
-    /** The list was applied but every field already matched. */
+    // Applied, but every field already matched — distinct from not applied.
     public const OUTCOME_UNCHANGED = 'unchanged';
 
-    /** No knsb_id, so there is nothing to match on. */
     public const OUTCOME_NO_KNSB_ID = 'no_knsb_id';
 
-    /** The knsb_id isn't in the currently stored list. */
+    // The knsb_id isn't in the list currently stored on the server.
     public const OUTCOME_NOT_LISTED = 'not_listed';
 
-    /** KNSB's name for this player is already taken by another player row. */
+    // KNSB's name for this player is already taken by another player row.
     public const OUTCOME_NAME_CONFLICT = 'name_conflict';
 
     public function __construct(

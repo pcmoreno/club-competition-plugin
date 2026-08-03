@@ -70,7 +70,7 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control = TimeControl::Classical): Season
+    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control): Season
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'seasons', [
             'name'           => $name,

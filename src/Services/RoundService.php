@@ -54,7 +54,8 @@ final class RoundService
             $white,
             $black,
             $board ?? $this->nextBoard($round->id),
-            time_control: $season->time_control,
+            null,
+            $season->time_control,
         );
     }
 
