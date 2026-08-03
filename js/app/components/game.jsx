@@ -1,6 +1,22 @@
 // Shared presentation for rendering a game's players and result, used by the
 // Pairings and Round history views (and later Player detail).
 
+// TimeControl enum (src/Entity/Enum/TimeControl.php). Lives here rather than in
+// the admin's tournamentShared so the viewer can label a tournament's tempo
+// without importing across the admin boundary.
+export const TIME_CONTROL_OPTIONS = [
+	{ value: 'classical', label: 'Classical' },
+	{ value: 'rapid', label: 'Rapid' },
+	{ value: 'blitz', label: 'Blitz' },
+];
+
+// The internal competition is classical, so that's where a new tournament starts.
+export const DEFAULT_TIME_CONTROL = 'classical';
+
+export const TIME_CONTROL_LABELS = Object.fromEntries(
+	TIME_CONTROL_OPTIONS.map( ( o ) => [ o.value, o.label ] )
+);
+
 // Chess-piece glyph by standings rank within a field of `total` players:
 // ♔ #1 → ♕ #2–3 → then ♖ ♗ ♘ split the rest of the TOP half → and the whole
 // BOTTOM half is ♙ (a chess set is half pawns). Shared by the standings table

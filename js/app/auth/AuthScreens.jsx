@@ -90,8 +90,10 @@ export function Login() {
 	const onSubmit = async ( { email, password } ) => {
 		setFormError( null );
 		try {
-			await login( email, password );
-			navigate( '/pairings' );
+			// Members land on their own home page; an admin account has no
+			// player record, so there is nothing there for them.
+			const role = await login( email, password );
+			navigate( role === 'ROLE_MEMBER' ? '/home' : '/pairings' );
 		} catch ( err ) {
 			setFormError(
 				err instanceof ApiError && err.status === 401

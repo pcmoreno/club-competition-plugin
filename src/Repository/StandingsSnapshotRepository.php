@@ -57,24 +57,31 @@ class StandingsSnapshotRepository
      */
     public function findLatestForSeason(int $season_id): array
     {
-        // "Latest" means the highest round_number that has a snapshot — not the
-        // highest round_id. A deleted-and-recreated or out-of-order round would
-        // break id ordering, so resolve it through the rounds table instead.
-        $latestRoundId = $this->connection->createQueryBuilder()
-            ->select('s.round_id')
-            ->from(SCS_TABLE_PREFIX . 'standings_snapshots', 's')
-            ->innerJoin('s', SCS_TABLE_PREFIX . 'rounds', 'r', 's.round_id = r.id')
-            ->where('s.season_id = :season_id')
-            ->setParameter('season_id', $season_id)
-            ->orderBy('r.round_number', 'DESC')
-            ->setMaxResults(1)
-            ->fetchOne();
+        $latestRoundId = $this->latestSnapshotRoundId($season_id);
 
-        if ($latestRoundId === false || $latestRoundId === null) {
-            return [];
+        return $latestRoundId === null ? [] : $this->findByRound($latestRoundId);
+    }
+
+    /**
+     * How many players the current standings hold — the field size behind a
+     * "12th of 34". Counts in SQL rather than fetching the rows to count them:
+     * the caller only ever wanted the number.
+     */
+    public function countLatestForSeason(int $season_id): int
+    {
+        $latestRoundId = $this->latestSnapshotRoundId($season_id);
+        if ($latestRoundId === null) {
+            return 0;
         }
 
-        return $this->findByRound((int)$latestRoundId);
+        return (int)$this->connection->createQueryBuilder()
+            ->select('COUNT(*)')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots')
+            ->where('round_id = :round_id')
+            ->andWhere('season_id = :season_id')
+            ->setParameter('round_id', $latestRoundId)
+            ->setParameter('season_id', $season_id)
+            ->fetchOne();
     }
 
     /**
@@ -177,6 +184,27 @@ class StandingsSnapshotRepository
     public function deleteBySeason(int $season_id): void
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'standings_snapshots', [ 'season_id' => $season_id ]);
+    }
+
+    /**
+     * The round whose snapshot is the season's current standings. "Latest" means
+     * the highest round_number that has a snapshot — not the highest round_id. A
+     * deleted-and-recreated or out-of-order round would break id ordering, so
+     * resolve it through the rounds table instead.
+     */
+    private function latestSnapshotRoundId(int $season_id): ?int
+    {
+        $roundId = $this->connection->createQueryBuilder()
+            ->select('s.round_id')
+            ->from(SCS_TABLE_PREFIX . 'standings_snapshots', 's')
+            ->innerJoin('s', SCS_TABLE_PREFIX . 'rounds', 'r', 's.round_id = r.id')
+            ->where('s.season_id = :season_id')
+            ->setParameter('season_id', $season_id)
+            ->orderBy('r.round_number', 'DESC')
+            ->setMaxResults(1)
+            ->fetchOne();
+
+        return $roundId === false || $roundId === null ? null : (int)$roundId;
     }
 
     private function hydrate(array $row): StandingsSnapshot

@@ -6,6 +6,10 @@ namespace SCS\Services;
 
 class EmailNotificationService
 {
+    // Mirrors RoundAbsenceService::MODE_REQUEST — kept as a local constant so
+    // the mailer doesn't depend on the service that calls it.
+    private const ABSENCE_MODE_REQUEST = 'request';
+
     public function sendInvite(string $email, string $token): bool
     {
         $url = $this->frontendUrl('/accept-invite?token=' . urlencode($token));
@@ -28,6 +32,74 @@ class EmailNotificationService
             . "This link expires in 1 hour. If you didn't request this, ignore this email.";
 
         return wp_mail($email, $subject, $body);
+    }
+
+    /**
+     * Tell the admins a member can't play a round. Two shapes, because the two
+     * modes need different things from the reader: a `self` notice is already
+     * recorded and is FYI, while a `request` arrives for a member who is already
+     * on a board and asks them to act — so it carries the board to re-pair.
+     *
+     * The reason is passed through, never stored (see RoundAbsenceService).
+     *
+     * @param list<string> $recipients active admins
+     * @param string $action 'declared' or 'withdrawn'
+     */
+    public function sendAbsenceNotice(
+        array $recipients,
+        string $playerName,
+        string $seasonName,
+        int $roundNumber,
+        ?string $roundDate,
+        string $mode,
+        string $action,
+        ?string $reason,
+        ?string $pairing,
+    ): bool {
+        if ($recipients === []) {
+            return false;
+        }
+
+        $round     = sprintf('round %d%s', $roundNumber, $roundDate !== null ? ' (' . $roundDate . ')' : '');
+        $reasonLine = $this->reasonLine($reason);
+
+        if ($action === 'withdrawn') {
+            $subject = sprintf('%s can play %s after all', $playerName, $round);
+            $body    = "{$playerName} has withdrawn their absence for {$round} of {$seasonName}.\n\n"
+                . "They are back in for this round; the absence has been removed.";
+
+            return wp_mail($recipients, $subject, $body);
+        }
+
+        if ($mode === self::ABSENCE_MODE_REQUEST) {
+            $subject = sprintf('Action needed: %s can\'t play %s', $playerName, $round);
+            $body    = "{$playerName} can't play {$round} of {$seasonName}.\n\n"
+                . "They are already paired, so NOTHING has been changed — "
+                . "please mark the absence and re-pair.\n\n"
+                . ($pairing !== null ? "They are currently on {$pairing}.\n\n" : "Their board could not be resolved.\n\n")
+                . $reasonLine;
+
+            return wp_mail($recipients, $subject, $body);
+        }
+
+        $subject = sprintf('%s can\'t play %s', $playerName, $round);
+        $body    = "{$playerName} has said they can't play {$round} of {$seasonName}.\n\n"
+            . "They are not paired in this round, so they have been marked absent (personal, no scored bye).\n\n"
+            . $reasonLine;
+
+        return wp_mail($recipients, $subject, $body);
+    }
+
+    /**
+     * The member's own words, flattened to one line and quoted. Interior
+     * newlines would otherwise let a member lay out extra paragraphs that read
+     * as system-generated in a mail the admin trusts.
+     */
+    private function reasonLine(?string $reason): string
+    {
+        $reason = $reason === null ? '' : trim((string)preg_replace('/\s+/u', ' ', $reason));
+
+        return $reason === '' ? 'No reason given.' : "Reason given: \"{$reason}\"\n";
     }
 
     /**

@@ -89,6 +89,19 @@ class AttendanceRepository
         }
     }
 
+    /**
+     * Drop one player's attendance row for a round, back to "nothing recorded".
+     * Used when a member withdraws a declared absence: there is no "present"
+     * to set — presence is what the admin asserts when finalising the round.
+     */
+    public function delete(int $round_id, int $season_player_id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'attendance', [
+            'round_id'         => $round_id,
+            'season_player_id' => $season_player_id,
+        ]);
+    }
+
     public function deleteBySeason(int $season_id): void
     {
         // Attendance references a round, not the season directly. Multi-table

@@ -22,6 +22,7 @@ class RestApi
             $rounds          = $container->get('round_controller');
             $import          = $container->get('import_controller');
             $knsb            = $container->get('knsb_controller');
+            $me              = $container->get('me_controller');
 
             // Parse the auth cookie's JWT and re-validate it against the DB
             // (account still exists, still Active, not older than a password
@@ -173,6 +174,31 @@ class RestApi
                 'methods'             => 'POST',
                 'callback'            => [$auth, 'changePassword'],
                 'permission_callback' => $isMemberWrite,
+            ]);
+
+            // ── Me ────────────────────────────────────────────────────────────
+            // The signed-in member's own view. The player is taken from the JWT,
+            // never from the request, so these can only ever answer for the
+            // caller.
+            register_rest_route('scs/v1', '/me/home', [
+                'methods'             => 'GET',
+                'callback'            => [$me, 'home'],
+                'permission_callback' => $isMember,
+            ]);
+
+            // "I can't play this round" / "I can after all". Which of the two
+            // this does depends on the round's status — see RoundAbsenceService.
+            register_rest_route('scs/v1', '/me/rounds/(?P<id>\d+)/absence', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$me, 'declareAbsence'],
+                    'permission_callback' => $isMemberWrite,
+                ],
+                [
+                    'methods'             => 'DELETE',
+                    'callback'            => [$me, 'withdrawAbsence'],
+                    'permission_callback' => $isMemberWrite,
+                ],
             ]);
 
             // ── Players ───────────────────────────────────────────────────────

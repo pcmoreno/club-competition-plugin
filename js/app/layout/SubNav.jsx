@@ -5,9 +5,12 @@ import { Link } from '../router/router';
  * Role-gated page tabs. Access model (see dev/page-inventory.md):
  *   public  → Pairings, Standings
  *   member  → + Round history, Players
+ *   player  → + Home (members only: an admin account has no player record, so
+ *             /me/home has nothing to answer with)
  *   admin   → + Admin (carries a lock badge; admin sub-app is a later build)
  */
 const TABS = [
+	{ to: '/home', label: 'Home', need: 'player' },
 	{ to: '/pairings', label: 'Pairings', need: 'public' },
 	{ to: '/standings', label: 'Standings', need: 'public' },
 	{ to: '/rounds', label: 'Round history', need: 'member' },
@@ -16,9 +19,12 @@ const TABS = [
 ];
 
 export function SubNav( { activePath } ) {
-	const { isMember, isAdmin } = useAuth();
+	const { isMember, isAdmin, playerId } = useAuth();
 
 	const visible = TABS.filter( ( t ) => {
+		if ( t.need === 'player' ) {
+			return playerId !== null && playerId !== undefined;
+		}
 		if ( t.need === 'member' ) {
 			return isMember;
 		}

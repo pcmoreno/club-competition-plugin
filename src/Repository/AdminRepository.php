@@ -38,6 +38,25 @@ class AdminRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    /**
+     * Every active admin — the recipients for notifications that go to "the
+     * admins" rather than one person (a member declaring they can't play).
+     *
+     * @return list<Admin>
+     */
+    public function findAllActive(): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->where('status = :status')
+            ->setParameter('status', AdminStatus::Active->value)
+            ->orderBy('name', 'ASC')
+            ->fetchAllAssociative();
+
+        return array_values(array_map($this->hydrate(...), $rows));
+    }
+
     public function countAll(): int
     {
         return (int)$this->connection->createQueryBuilder()

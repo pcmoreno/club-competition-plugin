@@ -123,6 +123,27 @@ class Container
             ->addArgument(new Reference('season_player_repository'))
             ->addArgument(new Reference('member_repository'));
 
+        $container->register('player_home_service', Services\PlayerHomeService::class)
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('standings_snapshot_repository'))
+            ->addArgument(new Reference('player_display_service'));
+
+        $container->register('round_absence_service', Services\RoundAbsenceService::class)
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('season_player_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('game_repository'))
+            ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('player_display_service'))
+            ->addArgument(new Reference('email_notification_service'))
+            ->addArgument(new Reference('rate_limiter_service'));
+
         $container->register('knsb_rating_list_fetcher', Services\KnsbRatingListFetcher::class);
 
         // Under uploads/, not the plugin dir: the list is personal data of ~20k
@@ -207,6 +228,15 @@ class Container
             ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('serializer_service'));
+
+        $container->register('me_controller', Controller\MeController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('auth_context_service'))
+            ->addArgument(new Reference('player_repository'))
+            ->addArgument(new Reference('player_home_service'))
+            ->addArgument(new Reference('round_absence_service'))
             ->addArgument(new Reference('serializer_service'));
 
         $container->register('player_controller', Controller\PlayerController::class)
