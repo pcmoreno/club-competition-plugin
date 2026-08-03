@@ -125,10 +125,16 @@ export function TournamentPairingsTab( { season, players } ) {
 	const createRound = useMutation( {
 		mutationFn: () => api.post( `seasons/${ season.id }/rounds`, {} ),
 		onSuccess: ( created ) => {
-			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			if ( created?.id ) {
+				// Seed the list before selecting: the selection is only honoured
+				// when it's found in `ordered`, so without this the tab falls
+				// back to the previous round until the refetch lands.
+				queryClient.setQueryData( roundsKey, ( prev ) =>
+					Array.isArray( prev ) ? [ ...prev, created ] : [ created ]
+				);
 				setSelectedRoundId( created.id );
 			}
+			queryClient.invalidateQueries( { queryKey: roundsKey } );
 		},
 	} );
 

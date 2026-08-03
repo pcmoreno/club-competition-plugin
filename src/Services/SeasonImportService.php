@@ -10,6 +10,7 @@ use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
+use SCS\Entity\Enum\TimeControl;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
@@ -101,7 +102,8 @@ class SeasonImportService
     /** @return array<string, int> */
     private function apply(array $data): array
     {
-        $seasonId = $this->upsertSeason($data['season']);
+        $seasonId    = $this->upsertSeason($data['season']);
+        $timeControl = $this->timeControl($data['season']);
 
         // Player registry: upsert by name first, so every name in the season
         // data resolves to a stable player id (existing ones keep their id).
@@ -174,6 +176,7 @@ class SeasonImportService
                     $resolveEnrolment($g['black']),
                     $g['board'] ?? null,
                     isset($g['result']) ? GameResult::from($g['result']) : null,
+                    $timeControl,
                 );
                 $counts['games']++;
             }
@@ -207,6 +210,17 @@ class SeasonImportService
         return ['players_created' => $playersCreated, 'season_players' => count($seasonPlayerIdByName)] + $counts;
     }
 
+    /**
+     * Optional in the fixture format, so the shipped classical fixtures keep
+     * importing unchanged.
+     *
+     * @param array<string, mixed> $s
+     */
+    private function timeControl(array $s): TimeControl
+    {
+        return TimeControl::from($s['time_control'] ?? TimeControl::Classical->value);
+    }
+
     /** Find-or-create the season by name, then sync its metadata. */
     private function upsertSeason(array $s): int
     {
@@ -219,6 +233,7 @@ class SeasonImportService
                 $s['end_date'] ?? null,
                 PairingSystem::from($s['pairing_system'] ?? PairingSystem::Keizer->value),
                 $s['categories'] ?? [],
+                $this->timeControl($s),
             );
         }
 
@@ -227,6 +242,7 @@ class SeasonImportService
             'start_date'     => $s['start_date'] ?? null,
             'end_date'       => $s['end_date'] ?? null,
             'pairing_system' => (PairingSystem::from($s['pairing_system'] ?? PairingSystem::Keizer->value))->value,
+            'time_control'   => $this->timeControl($s)->value,
             // An import always seeds a finished, historical competition (a full
             // scrape of a past season), so it is always marked "completed" —
             // regardless of what the fixture's status field says.

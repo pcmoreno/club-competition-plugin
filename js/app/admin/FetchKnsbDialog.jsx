@@ -30,7 +30,8 @@ function Row( { label, value } ) {
 // currently stored on the server (date + when it was downloaded + how many
 // players), and downloads the latest one server-side (the host has no CLI/cron
 // to run the fetch). Fetching only refreshes the stored list — it does NOT
-// change any player's rating; that's applied per player from their Sync action.
+// change any player's rating; that's applied either from the roster's "Sync KNSB
+// ratings" action for everyone, or per player from their own Sync action.
 export function FetchKnsbDialog( { onClose } ) {
 	const queryClient = useQueryClient();
 	const status = useQuery( {
@@ -50,7 +51,7 @@ export function FetchKnsbDialog( { onClose } ) {
 	return (
 		<Dialog
 			title="Fetch KNSB ratings"
-			description="Downloads the latest KNSB classical rating list from schaakbond.nl and stores it on the server. This doesn’t change any player’s rating — apply it per player from their Sync action."
+			description="Downloads the latest KNSB classical rating list from schaakbond.nl and stores it on the server. This doesn’t change any player’s rating — apply it with “Sync KNSB ratings” for the whole roster, or per player from their Sync action."
 			busy={ fetchList.isPending }
 			onClose={ onClose }
 		>

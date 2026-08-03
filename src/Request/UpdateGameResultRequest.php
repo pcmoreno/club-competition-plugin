@@ -34,8 +34,8 @@ class UpdateGameResultRequest
     {
         $dto = new self();
 
-        // has_param, not a null check on the value: WP_REST_Request::has_param
-        // tests key presence, so an explicit null is still reported as sent.
+        // Key presence, so an explicit `result: null` (clear the result) is
+        // still distinguishable from omitting the field entirely.
         $dto->resultProvided = $request->has_param('result');
 
         $raw = $request->get_param('result');

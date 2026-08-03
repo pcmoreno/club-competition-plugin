@@ -16,6 +16,9 @@ final class PlayerScore
     ) {
     }
 
+    // Every caller sorts. An unknown metric (a TPR with no rated opponent)
+    // orders as 0.0 by decision, sharing a rank with a genuine 0.0; display
+    // reads $scores directly and still renders it as "—".
     public function metric(StandingsMetric $metric): float
     {
         return (float)($this->scores[$metric->value] ?? 0.0);

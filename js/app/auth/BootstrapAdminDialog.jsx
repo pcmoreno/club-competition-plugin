@@ -110,6 +110,7 @@ export function BootstrapAdminDialog( { onClose } ) {
 								value: 8,
 								message: 'Use at least 8 characters.',
 							},
+							deps: [ 'confirm' ],
 						} ) }
 					/>
 				</Field>
@@ -122,11 +123,6 @@ export function BootstrapAdminDialog( { onClose } ) {
 						className={ inputClass }
 						autoComplete="new-password"
 						{ ...register( 'confirm', {
-							// deps revalidates this when `password` changes;
-							// getValues reads it without subscribing the form to
-							// every keystroke. Same pair in AuthScreens and
-							// ChangePasswordDialog.
-							deps: [ 'password' ],
 							validate: ( v ) =>
 								v === getValues( 'password' ) ||
 								'Passwords do not match.',

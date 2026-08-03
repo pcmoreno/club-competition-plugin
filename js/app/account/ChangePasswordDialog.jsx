@@ -120,6 +120,7 @@ export function ChangePasswordDialog( { onClose } ) {
 										value: 8,
 										message: 'Use at least 8 characters.',
 									},
+									deps: [ 'confirm' ],
 								} ) }
 							/>
 						</Field>
@@ -133,10 +134,6 @@ export function ChangePasswordDialog( { onClose } ) {
 								autoComplete="new-password"
 								className={ fieldInput }
 								{ ...register( 'confirm', {
-									// deps revalidates this when `newPassword`
-									// changes; getValues reads it without
-									// subscribing the form to every keystroke.
-									deps: [ 'newPassword' ],
 									validate: ( v ) =>
 										v === getValues( 'newPassword' ) ||
 										'New passwords do not match.',

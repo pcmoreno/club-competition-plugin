@@ -330,6 +330,9 @@ function SetPasswordForm( {
 								value: 8,
 								message: 'Use at least 8 characters.',
 							},
+							// deps must sit on the field that changes, naming
+							// the one to revalidate — not the reverse.
+							deps: [ 'confirm' ],
 						} ) }
 					/>
 				</Field>
@@ -342,13 +345,6 @@ function SetPasswordForm( {
 						className={ inputClass }
 						autoComplete="new-password"
 						{ ...register( 'confirm', {
-							// getValues, not watch: watch subscribes the whole
-							// form and re-renders on every keystroke in every
-							// field. deps re-runs this check when `password`
-							// changes — without it, correcting the password
-							// after filling confirm leaves the mismatch error
-							// showing, or hides a real one.
-							deps: [ 'password' ],
 							validate: ( v ) =>
 								v === getValues( 'password' ) ||
 								'Passwords do not match.',
