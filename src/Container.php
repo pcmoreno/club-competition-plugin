@@ -75,6 +75,9 @@ class Container
             ->addArgument(new Reference('db_connection'))
             ->setPublic(true);
 
+        $container->register('season_contact_repository', Repository\SeasonContactRepository::class)
+            ->addArgument(new Reference('db_connection'));
+
         // ── Services ──────────────────────────────────────────────────────────
         $container->register('jwt_service', Services\JwtService::class)
             ->setPublic(true);
@@ -132,6 +135,10 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('player_display_service'));
 
+        $container->register('season_contact_service', Services\SeasonContactService::class)
+            ->addArgument(new Reference('season_contact_repository'))
+            ->addArgument(new Reference('admin_repository'));
+
         $container->register('round_absence_service', Services\RoundAbsenceService::class)
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('season_player_repository'))
@@ -139,7 +146,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('player_repository'))
-            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('season_contact_service'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('email_notification_service'))
             ->addArgument(new Reference('rate_limiter_service'));
@@ -266,7 +273,17 @@ class Container
             ->addArgument(new Reference('settings_resolver'))
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
+            ->addArgument(new Reference('season_contact_repository'))
+            ->addArgument(new Reference('season_contact_service'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('auth_context_service'))
             ->addArgument(new Reference('transaction_manager'));
+
+        $container->register('admin_controller', Controller\AdminController::class)
+            ->setPublic(true)
+            ->addArgument(new Reference('validator'))
+            ->addArgument(new Reference('admin_repository'))
+            ->addArgument(new Reference('serializer_service'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)

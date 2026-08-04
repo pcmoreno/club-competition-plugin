@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use SCS\Entity\Admin;
 use SCS\Entity\Attendance;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
@@ -18,7 +17,6 @@ use SCS\Entity\SeasonPlayer;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\TooManyRequestsException;
-use SCS\Repository\AdminRepository;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\PlayerRepository;
@@ -75,8 +73,8 @@ class RoundAbsenceService
     /** Recorded, but not the member's to change — talk to the admin. */
     public const STATE_LOCKED = 'locked';
 
-    // Every declaration mails every active admin, so the endpoint is a mail
-    // trigger and is throttled like the other two (login, password reset).
+    // Every declaration mails the tournament's contacts, so the endpoint is a
+    // mail trigger and is throttled like the other two (login, password reset).
     private const NOTICE_MAX_PER_WINDOW = 10;
     private const NOTICE_DECAY_SECONDS  = 3600;
 
@@ -93,7 +91,7 @@ class RoundAbsenceService
         private readonly GameRepository $games,
         private readonly AttendanceRepository $attendance,
         private readonly PlayerRepository $players,
-        private readonly AdminRepository $admins,
+        private readonly SeasonContactService $seasonContacts,
         private readonly PlayerDisplayService $playerDisplay,
         private readonly EmailNotificationService $email,
         private readonly RateLimiterService $rateLimiter,
@@ -390,7 +388,9 @@ class RoundAbsenceService
             throw new NotFoundException('Player not found.');
         }
 
-        $recipients = $this->adminEmails();
+        // The tournament's contacts, not every admin — see SeasonContactService,
+        // which still falls back to all of them when a tournament has none.
+        $recipients = $this->seasonContacts->recipientEmails($season->id);
 
         $sent = $this->email->sendAbsenceNotice(
             $recipients,
@@ -419,15 +419,6 @@ class RoundAbsenceService
         ));
 
         return $sent;
-    }
-
-    /** @return list<string> */
-    private function adminEmails(): array
-    {
-        return array_map(
-            static fn (Admin $admin): string => $admin->email,
-            $this->admins->findAllActive()
-        );
     }
 
     /** e.g. "board 12 as Black against Jan Burggraaf". */

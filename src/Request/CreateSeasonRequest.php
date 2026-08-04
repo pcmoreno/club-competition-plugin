@@ -33,6 +33,12 @@ class CreateSeasonRequest
     /** @var list<string> */
     public array $categories = [];
 
+    // The admins to notify about this tournament, honoured as given. Null means
+    // the field was never sent, and the controller falls back to the creating
+    // admin — a caller that omits contacts entirely still gets a sane one.
+    /** @var list<int>|null */
+    public ?array $contact_admin_ids = null;
+
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
@@ -67,6 +73,9 @@ class CreateSeasonRequest
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));
+        }
+        if ($request->get_param('contact_admin_ids') !== null) {
+            $dto->contact_admin_ids = array_map('intval', array_values((array)$request->get_param('contact_admin_ids')));
         }
 
         return $dto;

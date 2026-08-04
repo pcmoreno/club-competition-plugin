@@ -1,5 +1,5 @@
-import { useState } from '@wordpress/element';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from '@wordpress/element';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Dialog } from '../components/Dialog';
 import {
@@ -11,12 +11,13 @@ import {
 	errorMessage,
 } from './tournamentShared';
 import { TIME_CONTROL_OPTIONS, DEFAULT_TIME_CONTROL } from '../components/game';
+import { ContactsField } from './ContactsField';
 import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
-// only — name, pairing system, dates, time control, location. The tournament is created in
-// Preparation; scoring/display settings and player enrolment are done afterward
-// through their own flows. Categories are deferred.
+// only — name, pairing system, dates, time control, location, contacts. The
+// tournament is created in Preparation; scoring/display settings and player
+// enrolment are done afterward through their own flows. Categories are deferred.
 export function CreateTournamentDialog( { onClose } ) {
 	const queryClient = useQueryClient();
 	const [ name, setName ] = useState( '' );
@@ -25,6 +26,21 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ endDate, setEndDate ] = useState( '' );
 	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
 	const [ timeControl, setTimeControl ] = useState( DEFAULT_TIME_CONTROL );
+
+	// Contacts default to whoever is creating the tournament. Pre-selected here
+	// rather than added server-side after the fact, so the list on screen is the
+	// list that gets saved — including when they take themselves back off it.
+	const { data: account } = useQuery( {
+		queryKey: keys.account(),
+		queryFn: () => api.get( 'auth/me' ),
+	} );
+	const [ contacts, setContacts ] = useState( null );
+	useEffect( () => {
+		if ( account?.id ) {
+			setContacts( ( current ) => current ?? [ account.id ] );
+		}
+	}, [ account ] );
+	const contactIds = contacts ?? [];
 
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
@@ -46,6 +62,7 @@ export function CreateTournamentDialog( { onClose } ) {
 			name: trimmedName,
 			pairing_system: pairing,
 			time_control: timeControl,
+			contact_admin_ids: contactIds,
 		};
 		if ( location.trim() !== '' ) {
 			payload.location = location.trim();
@@ -161,6 +178,8 @@ export function CreateTournamentDialog( { onClose } ) {
 						className={ fieldInput }
 					/>
 				</label>
+
+				<ContactsField value={ contactIds } onChange={ setContacts } />
 			</div>
 
 			{ create.isError && (

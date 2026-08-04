@@ -213,6 +213,27 @@ re-classification is theirs to reverse.
 The picker is meant to read "Round 12 · Tue 9 Dec", but nothing in the admin UI
 writes `rounds.date` yet, so it currently degrades to the round number alone.
 
+### Tournament Contacts
+
+The admins a tournament's notifications go to (`…scs_season_contacts`,
+`SeasonContactService`). Edited in the admin Create-tournament dialog and the
+Basic details tab; written through `POST /seasons` and `PATCH /seasons/{id}` as
+`contact_admin_ids`, read back from `GET /seasons/{id}/contacts`. The picker
+lists active admins from `GET /admins`.
+
+The admin who creates a tournament is its first contact. That's a **default,
+not an invariant** — the Create dialog pre-selects them (marked "you") and they
+can take themselves off before saving, so `store` honours a submitted list as
+it stands and only falls back to the creator when `contact_admin_ids` is absent
+entirely. Nothing treats one contact as special and there is no `created_by`
+column.
+
+**An empty list means every active admin.** That's the pre-contacts behaviour,
+so tournaments that predate the feature keep notifying everyone without a
+backfill migration, and emptying the list can't silently switch a tournament's
+notifications off. Contacts that are later revoked are filtered out at send
+time, and if that empties the list the same fallback applies.
+
 ### Database Architecture
 
 Table names are built from `SCS_TABLE_PREFIX` (`$wpdb->prefix . 'scs_'`), so
@@ -226,6 +247,7 @@ hardcode `wp_scs_`.
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type
 - `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
+- `…scs_season_contacts` — which admins a tournament's notifications go to
 - `…scs_members` — non-WordPress member accounts
 - `…scs_admins` — plugin admins
 - `…scs_players` — the person registry, shared across seasons
@@ -518,9 +540,9 @@ Via `wp_mail()` (uses WP Mail SMTP plugin on production):
 
 All sent from `src/Services/EmailNotificationService.php`. **There are no email
 templates**: every body is a plain-text string built inline in that service.
-Absence notices go to every *active* admin (`AdminRepository::findAllActive`),
-all in one `To:`. Known gap: with no active admin, or if `wp_mail` fails, the
-send is skipped silently — and for an already-published round the email is the
+Tournament-scoped mail (today: absence notices) goes to that tournament's
+**contacts** — see below — all in one `To:`. Known gap: if `wp_mail` fails the
+send is skipped silently, and for an already-published round the email is the
 feature's only effect.
 
 ## Important Files

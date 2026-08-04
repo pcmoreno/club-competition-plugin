@@ -23,6 +23,7 @@ class RestApi
             $import          = $container->get('import_controller');
             $knsb            = $container->get('knsb_controller');
             $me              = $container->get('me_controller');
+            $admins          = $container->get('admin_controller');
 
             // Parse the auth cookie's JWT and re-validate it against the DB
             // (account still exists, still Active, not older than a password
@@ -290,6 +291,16 @@ class RestApi
                 ],
             ]);
 
+            // ── Admins ────────────────────────────────────────────────────────
+            // Names and email addresses of the plugin's own admins, for the
+            // tournament-contacts picker. Admin-gated, and read-only — accounts
+            // are still created through WP-CLI or the bootstrap endpoint.
+            register_rest_route('scs/v1', '/admins', [
+                'methods'             => 'GET',
+                'callback'            => [$admins, 'index'],
+                'permission_callback' => $isAdminRead,
+            ]);
+
             // ── Seasons ───────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/seasons', [
                 [
@@ -326,6 +337,15 @@ class RestApi
                 'methods'             => 'GET',
                 'callback'            => [$seasons, 'standings'],
                 'permission_callback' => '__return_true',
+            ]);
+
+            // The admins this tournament's notifications go to. Written through
+            // POST /seasons and PATCH /seasons/{id} (contact_admin_ids), so this
+            // is read-only.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/contacts', [
+                'methods'             => 'GET',
+                'callback'            => [$seasons, 'contacts'],
+                'permission_callback' => $isAdminRead,
             ]);
 
             // Engine settings + their field schema, for the admin settings form.
