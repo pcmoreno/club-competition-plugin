@@ -33,6 +33,11 @@ class CreateSeasonRequest
     /** @var list<string> */
     public array $categories = [];
 
+    // Extra admins to notify about this tournament. The creating admin is added
+    // by the controller, so an untouched form still yields one contact.
+    /** @var list<int> */
+    public array $contact_admin_ids = [];
+
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
@@ -67,6 +72,9 @@ class CreateSeasonRequest
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));
+        }
+        if ($request->get_param('contact_admin_ids') !== null) {
+            $dto->contact_admin_ids = array_map('intval', array_values((array)$request->get_param('contact_admin_ids')));
         }
 
         return $dto;

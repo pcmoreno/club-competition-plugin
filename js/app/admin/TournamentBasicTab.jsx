@@ -1,5 +1,5 @@
-import { useState } from '@wordpress/element';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from '@wordpress/element';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
 	PAIRING_OPTIONS,
@@ -8,11 +8,13 @@ import {
 	errorMessage,
 } from './tournamentShared';
 import { TIME_CONTROL_OPTIONS, DEFAULT_TIME_CONTROL } from '../components/game';
+import { ContactsField } from './ContactsField';
 import { keys } from '../api/keys';
 
 // ADMIN. Basic-details tab of the tournament detail page. Edits the same fields
-// as the Create dialog (name, pairing system, dates, time control, location) via
-// PATCH /seasons/{id}. Changing the pairing system is guarded server-side (it
+// as the Create dialog (name, pairing system, dates, time control, location,
+// contacts) via PATCH /seasons/{id}. Changing the pairing system is guarded
+// server-side (it
 // resets pairing settings and is blocked after the first completed round); any
 // such error surfaces inline. Blank dates are left untouched — like the player
 // edit form, a missing param reads as "unchanged", so this pass can't clear a
@@ -28,6 +30,24 @@ export function TournamentBasicTab( { season } ) {
 		season.time_control ?? DEFAULT_TIME_CONTROL
 	);
 
+	// Contacts live in their own table, so they arrive from their own endpoint
+	// rather than on the season payload the parent already holds.
+	const { data: contactData } = useQuery( {
+		queryKey: keys.seasonContacts( season.id ),
+		queryFn: () => api.get( `seasons/${ season.id }/contacts` ),
+	} );
+	const savedContacts = ( contactData?.contacts ?? [] ).map( ( a ) => a.id );
+	const [ contacts, setContacts ] = useState( null );
+	// Seed the editable copy once the fetch lands, and re-seed after a save so
+	// the form tracks what's stored instead of a stale local edit.
+	useEffect( () => {
+		if ( contactData ) {
+			setContacts( savedContacts );
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ contactData ] );
+	const contactIds = contacts ?? savedContacts;
+
 	// The pairing system can only change while the tournament is in preparation;
 	// once it's active the games are already keyed to that system. (Pairing
 	// *settings* stay editable — those are tuned per round.)
@@ -41,18 +61,27 @@ export function TournamentBasicTab( { season } ) {
 				queryKey: keys.season( season.id ),
 			} );
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.seasonContacts( season.id ),
+			} );
 		},
 	} );
 
 	const trimmedName = name.trim();
 	const trimmedLocation = location.trim();
+	// Order is meaningful here (it's the order contacts are stored in), so this
+	// compares the lists as sequences rather than as sets.
+	const contactsDirty =
+		contactIds.length !== savedContacts.length ||
+		contactIds.some( ( id, i ) => id !== savedContacts[ i ] );
 	const dirty =
 		trimmedName !== ( season.name ?? '' ) ||
 		pairing !== season.pairing_system ||
 		startDate !== ( season.start_date ?? '' ) ||
 		endDate !== ( season.end_date ?? '' ) ||
 		trimmedLocation !== ( season.location ?? '' ) ||
-		timeControl !== ( season.time_control ?? DEFAULT_TIME_CONTROL );
+		timeControl !== ( season.time_control ?? DEFAULT_TIME_CONTROL ) ||
+		contactsDirty;
 	const canSave = trimmedName !== '' && dirty && ! save.isPending;
 
 	const submit = ( e ) => {
@@ -65,6 +94,7 @@ export function TournamentBasicTab( { season } ) {
 			pairing_system: pairing,
 			time_control: timeControl,
 			location: trimmedLocation,
+			contact_admin_ids: contactIds,
 		};
 		// Dates can't be cleared this pass (empty fails Date validation and a
 		// missing param means "unchanged"), so only send them when set.
@@ -191,6 +221,8 @@ export function TournamentBasicTab( { season } ) {
 					className={ fieldInput }
 				/>
 			</label>
+
+			<ContactsField value={ contactIds } onChange={ setContacts } />
 
 			{ save.isError && (
 				<p className="text-sm text-loss">

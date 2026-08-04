@@ -24,6 +24,7 @@ export const keys = {
 	seasons: () => [ 'seasons' ],
 	season: ( seasonId ) => [ 'season', id( seasonId ) ],
 	seasonSettings: ( seasonId ) => [ 'season-settings', id( seasonId ) ],
+	seasonContacts: ( seasonId ) => [ 'season-contacts', id( seasonId ) ],
 
 	// Rounds
 	rounds: ( seasonId ) => [ 'rounds', id( seasonId ) ],
@@ -48,6 +49,9 @@ export const keys = {
 
 	// The signed-in member's own view (GET /me/home).
 	home: () => [ 'me-home' ],
+
+	// The plugin's own admin accounts (GET /admins), for the contacts picker.
+	admins: () => [ 'admins' ],
 
 	// Account / setup
 	account: () => [ 'account' ],

@@ -11,12 +11,13 @@ import {
 	errorMessage,
 } from './tournamentShared';
 import { TIME_CONTROL_OPTIONS, DEFAULT_TIME_CONTROL } from '../components/game';
+import { ContactsField } from './ContactsField';
 import { keys } from '../api/keys';
 
 // ADMIN. Create a tournament (season) via POST /seasons. Phase 1: the basics
-// only — name, pairing system, dates, time control, location. The tournament is created in
-// Preparation; scoring/display settings and player enrolment are done afterward
-// through their own flows. Categories are deferred.
+// only — name, pairing system, dates, time control, location, contacts. The
+// tournament is created in Preparation; scoring/display settings and player
+// enrolment are done afterward through their own flows. Categories are deferred.
 export function CreateTournamentDialog( { onClose } ) {
 	const queryClient = useQueryClient();
 	const [ name, setName ] = useState( '' );
@@ -25,6 +26,9 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ endDate, setEndDate ] = useState( '' );
 	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
 	const [ timeControl, setTimeControl ] = useState( DEFAULT_TIME_CONTROL );
+	// Extra contacts only. The server adds whoever is creating the tournament,
+	// so this starts empty and the hint below says who is already on the list.
+	const [ contacts, setContacts ] = useState( [] );
 
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
@@ -46,6 +50,7 @@ export function CreateTournamentDialog( { onClose } ) {
 			name: trimmedName,
 			pairing_system: pairing,
 			time_control: timeControl,
+			contact_admin_ids: contacts,
 		};
 		if ( location.trim() !== '' ) {
 			payload.location = location.trim();
@@ -161,6 +166,12 @@ export function CreateTournamentDialog( { onClose } ) {
 						className={ fieldInput }
 					/>
 				</label>
+
+				<ContactsField
+					value={ contacts }
+					onChange={ setContacts }
+					hint="You are added as a contact automatically. Anyone added here is notified about this tournament too."
+				/>
 			</div>
 
 			{ create.isError && (

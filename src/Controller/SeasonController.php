@@ -13,10 +13,12 @@ use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
+use SCS\Repository\AdminRepository;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\PlayerRepository;
 use SCS\Repository\RoundRepository;
+use SCS\Repository\SeasonContactRepository;
 use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
 use SCS\Repository\StandingsSnapshotRepository;
@@ -25,8 +27,10 @@ use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\UpdateSeasonRequest;
+use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
+use SCS\Services\SeasonContactService;
 use SCS\Services\SerializerService;
 use SCS\Services\SettingsValidator;
 use SCS\Services\TransactionManager;
@@ -48,6 +52,10 @@ class SeasonController extends RestController
         private readonly SettingsResolver $settingsResolver,
         private readonly GameRepository $gameRepository,
         private readonly AttendanceRepository $attendanceRepository,
+        private readonly SeasonContactRepository $seasonContactRepository,
+        private readonly SeasonContactService $seasonContacts,
+        private readonly AdminRepository $adminRepository,
+        private readonly AuthContextService $authContext,
         private readonly TransactionManager $transactions,
     ) {
         parent::__construct($validator);
@@ -195,6 +203,15 @@ class SeasonController extends RestController
                 time_control:   TimeControl::from($input->time_control),
             );
 
+            // The creating admin is the tournament's first contact, ahead of
+            // anyone they picked in the form. Only a default — they can be
+            // removed again from the settings afterwards.
+            $creatorId = $this->authContext->currentClaims()['sub'] ?? null;
+            $this->seasonContacts->replace($season->id, array_merge(
+                $creatorId !== null ? [$creatorId] : [],
+                $input->contact_admin_ids,
+            ));
+
             return $this->created($this->serializer->serialize($season, SerializerService::GROUP_ADMIN));
         });
     }
@@ -212,11 +229,19 @@ class SeasonController extends RestController
 
             $data = $input->toUpdateData();
             $this->applySettings($input, $season, $data);
-            if (empty($data)) {
+            // Contacts live in their own table, so they count as a change even
+            // when nothing on the season row does — saving only the contacts is
+            // a normal edit, not an empty request.
+            if (empty($data) && $input->contact_admin_ids === null) {
                 throw new ValidationException(['fields' => 'No fields to update.']);
             }
 
-            $this->seasonRepository->update($season->id, $data);
+            if ($input->contact_admin_ids !== null) {
+                $this->seasonContacts->replace($season->id, $input->contact_admin_ids);
+            }
+            if (!empty($data)) {
+                $this->seasonRepository->update($season->id, $data);
+            }
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
@@ -246,10 +271,39 @@ class SeasonController extends RestController
                 $this->attendanceRepository->deleteBySeason($season->id);
                 $this->seasonPlayerRepository->deleteBySeason($season->id);
                 $this->roundRepository->deleteBySeason($season->id);
+                $this->seasonContactRepository->deleteBySeason($season->id);
                 $this->seasonRepository->delete($season->id);
             });
 
             return $this->ok(['deleted' => true]);
+        });
+    }
+
+    /**
+     * Admin read: this tournament's contacts, in the order they're stored.
+     *
+     * Empty means the tournament has never set one, which the mailer reads as
+     * "all active admins" (SeasonContactService) — `notifies_all_admins` says
+     * that outright rather than leaving the form to infer it from the empty
+     * list. The selectable admins come from GET /admins.
+     */
+    public function contacts(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $stored = $this->seasonContacts->storedAdminIds($season->id);
+
+            return $this->ok([
+                'contacts' => $this->serializer->serializeMany(
+                    $this->adminRepository->findByIds($stored),
+                    SerializerService::GROUP_ADMIN
+                ),
+                'notifies_all_admins' => $stored === [],
+            ]);
         });
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Admin;
 use SCS\Entity\Enum\AdminStatus;
@@ -55,6 +56,41 @@ class AdminRepository
             ->fetchAllAssociative();
 
         return array_values(array_map($this->hydrate(...), $rows));
+    }
+
+    /**
+     * Admins by id, in the order they were given — the caller's order is the
+     * one the tournament stored, and re-sorting it here would lose it.
+     *
+     * @param list<int> $ids
+     * @return list<Admin>
+     */
+    public function findByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->where('id IN (:ids)')
+            ->setParameter('ids', $ids, ArrayParameterType::INTEGER)
+            ->fetchAllAssociative();
+
+        $byId = [];
+        foreach ($rows as $row) {
+            $byId[(int)$row['id']] = $this->hydrate($row);
+        }
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $ordered[] = $byId[$id];
+            }
+        }
+
+        return $ordered;
     }
 
     public function countAll(): int

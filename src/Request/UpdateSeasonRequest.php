@@ -32,6 +32,12 @@ class UpdateSeasonRequest
     /** @var list<string>|null */
     public ?array $categories = null;
 
+    // The tournament's notification recipients. Lives in its own table, so it's
+    // handled beside toUpdateData() rather than in it. Null means "unchanged";
+    // an empty array is a real value and clears the list back to "all admins".
+    /** @var list<int>|null */
+    public ?array $contact_admin_ids = null;
+
     // Raw settings blobs — validated + normalised by SettingsValidator in the controller, not here.
     /** @var array<string,mixed>|null */
     public ?array $pairing_settings = null;
@@ -85,6 +91,9 @@ class UpdateSeasonRequest
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));
+        }
+        if ($request->get_param('contact_admin_ids') !== null) {
+            $dto->contact_admin_ids = array_map('intval', array_values((array)$request->get_param('contact_admin_ids')));
         }
         if ($request->get_param('pairing_settings') !== null) {
             $dto->pairing_settings = (array)$request->get_param('pairing_settings');
