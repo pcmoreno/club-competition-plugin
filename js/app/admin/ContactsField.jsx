@@ -73,6 +73,16 @@ export function ContactsField( { value, onChange, hint } ) {
 				</ul>
 			) }
 
+			{ /* Nothing left to offer reads as a broken control unless it says
+			     so — most clubs have few admins, so this is a normal state. */ }
+			{ available.length === 0 && ! isLoading && (
+				<p className="text-sm text-muted">
+					{ admins.length === 0
+						? 'No admins to choose from.'
+						: 'Every admin is already a contact.' }
+				</p>
+			) }
+
 			{ available.length > 0 && (
 				<select
 					value=""
