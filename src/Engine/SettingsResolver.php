@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine;
 
 use SCS\Engine\Settings\ManualPairingSettings;
+use SCS\Engine\Settings\Setting\NumberOfRounds;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
 use SCS\Engine\Settings\TournamentPairingSettings;
@@ -39,5 +40,21 @@ final class SettingsResolver
     public function display(Season $season): TournamentStandingsDisplaySettings
     {
         return StandingsDisplaySettings::fromArray($season->display_settings ?? []);
+    }
+
+    /**
+     * The last round number this season may have, or null for no limit.
+     *
+     * Read by key off the resolved pairing settings, so a system that doesn't
+     * compose NumberOfRounds simply has no key and therefore no limit — which is
+     * the right answer both for one that never caps rounds and for one that will
+     * derive its own count (round-robin from the roster, a knockout from the
+     * field size).
+     */
+    public function roundLimit(Season $season): ?int
+    {
+        $rounds = $this->pairing($season)?->getSettings()[NumberOfRounds::KEY] ?? null;
+
+        return is_int($rounds) ? $rounds : null;
     }
 }

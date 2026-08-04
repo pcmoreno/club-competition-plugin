@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
+use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
@@ -35,6 +36,7 @@ class RoundController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
         private readonly RoundService $roundService,
+        private readonly SettingsResolver $settingsResolver,
     ) {
         parent::__construct($validator);
     }
@@ -127,6 +129,7 @@ class RoundController extends RestController
             $round = $this->roundRepository->createNextForSeason(
                 season_id: $season->id,
                 date:      $input->date,
+                maxRounds: $this->settingsResolver->roundLimit($season),
             );
 
             return $this->created($this->serializer->serialize($round, SerializerService::GROUP_ADMIN));

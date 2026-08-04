@@ -294,7 +294,8 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('round_service'));
+            ->addArgument(new Reference('round_service'))
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)
