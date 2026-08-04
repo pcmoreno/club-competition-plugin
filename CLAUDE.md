@@ -130,6 +130,35 @@ Note this conflicts with immutable standings snapshots (see below): a completed
 round's snapshot is published history and is only rewritten by re-completing
 that round.
 
+### Engine Settings
+
+Three axes, each a JSON column on `seasons` (`pairing_settings`,
+`scoring_settings`, `display_settings`), hydrated by `SettingsResolver` into
+typed objects that expose `getSettingsFields()` — a schema the admin Settings
+dialog renders the whole form from. Adding a knob means changing its settings
+class, not the frontend. Scoring freezes after the first completed round;
+display never locks; pairing settings are wiped when the pairing system changes
+(they're system-specific).
+
+**`SettingsResolver::pairing()` returns null for every system except Manual**,
+so Swiss and round-robin seasons currently have no pairing settings at all —
+the endpoint sends `fields: null` and the dialog renders nothing for them.
+
+Individual knobs live in `src/Engine/Settings/Setting/` as `SettingInterface`
+objects owning their key, schema and value coercion; settings classes
+**compose** them. That composition is how the engine answers whether a knob
+applies: a system that derives its round count (round-robin from the roster, a
+knockout from the field size) simply doesn't compose `NumberOfRounds`, and the
+admin is never asked. `normalise()` never throws — `fromArray()` is also the
+validation path (`SettingsValidator` round-trips through it), so bad input falls
+back rather than being rejected.
+
+`NumberOfRounds` (null = unlimited) is the first of these. Every tournament that
+predates it reads as unlimited. It is **enforced**: `SettingsResolver::roundLimit()`
+reads it by key, and `RoundRepository::createNextForSeason` refuses a round past
+it — inside the same `forUpdate()` lock as the number it's checked against, so
+two concurrent appends can't overshoot.
+
 ### Member Authentication
 
 Members log in via email + password (not WordPress accounts):

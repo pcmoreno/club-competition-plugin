@@ -7,6 +7,7 @@ namespace SCS\Repository;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Round;
+use SCS\Exception\ConflictException;
 
 class RoundRepository
 {
@@ -90,9 +91,15 @@ class RoundRepository
         $this->connection->delete(SCS_TABLE_PREFIX . 'rounds', [ 'season_id' => $season_id ]);
     }
 
-    public function createNextForSeason(int $season_id, ?string $date): Round
+    /**
+     * Append the next draft round. `$maxRounds` is the tournament's round limit
+     * (null for none), enforced here rather than by the caller so it sits inside
+     * the same lock as the number it's checked against — otherwise two admins
+     * appending at once could both pass the check and overshoot the limit.
+     */
+    public function createNextForSeason(int $season_id, ?string $date, ?int $maxRounds = null): Round
     {
-        return $this->connection->transactional(function () use ($season_id, $date): Round {
+        return $this->connection->transactional(function () use ($season_id, $date, $maxRounds): Round {
             // forUpdate() emits SELECT ... FOR UPDATE to lock the gap and serialize
             // concurrent inserts, so two requests can't claim the same round_number.
             // This relies on MySQL/InnoDB row-locking (our only target); a different
@@ -106,6 +113,13 @@ class RoundRepository
                 ->fetchAssociative();
 
             $nextNumber = ((int)($maxRow['max_number'] ?? 0)) + 1;
+
+            if ($maxRounds !== null && $nextNumber > $maxRounds) {
+                throw new ConflictException(sprintf(
+                    'This tournament runs %d rounds and they have all been created.',
+                    $maxRounds
+                ));
+            }
 
             $this->connection->insert(SCS_TABLE_PREFIX . 'rounds', [
                 'season_id'    => $season_id,

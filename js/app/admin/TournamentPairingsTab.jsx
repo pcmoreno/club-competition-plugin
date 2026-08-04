@@ -37,6 +37,15 @@ export function TournamentPairingsTab( { season, players } ) {
 		queryFn: () => api.get( `seasons/${ season.id }/rounds` ),
 	} );
 
+	// The tournament's round limit lives in its pairing settings (null = no
+	// limit). The backend refuses a round past it either way; this is so the
+	// button doesn't offer one it can't create.
+	const { data: settings } = useQuery( {
+		queryKey: keys.seasonSettings( season.id ),
+		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
+	} );
+	const roundLimit = settings?.pairing?.values?.numberOfRounds ?? null;
+
 	// Default to the latest round; the admin can switch to an earlier one.
 	const ordered = useMemo(
 		() =>
@@ -357,6 +366,7 @@ export function TournamentPairingsTab( { season, players } ) {
 		);
 	}
 
+	const roundsFull = roundLimit !== null && ordered.length >= roundLimit;
 	const genLabel = generateLabel( season.cadence );
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
 	// Match the backend's board numbering (max existing board + 1) so the
@@ -386,14 +396,20 @@ export function TournamentPairingsTab( { season, players } ) {
 					) ) }
 				</div>
 
-				<button
-					type="button"
-					onClick={ () => createRound.mutate() }
-					disabled={ createRound.isPending }
-					className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
-				>
-					{ createRound.isPending ? 'Adding…' : '+ New round' }
-				</button>
+				{ roundsFull ? (
+					<span className="text-sm text-muted">
+						All { roundLimit } rounds created
+					</span>
+				) : (
+					<button
+						type="button"
+						onClick={ () => createRound.mutate() }
+						disabled={ createRound.isPending }
+						className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
+					>
+						{ createRound.isPending ? 'Adding…' : '+ New round' }
+					</button>
+				) }
 
 				<div className="ml-auto flex items-center gap-3">
 					{ genLabel && (

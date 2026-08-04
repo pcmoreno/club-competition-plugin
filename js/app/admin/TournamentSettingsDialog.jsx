@@ -390,6 +390,80 @@ function TiebreakConfig( {
 	);
 }
 
+// A number that can also be "not set" — the null is a real choice, not an empty
+// box, so it gets its own toggle. Ticking it clears and disables the input;
+// unticking hands back an empty field to type into.
+function NullableNumberField( { field, value, onChange, disabled } ) {
+	const isNull = value === null || value === undefined;
+
+	return (
+		<div>
+			<div className="flex items-center gap-3">
+				<input
+					type="number"
+					min={ field.min ?? 1 }
+					max={ field.max }
+					step={ field.step ?? 1 }
+					className={ inputCls + ' num w-28 text-right' }
+					value={ isNull ? '' : value }
+					disabled={ disabled || isNull }
+					onChange={ ( e ) => {
+						const n = parseInt( e.target.value, 10 );
+						onChange( Number.isFinite( n ) ? n : null );
+					} }
+				/>
+				<label className="flex items-center gap-2 text-sm text-ink-3">
+					<input
+						type="checkbox"
+						checked={ isNull }
+						disabled={ disabled }
+						onChange={ ( e ) =>
+							onChange(
+								e.target.checked ? null : field.min ?? 1
+							)
+						}
+					/>
+					{ field.nullLabel }
+				</label>
+			</div>
+			{ field.hint && (
+				<p className="mt-1 text-xs text-ink-3">{ field.hint }</p>
+			) }
+		</div>
+	);
+}
+
+// Pairing settings are a flat list of fields rather than the grouped shape
+// scoring uses, so they render straight from the schema.
+function PairingField( { field, values, setValues, disabled } ) {
+	const value = values?.[ field.key ] ?? field.default ?? null;
+	const set = ( v ) => setValues( { ...values, [ field.key ]: v } );
+
+	if ( field.type === 'number' && field.nullable ) {
+		return (
+			<NullableNumberField
+				field={ field }
+				value={ value }
+				onChange={ set }
+				disabled={ disabled }
+			/>
+		);
+	}
+
+	return (
+		<input
+			type="number"
+			min={ field.min }
+			max={ field.max }
+			step={ field.step ?? 1 }
+			className={ inputCls + ' num w-28 text-right' }
+			value={ value ?? '' }
+			disabled={ disabled }
+			onChange={ ( e ) => set( toNumber( e.target.value, field.default ) ) }
+		/>
+	);
+}
+
 function ScoringGroup( { group, values, setValues, disabled } ) {
 	if ( group.group === 'game_outcomes' ) {
 		return (
@@ -508,6 +582,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 
 export function TournamentSettingsDialog( { season, onClose } ) {
 	const queryClient = useQueryClient();
+	const [ pairing, setPairing ] = useState( null );
 	const [ scoring, setScoring ] = useState( null );
 	const [ display, setDisplay ] = useState( null );
 	const [ saved, setSaved ] = useState( false );
@@ -537,6 +612,10 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	// A ref, not state: this must be readable inside the effect below without
 	// re-running it, and re-rendering on the first keystroke would be pointless.
 	const dirty = useRef( false );
+	const editPairing = ( next ) => {
+		dirty.current = true;
+		setPairing( next );
+	};
 	const editScoring = ( next ) => {
 		dirty.current = true;
 		setScoring( next );
@@ -550,6 +629,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 		if ( ! data || dirty.current ) {
 			return;
 		}
+		setPairing( data.pairing?.values ?? null );
 		setScoring( data.scoring?.values ?? null );
 		setDisplay( data.display?.values ?? null );
 	}, [ data ] );
@@ -572,12 +652,16 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	} );
 
 	const scoringLocked = data?.scoring_locked ?? false;
+	const pairingFields = data?.pairing?.fields ?? null;
 	const scoringFields = data?.scoring?.fields ?? null;
 	const displayFields = data?.display?.fields ?? null;
 
 	const submit = () => {
 		setSaved( false );
 		const payload = {};
+		if ( pairing ) {
+			payload.pairing_settings = pairing;
+		}
 		if ( scoring && ! scoringLocked ) {
 			payload.scoring_settings = scoring;
 		}
@@ -601,6 +685,29 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 						locked for this tournament. Display settings can still
 						be changed.
 					</Notice>
+				) }
+
+				{ pairingFields && pairingFields.length > 0 && (
+					<section>
+						<SectionTitle hint="How the tournament is run.">
+							Pairing
+						</SectionTitle>
+						<div className="flex flex-col gap-3">
+							{ pairingFields.map( ( f ) => (
+								<label key={ f.key } className="block">
+									<span className="mb-1 block text-sm text-ink-3">
+										{ f.label }
+									</span>
+									<PairingField
+										field={ f }
+										values={ pairing }
+										setValues={ editPairing }
+										disabled={ save.isPending }
+									/>
+								</label>
+							) ) }
+						</div>
+					</section>
 				) }
 
 				{ scoringFields && scoring ? (
