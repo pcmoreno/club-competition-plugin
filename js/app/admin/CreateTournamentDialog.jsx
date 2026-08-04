@@ -1,5 +1,5 @@
-import { useState } from '@wordpress/element';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from '@wordpress/element';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Dialog } from '../components/Dialog';
 import {
@@ -26,9 +26,21 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ endDate, setEndDate ] = useState( '' );
 	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
 	const [ timeControl, setTimeControl ] = useState( DEFAULT_TIME_CONTROL );
-	// Extra contacts only. The server adds whoever is creating the tournament,
-	// so this starts empty and the hint below says who is already on the list.
-	const [ contacts, setContacts ] = useState( [] );
+
+	// Contacts default to whoever is creating the tournament. Pre-selected here
+	// rather than added server-side after the fact, so the list on screen is the
+	// list that gets saved — including when they take themselves back off it.
+	const { data: account } = useQuery( {
+		queryKey: keys.account(),
+		queryFn: () => api.get( 'auth/me' ),
+	} );
+	const [ contacts, setContacts ] = useState( null );
+	useEffect( () => {
+		if ( account?.id ) {
+			setContacts( ( current ) => current ?? [ account.id ] );
+		}
+	}, [ account ] );
+	const contactIds = contacts ?? [];
 
 	const create = useMutation( {
 		mutationFn: ( payload ) => api.post( 'seasons', payload ),
@@ -50,7 +62,7 @@ export function CreateTournamentDialog( { onClose } ) {
 			name: trimmedName,
 			pairing_system: pairing,
 			time_control: timeControl,
-			contact_admin_ids: contacts,
+			contact_admin_ids: contactIds,
 		};
 		if ( location.trim() !== '' ) {
 			payload.location = location.trim();
@@ -167,11 +179,7 @@ export function CreateTournamentDialog( { onClose } ) {
 					/>
 				</label>
 
-				<ContactsField
-					value={ contacts }
-					onChange={ setContacts }
-					hint="You are added as a contact automatically. Anyone added here is notified about this tournament too."
-				/>
+				<ContactsField value={ contactIds } onChange={ setContacts } />
 			</div>
 
 			{ create.isError && (

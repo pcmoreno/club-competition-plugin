@@ -177,6 +177,9 @@ class AuthController extends RestController
 
                 return $this->ok([
                     'role'       => Role::Admin->value,
+                    // Their own id, so admin UI can tell which row is them —
+                    // the tournament-contacts picker marks and pre-selects it.
+                    'id'         => $admin->id,
                     'name'       => $admin->name,
                     'email'      => $admin->email,
                     'status'     => $admin->status->value,

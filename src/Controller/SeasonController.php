@@ -203,14 +203,15 @@ class SeasonController extends RestController
                 time_control:   TimeControl::from($input->time_control),
             );
 
-            // The creating admin is the tournament's first contact, ahead of
-            // anyone they picked in the form. Only a default — they can be
-            // removed again from the settings afterwards.
+            // The creating admin is the tournament's first contact — but only as
+            // a default, so a list that was actually submitted is taken as it
+            // stands. Forcing them in on top would contradict the form, which
+            // pre-selects them and lets them take themselves off again.
             $creatorId = $this->authContext->currentClaims()['sub'] ?? null;
-            $this->seasonContacts->replace($season->id, array_merge(
-                $creatorId !== null ? [$creatorId] : [],
-                $input->contact_admin_ids,
-            ));
+            $this->seasonContacts->replace(
+                $season->id,
+                $input->contact_admin_ids ?? ($creatorId !== null ? [$creatorId] : []),
+            );
 
             return $this->created($this->serializer->serialize($season, SerializerService::GROUP_ADMIN));
         });

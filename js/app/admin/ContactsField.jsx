@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { fieldInput } from './tournamentShared';
+import { YouTag } from '../components/ui';
 import { keys } from '../api/keys';
 
 // ADMIN. The tournament-contacts picker, shared by the Create dialog and the
@@ -15,11 +16,19 @@ import { keys } from '../api/keys';
 // notifications go to every active admin, which is what the club had before
 // contacts existed. The hint below says so, so an empty list doesn't read as
 // "nobody will be told".
-export function ContactsField( { value, onChange, hint } ) {
+export function ContactsField( { value, onChange } ) {
 	const { data: admins = [], isLoading } = useQuery( {
 		queryKey: keys.admins(),
 		queryFn: () => api.get( 'admins' ),
 	} );
+
+	// Which of these admins is the signed-in one, so their row can say so.
+	// Shares the cache entry AuthProvider already fills, so it costs nothing.
+	const { data: account } = useQuery( {
+		queryKey: keys.account(),
+		queryFn: () => api.get( 'auth/me' ),
+	} );
+	const youId = account?.id ?? null;
 
 	const byId = new Map( admins.map( ( a ) => [ a.id, a ] ) );
 	// Ids the parent holds that no active admin matches (a revoked account, say)
@@ -56,6 +65,7 @@ export function ContactsField( { value, onChange, hint } ) {
 						>
 							<span className="text-sm text-ink">
 								{ admin.name }
+								{ admin.id === youId && <YouTag /> }
 								<span className="ml-2 text-xs text-muted">
 									{ admin.email }
 								</span>
@@ -105,10 +115,9 @@ export function ContactsField( { value, onChange, hint } ) {
 			) }
 
 			<span className="mt-1 block text-xs text-muted">
-				{ hint ??
-					( selected.length === 0
-						? 'With no contacts, notifications about this tournament go to every admin.'
-						: 'Notifications about this tournament go to these admins.' ) }
+				{ selected.length === 0
+					? 'With no contacts, notifications about this tournament go to every admin.'
+					: 'Notifications about this tournament go to these admins.' }
 			</span>
 		</div>
 	);

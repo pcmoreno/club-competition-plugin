@@ -221,10 +221,12 @@ Basic details tab; written through `POST /seasons` and `PATCH /seasons/{id}` as
 `contact_admin_ids`, read back from `GET /seasons/{id}/contacts`. The picker
 lists active admins from `GET /admins`.
 
-The admin who creates a tournament is seeded as its first contact. That's a
-**default, not an invariant** — the list is a plain set and the creator can be
-taken off it again, so nothing treats one contact as special and there is no
-`created_by` column.
+The admin who creates a tournament is its first contact. That's a **default,
+not an invariant** — the Create dialog pre-selects them (marked "you") and they
+can take themselves off before saving, so `store` honours a submitted list as
+it stands and only falls back to the creator when `contact_admin_ids` is absent
+entirely. Nothing treats one contact as special and there is no `created_by`
+column.
 
 **An empty list means every active admin.** That's the pre-contacts behaviour,
 so tournaments that predate the feature keep notifying everyone without a

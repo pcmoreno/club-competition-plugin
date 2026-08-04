@@ -33,10 +33,11 @@ class CreateSeasonRequest
     /** @var list<string> */
     public array $categories = [];
 
-    // Extra admins to notify about this tournament. The creating admin is added
-    // by the controller, so an untouched form still yields one contact.
-    /** @var list<int> */
-    public array $contact_admin_ids = [];
+    // The admins to notify about this tournament, honoured as given. Null means
+    // the field was never sent, and the controller falls back to the creating
+    // admin — a caller that omits contacts entirely still gets a sane one.
+    /** @var list<int>|null */
+    public ?array $contact_admin_ids = null;
 
     /** @return list<string> */
     public static function pairingSystemChoices(): array
