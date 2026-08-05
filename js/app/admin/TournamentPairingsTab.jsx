@@ -551,10 +551,6 @@ export function TournamentPairingsTab( { season, players } ) {
 							Clear
 						</button>
 					) }
-					<span className="text-xs text-muted">
-						The evening this round is played. Shown to members when
-						they say they can’t make it.
-					</span>
 					{ setRoundDate.isError && (
 						<span className="text-sm text-loss">
 							{ errorMessage( setRoundDate.error ) }
