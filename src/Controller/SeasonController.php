@@ -229,6 +229,18 @@ class SeasonController extends RestController
             $this->validate($input);
 
             $data = $input->toUpdateData();
+
+            // The tempo is fixed once the tournament leaves preparation. Games
+            // take it when they are paired, so changing it mid-tournament would
+            // split one tournament across two tempos — and a full-schedule
+            // system pairs every game up front, where it wouldn't even apply.
+            if (isset($data['time_control'])
+                && $data['time_control'] !== $season->time_control->value
+                && $season->status !== SeasonStatus::Preparation
+            ) {
+                throw new ValidationException(['time_control' => 'The time control can only be changed while the tournament is in preparation.']);
+            }
+
             $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is

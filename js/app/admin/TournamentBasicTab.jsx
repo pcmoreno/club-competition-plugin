@@ -48,9 +48,10 @@ export function TournamentBasicTab( { season } ) {
 	}, [ contactData ] );
 	const contactIds = contacts ?? savedContacts;
 
-	// The pairing system can only change while the tournament is in preparation;
-	// once it's active the games are already keyed to that system. (Pairing
-	// *settings* stay editable — those are tuned per round.)
+	// The pairing system and the tempo can only change while the tournament is in
+	// preparation: once it's active the games are already keyed to the system and
+	// already carry the tempo they were paired under. (Pairing *settings* stay
+	// editable — those are tuned per round.)
 	const pairingLocked = season.status !== 'preparation';
 
 	const save = useMutation( {
@@ -195,7 +196,11 @@ export function TournamentBasicTab( { season } ) {
 				<select
 					value={ timeControl }
 					onChange={ ( e ) => setTimeControl( e.target.value ) }
-					className={ fieldInput }
+					disabled={ pairingLocked }
+					className={
+						fieldInput +
+						( pairingLocked ? ' cursor-not-allowed opacity-60' : '' )
+					}
 				>
 					{ TIME_CONTROL_OPTIONS.map( ( o ) => (
 						<option key={ o.value } value={ o.value }>
@@ -204,8 +209,9 @@ export function TournamentBasicTab( { season } ) {
 					) ) }
 				</select>
 				<span className="mt-1 block text-xs text-muted">
-					Games take the tournament&rsquo;s time control when they are
-					paired; changing it here leaves existing pairings alone.
+					{ pairingLocked
+						? 'The time control is locked once the tournament has started — its games already carry it.'
+						: 'Games take the tournament’s time control when they are paired.' }
 				</span>
 			</label>
 

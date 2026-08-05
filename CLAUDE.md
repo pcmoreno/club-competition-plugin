@@ -242,10 +242,16 @@ Admins are separate (created via WP-CLI, stored in the `admins` table).
 Both `seasons` and `games` carry a `time_control` (`TimeControl` enum: blitz /
 rapid / classical, `NOT NULL DEFAULT 'classical'`). A game takes the season's
 value **at the moment it is paired** (`RoundService::addPairing`) rather than
-reading through to the season on display, so changing a running tournament's
-tempo doesn't rewrite games already played under the old one.
+reading through to the season on display, so a game keeps the tempo it was
+actually played under whatever happens to the season row afterwards.
 
-Nothing can set a game's tempo independently of its season yet — a single blitz
+**The season's tempo is fixed once it leaves preparation**, same rule as the
+pairing system: `SeasonController::update` rejects a change (the Basic details
+tab disables the select and says so). Otherwise one tournament would run half
+at one tempo and half at another — and a full-schedule system pairs every game
+up front, so a later change wouldn't reach any of them.
+
+Nothing can set a game's tempo independently of its season — a single blitz
 board inside a classical evening isn't expressible.
 
 ### Member Home and Absence Self-Report
