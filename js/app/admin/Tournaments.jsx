@@ -5,7 +5,6 @@ import { Link } from '../router/router';
 import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
 import { CreateTournamentDialog } from './CreateTournamentDialog';
-import { TournamentSettingsDialog } from './TournamentSettingsDialog';
 import { PAIRING_LABELS, STATUS_LABELS } from './tournamentShared';
 import {
 	Notice,
@@ -16,8 +15,9 @@ import {
 import { keys } from '../api/keys';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /
-// Completed, from GET /seasons. Clicking a name opens the detail page
-// (/admin/tournaments/:id) with basic-details / players / categories tabs.
+// Completed, from GET /seasons. This screen only lists and creates — everything
+// about a single tournament, settings and delete included, lives on its detail
+// page (/admin/tournaments/:id), reached by clicking the name.
 
 // Display order of the status groups.
 const GROUPS = [
@@ -29,7 +29,6 @@ const GROUPS = [
 export function Tournaments() {
 	const [ importing, setImporting ] = useState( false );
 	const [ creating, setCreating ] = useState( false );
-	const [ settingsFor, setSettingsFor ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: keys.seasons(),
@@ -65,7 +64,6 @@ export function Tournaments() {
 								key={ g.status }
 								label={ g.label }
 								rows={ rows }
-								onSettings={ setSettingsFor }
 							/>
 						);
 					} ) }
@@ -109,12 +107,6 @@ export function Tournaments() {
 			{ importing && (
 				<ImportSeasonDialog onClose={ () => setImporting( false ) } />
 			) }
-			{ settingsFor && (
-				<TournamentSettingsDialog
-					season={ settingsFor }
-					onClose={ () => setSettingsFor( null ) }
-				/>
-			) }
 		</>
 	);
 }
@@ -128,7 +120,7 @@ function byEndDate( a, b ) {
 	return b.end_date.localeCompare( a.end_date );
 }
 
-function TournamentGroup( { label, rows, onSettings } ) {
+function TournamentGroup( { label, rows } ) {
 	const sorted = [ ...rows ].sort( byEndDate );
 	return (
 		<section>
@@ -144,9 +136,6 @@ function TournamentGroup( { label, rows, onSettings } ) {
 							<th className="px-4 py-2 font-medium">Pairing</th>
 							<th className="px-4 py-2 font-medium">Dates</th>
 							<th className="px-4 py-2 font-medium">Status</th>
-							<th className="px-4 py-2 font-medium">
-								<span className="sr-only">Actions</span>
-							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -178,15 +167,6 @@ function TournamentGroup( { label, rows, onSettings } ) {
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
 									{ STATUS_LABELS[ s.status ] ?? s.status }
-								</td>
-								<td className="px-4 py-2.5 text-right">
-									<button
-										type="button"
-										className="text-sm text-ink-3 hover:text-ink"
-										onClick={ () => onSettings( s ) }
-									>
-										Settings
-									</button>
 								</td>
 							</tr>
 						) ) }

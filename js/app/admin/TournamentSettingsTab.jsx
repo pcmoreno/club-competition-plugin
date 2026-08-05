@@ -1,35 +1,20 @@
 import { useState, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../api/client';
-import { Dialog } from '../components/Dialog';
+import { api } from '../api/client';
+import { navigate } from '../router/router';
 import { ConfirmModal, Notice } from '../components/ui';
+import { primaryBtn, ghostBtn, errorMessage } from './tournamentShared';
 import { keys } from '../api/keys';
 
-// ADMIN. Tournament engine settings. The form is rendered entirely from the
-// field schema served by GET /seasons/{id}/settings, so a new scoring system
-// (or a new metric) needs no change here — only its getSettingsFields().
-// Scoring is read-only once a round has completed; display settings never lock.
+// ADMIN. Settings tab of the tournament detail page: the engine's three axes
+// (pairing, scoring, standings columns) plus delete. The form is rendered
+// entirely from the field schema served by GET /seasons/{id}/settings, so a new
+// system — or a new knob on an existing one — needs no change here, only its
+// getSettingsFields(). Scoring is read-only once a round has completed; display
+// settings never lock.
 
-const primaryBtn =
-	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60';
-const ghostBtn =
-	'rounded px-4 py-2 text-sm font-medium text-ink-3 hover:text-ink disabled:opacity-60';
 const inputCls =
 	'rounded border border-rule bg-paper px-2 py-1 text-sm text-ink disabled:opacity-60';
-
-function errorMessage( err ) {
-	if ( err instanceof ApiError ) {
-		// Field-level validation errors come back keyed by path.
-		const errors = err.body?.data?.errors || err.body?.errors;
-		if ( errors && typeof errors === 'object' ) {
-			return Object.entries( errors )
-				.map( ( [ key, msg ] ) => `${ key }: ${ msg }` )
-				.join( ' · ' );
-		}
-		return err.message;
-	}
-	return 'Something went wrong. Please try again.';
-}
 
 // Clearing a number input yields '', and parseFloat('') is NaN — which isn't
 // nullish, so the `?? default` on the value prop doesn't catch it. React then
@@ -209,9 +194,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 
 	const patch = ( index, changes ) =>
 		onChange(
-			list.map( ( row, i ) =>
-				i === index ? { ...row, ...changes } : row
-			)
+			list.map( ( row, i ) => ( i === index ? { ...row, ...changes } : row ) )
 		);
 
 	const removeAt = ( index ) => {
@@ -281,10 +264,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 					className={ ghostBtn + ' px-0' }
 					disabled={ disabled }
 					onClick={ () =>
-						onChange( [
-							...list,
-							{ key: '', label: '', points: 0 },
-						] )
+						onChange( [ ...list, { key: '', label: '', points: 0 } ] )
 					}
 				>
 					+ Add bye type
@@ -322,8 +302,7 @@ function TiebreakConfig( {
 						{ labelFor( metric ) }
 					</h4>
 					{ fields.map( ( f ) => {
-						const current =
-							values?.[ metric ]?.[ f.key ] ?? f.default;
+						const current = values?.[ metric ]?.[ f.key ] ?? f.default;
 						const set = ( v ) =>
 							onChange( {
 								...values,
@@ -542,9 +521,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 								type="number"
 								step={ f.step ?? 0.5 }
 								className={ inputCls + ' num w-20' }
-								value={
-									values.gameOutcomes?.[ f.key ] ?? f.default
-								}
+								value={ values.gameOutcomes?.[ f.key ] ?? f.default }
 								disabled={ disabled }
 								onChange={ ( e ) =>
 									setValues( {
@@ -642,7 +619,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 	return null;
 }
 
-export function TournamentSettingsDialog( { season, onClose } ) {
+export function TournamentSettingsTab( { season } ) {
 	const queryClient = useQueryClient();
 	const [ pairing, setPairing ] = useState( null );
 	const [ scoring, setScoring ] = useState( null );
@@ -657,7 +634,9 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 		mutationFn: () => api.del( `seasons/${ season.id }` ),
 		onSuccess: () => {
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
-			onClose();
+			// This tab lives on the deleted tournament's own page, so there's
+			// nothing left to return to.
+			navigate( '/admin/tournaments' );
 		},
 	} );
 
@@ -697,8 +676,7 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 	}, [ data ] );
 
 	const save = useMutation( {
-		mutationFn: ( payload ) =>
-			api.patch( `seasons/${ season.id }`, payload ),
+		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
 			setSaved( true );
 			// Saved state is now the server's, so let the refetch below reseed —
@@ -733,133 +711,111 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 		save.mutate( payload );
 	};
 
-	let body;
 	if ( isLoading ) {
-		body = <Notice>Loading…</Notice>;
-	} else if ( isError ) {
-		body = <Notice>Couldn’t load settings. Please try again.</Notice>;
-	} else {
-		body = (
-			<div className="flex flex-col gap-6">
-				{ scoringLocked && (
-					<Notice>
-						A round has been completed, so scoring settings are
-						locked for this tournament. Display settings can still
-						be changed.
-					</Notice>
-				) }
-
-				{ pairingFields && pairingFields.length > 0 && (
-					<section>
-						<SectionTitle hint="How the tournament is run.">
-							Pairing
-						</SectionTitle>
-						<div className="flex flex-col gap-3">
-							{ pairingFields.map( ( f ) => (
-								<PairingRow
-									key={ f.key }
-									field={ f }
-									values={ pairing }
-									setValues={ editPairing }
-									disabled={ save.isPending }
-								/>
-							) ) }
-						</div>
-					</section>
-				) }
-
-				{ scoringFields && scoring ? (
-					scoringFields.map( ( group ) => (
-						<ScoringGroup
-							key={ group.group }
-							group={ group }
-							values={ scoring }
-							setValues={ editScoring }
-							disabled={ scoringLocked || save.isPending }
-						/>
-					) )
-				) : (
-					<Notice>
-						Scoring for the “{ data?.scoring_system }” system isn’t
-						configurable yet.
-					</Notice>
-				) }
-
-				{ displayFields && display && (
-					<section>
-						<SectionTitle hint="Which columns the standings table shows, in order.">
-							Standings columns
-						</SectionTitle>
-						<OrderedMultiSelect
-							options={ displayFields[ 0 ].options }
-							value={ display.columns }
-							disabled={ save.isPending }
-							onChange={ ( columns ) =>
-								editDisplay( { ...display, columns } )
-							}
-						/>
-					</section>
-				) }
-			</div>
-		);
+		return <Notice>Loading…</Notice>;
+	}
+	if ( isError ) {
+		return <Notice>Couldn’t load settings. Please try again.</Notice>;
 	}
 
 	return (
-		<Dialog
-			title="Tournament settings"
-			description={ season.name }
-			size="xl"
-			scroll
-			busy={ save.isPending }
-			onClose={ onClose }
-			headerExtra={
-				<button
-					type="button"
-					className="rounded p-2 text-loss hover:bg-loss/10 disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
-					onClick={ () => setConfirmingDelete( true ) }
-					disabled={ ! canDelete }
-					title={
-						canDelete
-							? 'Delete tournament'
-							: 'Only a tournament in preparation can be deleted.'
-					}
-					aria-label="Delete tournament"
-				>
-					<TrashIcon />
-				</button>
-			}
-		>
-			<div className="mt-4">{ body }</div>
+		<div className="flex max-w-2xl flex-col gap-6">
+			{ scoringLocked && (
+				<Notice>
+					A round has been completed, so scoring settings are locked for
+					this tournament. Display settings can still be changed.
+				</Notice>
+			) }
+
+			{ pairingFields && pairingFields.length > 0 && (
+				<section>
+					<SectionTitle hint="How the tournament is run.">
+						Pairing
+					</SectionTitle>
+					<div className="flex flex-col gap-3">
+						{ pairingFields.map( ( f ) => (
+							<PairingRow
+								key={ f.key }
+								field={ f }
+								values={ pairing }
+								setValues={ editPairing }
+								disabled={ save.isPending }
+							/>
+						) ) }
+					</div>
+				</section>
+			) }
+
+			{ scoringFields && scoring ? (
+				scoringFields.map( ( group ) => (
+					<ScoringGroup
+						key={ group.group }
+						group={ group }
+						values={ scoring }
+						setValues={ editScoring }
+						disabled={ scoringLocked || save.isPending }
+					/>
+				) )
+			) : (
+				<Notice>
+					Scoring for the “{ data?.scoring_system }” system isn’t
+					configurable yet.
+				</Notice>
+			) }
+
+			{ displayFields && display && (
+				<section>
+					<SectionTitle hint="Which columns the standings table shows, in order.">
+						Standings columns
+					</SectionTitle>
+					<OrderedMultiSelect
+						options={ displayFields[ 0 ].options }
+						value={ display.columns }
+						disabled={ save.isPending }
+						onChange={ ( columns ) =>
+							editDisplay( { ...display, columns } )
+						}
+					/>
+				</section>
+			) }
 
 			{ save.isError && (
-				<p className="mt-3 text-sm text-loss">
-					{ errorMessage( save.error ) }
-				</p>
-			) }
-			{ saved && ! save.isError && (
-				<p className="mt-3 text-sm text-win">Settings saved.</p>
+				<p className="text-sm text-loss">{ errorMessage( save.error ) }</p>
 			) }
 
-			{ ! isLoading && ! isError && (
-				<div className="mt-6 flex justify-end gap-2">
-					<button
-						type="button"
-						className={ ghostBtn }
-						disabled={ save.isPending }
-						onClick={ onClose }
-					>
-						Close
-					</button>
-					<button
-						type="button"
-						className={ primaryBtn }
-						disabled={ save.isPending }
-						onClick={ submit }
-					>
-						{ save.isPending ? 'Saving…' : 'Save settings' }
-					</button>
-				</div>
-			) }
+			<div className="flex items-center gap-3">
+				<button
+					type="button"
+					className={ primaryBtn }
+					disabled={ save.isPending }
+					onClick={ submit }
+				>
+					{ save.isPending ? 'Saving…' : 'Save settings' }
+				</button>
+				{ saved && ! save.isError && (
+					<span className="text-sm text-muted">Settings saved.</span>
+				) }
+			</div>
+
+			<section className="mt-2 rounded border border-rule-soft p-4">
+				<SectionTitle
+					hint={
+						canDelete
+							? 'Removes the tournament and all its data. This can’t be undone.'
+							: 'Only a tournament in preparation can be deleted.'
+					}
+				>
+					Delete tournament
+				</SectionTitle>
+				<button
+					type="button"
+					className="rounded border border-loss px-3 py-1.5 text-sm text-loss hover:bg-loss/10 disabled:cursor-not-allowed disabled:border-rule disabled:text-muted disabled:hover:bg-transparent"
+					disabled={ ! canDelete }
+					onClick={ () => setConfirmingDelete( true ) }
+				>
+					Delete tournament
+				</button>
+			</section>
 
 			{ confirmingDelete && (
 				<ConfirmModal
@@ -874,9 +830,9 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 				>
 					<p>
 						Permanently delete{ ' ' }
-						<strong className="text-ink">{ season.name }</strong>{ ' ' }
-						and all its data (enrolled players, rounds, results)?
-						This can’t be undone.
+						<strong className="text-ink">{ season.name }</strong> and
+						all its data (enrolled players, rounds, results)? This
+						can’t be undone.
 					</p>
 					{ remove.isError && (
 						<p className="mt-3 text-loss">
@@ -885,25 +841,6 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 					) }
 				</ConfirmModal>
 			) }
-		</Dialog>
-	);
-}
-
-function TrashIcon( { className } ) {
-	return (
-		<svg
-			className={ className }
-			width="16"
-			height="16"
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.4"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden="true"
-		>
-			<path d="M2.5 4h11M6 4V2.5h4V4M5 4l.5 9h5l.5-9M6.5 6.5v4M9.5 6.5v4" />
-		</svg>
+		</div>
 	);
 }

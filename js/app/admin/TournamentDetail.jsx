@@ -8,12 +8,14 @@ import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
 import { TournamentCategoriesTab } from './TournamentCategoriesTab';
+import { TournamentSettingsTab } from './TournamentSettingsTab';
 import { keys } from '../api/keys';
 
 // ADMIN. Detail page for a single tournament (= season), reached by clicking a
-// name in the Tournaments list (/admin/tournaments/:id). Three tabs: Basic
-// details (name/pairing/dates/location), Players (enrolment) and Categories.
-// Scoring/tie-breaks/display and delete stay in the separate Settings dialog.
+// name in the Tournaments list (/admin/tournaments/:id). Everything about one
+// tournament lives here: Basic details (name/pairing/dates/location), Pairings,
+// Players (enrolment), Categories, and Settings (the engine's pairing/scoring/
+// display knobs, plus delete).
 
 // The Pairings tab only applies once the tournament has started (you enrol and
 // set categories in preparation, then Start). It's the default tab while active.
@@ -25,6 +27,7 @@ function tabsFor( status ) {
 			: [] ),
 		{ key: 'players', label: 'Players' },
 		{ key: 'categories', label: 'Categories' },
+		{ key: 'settings', label: 'Settings' },
 	];
 }
 
@@ -141,6 +144,9 @@ export function TournamentDetail( { seasonId } ) {
 						season={ season }
 						players={ players }
 					/>
+				) }
+				{ activeTab === 'settings' && (
+					<TournamentSettingsTab season={ season } />
 				) }
 			</div>
 
