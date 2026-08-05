@@ -22,7 +22,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Keizer pairing and scoring | **Not implemented** — no Keizer engine |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Email notifications | Invites, password resets, absence notices |
-| Round dates in the admin UI | **Not implemented** — `rounds.date` exists, nothing writes it |
+| Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
 
 ## Architecture
@@ -298,8 +298,12 @@ classical season turns the absence into a bye that affects scoring. The reason i
 for it. Withdrawal removes only an `Absent` + `Personal` row; an admin
 re-classification is theirs to reverse.
 
-The picker is meant to read "Round 12 · Tue 9 Dec", but nothing in the admin UI
-writes `rounds.date` yet, so it currently degrades to the round number alone.
+The picker reads "Round 12 · Tue 9 Dec" once the round has a date, and degrades
+to the number alone when it doesn't — undated rounds sort last rather than
+dropping out. The date is set on the admin Pairings tab (`PATCH /rounds/{id}`),
+which is deliberately not guarded on round status: it records the evening a
+round was played, not competition data, so correcting it afterwards is a
+legitimate admin fix.
 
 ### Tournament Contacts
 

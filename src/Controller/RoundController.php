@@ -11,6 +11,7 @@ use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
+use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\RoundRepository;
@@ -20,6 +21,7 @@ use SCS\Request\CreateRoundRequest;
 use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdatePairingRequest;
+use SCS\Request\UpdateRoundRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\RoundService;
@@ -166,6 +168,32 @@ class RoundController extends RestController
                     $rounds
                 ),
             ]);
+        });
+    }
+
+    /**
+     * Set or clear the round's date. Not guarded on round status: the date is
+     * when the evening was played, not competition data, so correcting it after
+     * the fact is a legitimate admin fix.
+     */
+    public function update(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
+            }
+
+            $input = UpdateRoundRequest::fromRequest($request);
+            $this->validate($input);
+
+            if (!$input->dateProvided) {
+                throw new ValidationException(['fields' => 'No fields to update.']);
+            }
+
+            $this->roundRepository->update($round->id, ['date' => $input->date]);
+
+            return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
         });
     }
 

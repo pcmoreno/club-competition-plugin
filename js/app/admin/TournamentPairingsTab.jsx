@@ -28,6 +28,9 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
 	const [ confirmReopen, setConfirmReopen ] = useState( false );
 	const [ confirmGenerate, setConfirmGenerate ] = useState( false );
+	// Held locally so the input doesn't snap back to the stored value between the
+	// change and the refetch that confirms it.
+	const [ dateDraft, setDateDraft ] = useState( null );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
@@ -123,9 +126,10 @@ export function TournamentPairingsTab( { season, players } ) {
 	const resultsOpen = round !== null && round.status === 'finalised';
 
 	// Clearing the builder whenever the round changes avoids a slot carrying a
-	// half-made pairing across rounds.
+	// half-made pairing across rounds; the date draft belongs to one round too.
 	useEffect( () => {
 		setBuilder( { white: null, black: null } );
+		setDateDraft( null );
 	}, [ currentRoundId ] );
 
 	const roundKey = keys.round( currentRoundId );
@@ -158,6 +162,17 @@ export function TournamentPairingsTab( { season, players } ) {
 			setSelectedRoundId( created?.rounds?.[ 0 ]?.id ?? null );
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+		},
+	} );
+
+	// Round dates are the only thing here that isn't competition data, so this
+	// stays open whatever the round's status — correcting the evening a round was
+	// played on is a legitimate fix after the fact.
+	const setRoundDate = useMutation( {
+		mutationFn: ( date ) => api.patch( `rounds/${ currentRoundId }`, { date } ),
+		onSuccess: () => {
+			invalidateRound();
+			queryClient.invalidateQueries( { queryKey: roundsKey } );
 		},
 	} );
 
@@ -505,6 +520,48 @@ export function TournamentPairingsTab( { season, players } ) {
 					) }
 				</div>
 			</div>
+
+			{ round && (
+				<div className="flex flex-wrap items-center gap-3">
+					<label className="flex items-center gap-2">
+						<span className="text-xs uppercase tracking-wide text-muted">
+							Date
+						</span>
+						<input
+							type="date"
+							value={ dateDraft ?? round.date ?? '' }
+							disabled={ setRoundDate.isPending }
+							onChange={ ( e ) => {
+								setDateDraft( e.target.value );
+								setRoundDate.mutate( e.target.value );
+							} }
+							className="rounded border border-rule bg-paper px-2 py-1 text-sm text-ink disabled:opacity-60"
+						/>
+					</label>
+					{ ( dateDraft ?? round.date ) && (
+						<button
+							type="button"
+							onClick={ () => {
+								setDateDraft( '' );
+								setRoundDate.mutate( '' );
+							} }
+							disabled={ setRoundDate.isPending }
+							className="text-xs text-ink-3 hover:text-ink disabled:opacity-40"
+						>
+							Clear
+						</button>
+					) }
+					<span className="text-xs text-muted">
+						The evening this round is played. Shown to members when
+						they say they can’t make it.
+					</span>
+					{ setRoundDate.isError && (
+						<span className="text-sm text-loss">
+							{ errorMessage( setRoundDate.error ) }
+						</span>
+					) }
+				</div>
+			) }
 
 			{ season.cadence === 'per-round' && (
 				<Notice>
