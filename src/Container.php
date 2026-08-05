@@ -101,7 +101,8 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
-        $container->register('settings_validator', Services\SettingsValidator::class);
+        $container->register('settings_validator', Services\SettingsValidator::class)
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('player_display_service', Services\PlayerDisplayService::class)
             ->addArgument(new Reference('season_player_repository'))

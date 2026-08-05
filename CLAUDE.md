@@ -140,9 +140,12 @@ class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
-**`SettingsResolver::pairing()` returns null for every system except Manual**,
-so Swiss and round-robin seasons currently have no pairing settings at all —
-the endpoint sends `fields: null` and the dialog renders nothing for them.
+**`SettingsResolver::pairing()` returns null for Swiss and Keizer**, which have
+no pairing settings class yet — the endpoint sends `fields: null` and the dialog
+renders nothing for them. Manual and both round-robins resolve. The mapping
+itself lives in `pairingFor(PairingSystem, array)`, keyed by system rather than
+season so `SettingsValidator` can normalise a submitted blob against the same
+match arm before any season holds it.
 
 Individual knobs live in `src/Engine/Settings/Setting/` as `SettingInterface`
 objects owning their key, schema and value coercion; settings classes
@@ -158,6 +161,23 @@ predates it reads as unlimited. It is **enforced**: `SettingsResolver::roundLimi
 reads it by key, and `RoundRepository::createNextForSeason` refuses a round past
 it — inside the same `forUpdate()` lock as the number it's checked against, so
 two concurrent appends can't overshoot.
+
+Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`; the grouped
+variant adds `Grouping`. **There is deliberately no round count** — it is
+legs × (N-1) for an even field and legs × N for an odd one — and no bye value,
+because the odd player out takes the `pairing_bye` that scoring already prices.
+`Legs` caps at a flat 100 because a Setting can't see the roster: what is
+actually bounded is legs × field size (100 legs is fine for a two-player match
+and impossible for four players), so the real ceiling belongs to the generator.
+`Grouping` only implements "the season's categories"; the rating splits need a
+conditional group-count field the settings form can't render yet.
+
+**No pairing generator exists for round-robin yet**, so these settings are
+currently inert configuration — a round-robin season is still hand-paired, and
+`roundLimit()` returns null for it so rounds can still be appended freely. When
+the generator lands, ad-hoc round creation has to be refused for
+`PairingSystem::cadence() === 'full'` outright rather than capped, since there
+the schedule *is* the round set.
 
 ### Member Authentication
 

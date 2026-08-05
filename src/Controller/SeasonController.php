@@ -379,7 +379,7 @@ class SeasonController extends RestController
                 $data['scoring_settings'] = null;
             }
         } elseif ($input->pairing_settings !== null) {
-            $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($input->pairing_settings));
+            $data['pairing_settings'] = json_encode($this->settingsValidator->validatePairing($newSystem, $input->pairing_settings));
         }
 
         if ($input->scoring_settings !== null) {

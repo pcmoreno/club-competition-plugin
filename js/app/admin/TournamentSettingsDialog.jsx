@@ -397,38 +397,31 @@ function NullableNumberField( { field, value, onChange, disabled } ) {
 	const isNull = value === null || value === undefined;
 
 	return (
-		<div>
-			<div className="flex items-center gap-3">
+		<div className="flex items-center gap-3">
+			<input
+				type="number"
+				min={ field.min ?? 1 }
+				max={ field.max }
+				step={ field.step ?? 1 }
+				className={ inputCls + ' num w-28 text-right' }
+				value={ isNull ? '' : value }
+				disabled={ disabled || isNull }
+				onChange={ ( e ) => {
+					const n = parseInt( e.target.value, 10 );
+					onChange( Number.isFinite( n ) ? n : null );
+				} }
+			/>
+			<span className="flex items-center gap-2 text-sm text-ink-3">
 				<input
-					type="number"
-					min={ field.min ?? 1 }
-					max={ field.max }
-					step={ field.step ?? 1 }
-					className={ inputCls + ' num w-28 text-right' }
-					value={ isNull ? '' : value }
-					disabled={ disabled || isNull }
-					onChange={ ( e ) => {
-						const n = parseInt( e.target.value, 10 );
-						onChange( Number.isFinite( n ) ? n : null );
-					} }
+					type="checkbox"
+					checked={ isNull }
+					disabled={ disabled }
+					onChange={ ( e ) =>
+						onChange( e.target.checked ? null : field.min ?? 1 )
+					}
 				/>
-				<label className="flex items-center gap-2 text-sm text-ink-3">
-					<input
-						type="checkbox"
-						checked={ isNull }
-						disabled={ disabled }
-						onChange={ ( e ) =>
-							onChange(
-								e.target.checked ? null : field.min ?? 1
-							)
-						}
-					/>
-					{ field.nullLabel }
-				</label>
-			</div>
-			{ field.hint && (
-				<p className="mt-1 text-xs text-ink-3">{ field.hint }</p>
-			) }
+				{ field.nullLabel }
+			</span>
 		</div>
 	);
 }
@@ -450,6 +443,39 @@ function PairingField( { field, values, setValues, disabled } ) {
 		);
 	}
 
+	if ( field.type === 'toggle' ) {
+		return (
+			<input
+				type="checkbox"
+				checked={ value === true }
+				disabled={ disabled }
+				onChange={ ( e ) => set( e.target.checked ) }
+			/>
+		);
+	}
+
+	if ( field.type === 'select' ) {
+		return (
+			<select
+				className={ inputCls + ' pr-8' }
+				value={ value ?? '' }
+				disabled={ disabled }
+				onChange={ ( e ) => set( e.target.value ) }
+			>
+				{ field.options.map( ( o ) => (
+					<option
+						key={ o.value }
+						value={ o.value }
+						disabled={ o.implemented === false }
+					>
+						{ o.label }
+						{ o.implemented === false ? ' (not implemented)' : '' }
+					</option>
+				) ) }
+			</select>
+		);
+	}
+
 	return (
 		<input
 			type="number"
@@ -461,6 +487,42 @@ function PairingField( { field, values, setValues, disabled } ) {
 			disabled={ disabled }
 			onChange={ ( e ) => set( toNumber( e.target.value, field.default ) ) }
 		/>
+	);
+}
+
+// One labelled pairing knob. A checkbox reads as its own label, so a toggle puts
+// the control first instead of stacking an empty box under a heading.
+function PairingRow( { field, values, setValues, disabled } ) {
+	const control = (
+		<PairingField
+			field={ field }
+			values={ values }
+			setValues={ setValues }
+			disabled={ disabled }
+		/>
+	);
+
+	return (
+		<label className="block">
+			{ field.type === 'toggle' ? (
+				<span className="flex items-center gap-2 text-sm text-ink-3">
+					{ control }
+					{ field.label }
+				</span>
+			) : (
+				<>
+					<span className="mb-1 block text-sm text-ink-3">
+						{ field.label }
+					</span>
+					{ control }
+				</>
+			) }
+			{ field.hint && (
+				<span className="mt-1 block text-xs text-ink-3">
+					{ field.hint }
+				</span>
+			) }
+		</label>
 	);
 }
 
@@ -694,17 +756,13 @@ export function TournamentSettingsDialog( { season, onClose } ) {
 						</SectionTitle>
 						<div className="flex flex-col gap-3">
 							{ pairingFields.map( ( f ) => (
-								<label key={ f.key } className="block">
-									<span className="mb-1 block text-sm text-ink-3">
-										{ f.label }
-									</span>
-									<PairingField
-										field={ f }
-										values={ pairing }
-										setValues={ editPairing }
-										disabled={ save.isPending }
-									/>
-								</label>
+								<PairingRow
+									key={ f.key }
+									field={ f }
+									values={ pairing }
+									setValues={ editPairing }
+									disabled={ save.isPending }
+								/>
 							) ) }
 						</div>
 					</section>
