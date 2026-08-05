@@ -416,9 +416,11 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	return (
 		<div className="space-y-6">
-			{ /* Round bar */ }
-			<div className="flex flex-wrap items-center gap-3 border-b border-rule pb-4">
-				<div className="flex flex-wrap items-center gap-1">
+			{ /* Round bar. The round list is its own flex column so a long
+			     schedule wraps within it instead of pushing the round actions
+			     onto a line of their own. */ }
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-rule pb-4">
+				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
 					{ ordered.map( ( r ) => (
 						<button
 							key={ r.id }
@@ -434,25 +436,25 @@ export function TournamentPairingsTab( { season, players } ) {
 							Round { r.round_number }
 						</button>
 					) ) }
+
+					{ roundsFull && (
+						<span className="ml-2 text-sm text-muted">
+							All { roundLimit } rounds created
+						</span>
+					) }
+					{ ! roundsFull && canAddRound && (
+						<button
+							type="button"
+							onClick={ () => createRound.mutate() }
+							disabled={ createRound.isPending }
+							className="ml-1 rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
+						>
+							{ createRound.isPending ? 'Adding…' : '+ New round' }
+						</button>
+					) }
 				</div>
 
-				{ roundsFull && (
-					<span className="text-sm text-muted">
-						All { roundLimit } rounds created
-					</span>
-				) }
-				{ ! roundsFull && canAddRound && (
-					<button
-						type="button"
-						onClick={ () => createRound.mutate() }
-						disabled={ createRound.isPending }
-						className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
-					>
-						{ createRound.isPending ? 'Adding…' : '+ New round' }
-					</button>
-				) }
-
-				<div className="ml-auto flex items-center gap-3">
+				<div className="flex shrink-0 items-center gap-3">
 					{ genLabel && season.cadence === 'full' && (
 						<button
 							type="button"
