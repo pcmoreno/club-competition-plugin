@@ -17,24 +17,44 @@ use SCS\Entity\Enum\SeedingMethod;
  * Legs and seeding apply within each group — the groups are separate
  * tournaments that happen to share a round schedule and a standings page.
  */
-final class RoundRobinGroupsPairingSettings implements TournamentPairingSettings
+final class RoundRobinGroupsPairingSettings implements RoundRobinSettings
 {
     public function __construct(
-        public readonly int $legs = 1,
-        public readonly SeedingMethod $seeding = SeedingMethod::Rating,
-        public readonly bool $alternateColoursPerLeg = AlternateColoursPerLeg::DEFAULT,
-        public readonly GroupingMode $grouping = GroupingMode::Categories,
+        private readonly int $legsValue = 1,
+        private readonly SeedingMethod $seedingValue = SeedingMethod::Rating,
+        private readonly bool $alternateColours = AlternateColoursPerLeg::DEFAULT,
+        private readonly GroupingMode $groupingValue = GroupingMode::Categories,
     ) {
+    }
+
+    public function legs(): int
+    {
+        return $this->legsValue;
+    }
+
+    public function seeding(): SeedingMethod
+    {
+        return $this->seedingValue;
+    }
+
+    public function alternateColoursPerLeg(): bool
+    {
+        return $this->alternateColours;
+    }
+
+    public function grouping(): GroupingMode
+    {
+        return $this->groupingValue;
     }
 
     /** @return array<string,mixed> */
     public function getSettings(): array
     {
         return [
-            Legs::KEY                   => $this->legs,
-            Seeding::KEY                => $this->seeding->value,
-            AlternateColoursPerLeg::KEY => $this->alternateColoursPerLeg,
-            Grouping::KEY               => $this->grouping->value,
+            Legs::KEY                   => $this->legsValue,
+            Seeding::KEY                => $this->seedingValue->value,
+            AlternateColoursPerLeg::KEY => $this->alternateColours,
+            Grouping::KEY               => $this->groupingValue->value,
         ];
     }
 

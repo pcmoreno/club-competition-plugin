@@ -212,7 +212,8 @@ class Container
             ->addArgument(new Reference('player_score_calculator'))
             ->addArgument(new Reference('standings_calculator'));
 
-        $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class);
+        $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class)
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('settings_resolver', Engine\SettingsResolver::class);
 
@@ -224,7 +225,8 @@ class Container
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
-            ->addArgument(new Reference('standings_snapshot_repository'));
+            ->addArgument(new Reference('standings_snapshot_repository'))
+            ->addArgument(new Reference('pairing_engine_resolver'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)

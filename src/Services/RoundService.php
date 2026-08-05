@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
+use SCS\Engine\Pairing\FullSchedulePairing;
+use SCS\Engine\PairingEngineResolver;
 use SCS\Engine\ScoringStrategyResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
@@ -11,6 +13,7 @@ use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Game;
 use SCS\Entity\Round;
+use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -33,7 +36,87 @@ final class RoundService
         private readonly GameRepository $games,
         private readonly AttendanceRepository $attendance,
         private readonly StandingsSnapshotRepository $snapshots,
+        private readonly PairingEngineResolver $pairingEngines,
     ) {
+    }
+
+    /**
+     * Build a full-schedule tournament's entire fixture in one go, as a run of
+     * draft rounds.
+     *
+     * Regenerating is only allowed while every round is still draft. The whole
+     * schedule is derived from pairing numbers, so rebuilding it rewrites boards
+     * from round 1 — harmless before anyone has seen them, and unacceptable once
+     * a round is published. The roster is effectively locked from here on for the
+     * same reason: a late enrolment shifts every number after it.
+     *
+     * @return list<Round>
+     */
+    public function generateSchedule(Season $season): array
+    {
+        $engine = $this->pairingEngines->resolve($season);
+        if (!$engine instanceof FullSchedulePairing) {
+            throw new ConflictException('This tournament pairs one round at a time, not as a whole schedule.');
+        }
+
+        $existing = $this->rounds->findBySeason($season->id);
+        foreach ($existing as $round) {
+            if ($round->status !== RoundStatus::Draft) {
+                throw new ConflictException(sprintf(
+                    'Round %d is already %s, so the schedule can no longer be generated.',
+                    $round->round_number,
+                    $round->status->value
+                ));
+            }
+        }
+
+        /** @var list<\SCS\Entity\SeasonPlayer> $roster */
+        $roster = $this->seasonPlayers->findBySeason($season->id);
+
+        // Outside the transaction: the engine is pure, and its guards (too few
+        // players, too many rounds) should fail before anything is deleted.
+        $schedule = $engine->pairSchedule($season, $roster);
+
+        return $this->transactions->transactional(function () use ($season, $existing, $schedule): array {
+            if ($existing !== []) {
+                $this->games->deleteBySeason($season->id);
+                $this->attendance->deleteBySeason($season->id);
+                $this->rounds->deleteBySeason($season->id);
+            }
+
+            $created = [];
+            foreach ($schedule as $index => $result) {
+                $round = $this->rounds->create($season->id, $index + 1, null, RoundStatus::Draft);
+
+                foreach ($result->pairings as $pairing) {
+                    $this->games->create(
+                        $round->id,
+                        $pairing['white'],
+                        $pairing['black'],
+                        $pairing['board'],
+                        null,
+                        $season->time_control,
+                    );
+                }
+
+                // The odd player out is present, not absent — a pairing bye is
+                // "here, but nobody to play", which is what scoring prices.
+                // Saved one at a time rather than through saveMany, which opens
+                // a transaction of its own and would nest inside this one.
+                foreach ($result->byes as $bye) {
+                    $this->attendance->save(
+                        $round->id,
+                        $bye['season_player_id'],
+                        AttendanceStatus::Present,
+                        ByeType::from($bye['bye_type']),
+                    );
+                }
+
+                $created[] = $round;
+            }
+
+            return $created;
+        });
     }
 
     public function addPairing(int $roundId, int $white, int $black, ?int $board): Game

@@ -9,6 +9,7 @@ use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
+use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
@@ -123,6 +124,14 @@ class RoundController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            // A full-schedule tournament's rounds come from its generated fixture,
+            // so an extra one would sit outside the schedule. Before there is a
+            // schedule the manual path stays open, so a failed generation can
+            // never leave the admin with no way to create a round at all.
+            if ($season->pairing_system->cadence() === 'full' && $this->roundRepository->findBySeason($season->id) !== []) {
+                throw new ConflictException('This tournament’s rounds come from its generated schedule.');
+            }
+
             $input = CreateRoundRequest::fromRequest($request);
             $this->validate($input);
 
@@ -133,6 +142,30 @@ class RoundController extends RestController
             );
 
             return $this->created($this->serializer->serialize($round, SerializerService::GROUP_ADMIN));
+        });
+    }
+
+    /**
+     * Build the whole fixture at once. Only for a full-schedule system
+     * (round-robin); the service refuses anything else, and refuses to rebuild
+     * once a round has left draft.
+     */
+    public function generate(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $rounds = $this->roundService->generateSchedule($season);
+
+            return $this->created([
+                'rounds' => array_map(
+                    fn ($round) => $this->serializer->serialize($round, SerializerService::GROUP_ADMIN),
+                    $rounds
+                ),
+            ]);
         });
     }
 

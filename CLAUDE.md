@@ -19,7 +19,8 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member invitations and auth (no WP account) | Built |
 | Member self-report absence | Built — see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
-| Keizer pairing and scoring | **Not implemented** — manual pairing only |
+| Keizer pairing and scoring | **Not implemented** — no Keizer engine |
+| Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | **Not implemented** — `rounds.date` exists, nothing writes it |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -111,10 +112,11 @@ it alone, and `PairingSystem::implementedValues()` excludes it, so neither
 `StandardScoring` (classical points + configurable tiebreaks) under
 `src/Engine/Scoring/`.
 
-No pairing **generator** exists for any system — `PairingEngineResolver` throws
-for everything except `manual`, so boards are hand-built whatever the season
-says. Pairing system and scoring system are separate axes here; don't read
-"Swiss is selectable" as "Swiss pairs itself".
+**Round-robin is the one system that pairs itself** —
+`RoundRobinPairing` (a `FullSchedulePairing`) builds the entire fixture as a
+FIDE Berger table, and `PairingEngineResolver` still throws for Swiss and
+Keizer, so those are hand-built. Pairing system and scoring system are separate
+axes here; don't read "Swiss is selectable" as "Swiss pairs itself".
 
 The seam is in place — implement `ScoringStrategyInterface` and register it in
 the resolver. The intended behaviour, for whoever builds it:
@@ -135,13 +137,14 @@ that round.
 Three axes, each a JSON column on `seasons` (`pairing_settings`,
 `scoring_settings`, `display_settings`), hydrated by `SettingsResolver` into
 typed objects that expose `getSettingsFields()` — a schema the admin Settings
-dialog renders the whole form from. Adding a knob means changing its settings
+tab (`TournamentSettingsTab`, on the tournament detail page) renders the whole
+form from. Adding a knob means changing its settings
 class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
 **`SettingsResolver::pairing()` returns null for Swiss and Keizer**, which have
-no pairing settings class yet — the endpoint sends `fields: null` and the dialog
+no pairing settings class yet — the endpoint sends `fields: null` and the tab
 renders nothing for them. Manual and both round-robins resolve. The mapping
 itself lives in `pairingFor(PairingSystem, array)`, keyed by system rather than
 season so `SettingsValidator` can normalise a submitted blob against the same
@@ -172,12 +175,42 @@ and impossible for four players), so the real ceiling belongs to the generator.
 `Grouping` only implements "the season's categories"; the rating splits need a
 conditional group-count field the settings form can't render yet.
 
-**No pairing generator exists for round-robin yet**, so these settings are
-currently inert configuration — a round-robin season is still hand-paired, and
-`roundLimit()` returns null for it so rounds can still be appended freely. When
-the generator lands, ad-hoc round creation has to be refused for
-`PairingSystem::cadence() === 'full'` outright rather than capped, since there
-the schedule *is* the round set.
+`roundLimit()` returns null for round-robin, and deliberately: the schedule is
+the round set, so `RoundController::store` refuses a hand-made round outright
+once a season with `cadence() === 'full'` has one — rather than capping at a
+number. Before there is a schedule the manual path stays open, so a failed
+generation can't leave the admin with no way to create a round at all.
+
+### Round-Robin Pairing
+
+`RoundRobinPairing` implements `FullSchedulePairing`: one call returns the whole
+fixture (`POST /seasons/{id}/rounds/generate` → `RoundService::generateSchedule`),
+persisted as a run of draft rounds with their games and pairing byes.
+
+The schedule is a **FIDE Berger table** and matches the published ones
+pair-for-pair and colour-for-colour — organisers check. One slot stays fixed
+while the rest rotate around it; its opponent in round *r* is *k*, every other
+pair is *(k+d, k−d)* around that rotation with the higher offset taking white,
+and the fixed slot alternates colour by round. An odd field plays as if one more
+player were present, and whoever draws that number sits out — exactly once each,
+recorded as a `pairing_bye` (present, not absent). Boards are ordered by highest
+seed in the pair, which is a presentation choice, not the table's own order.
+
+Three things follow from the fixture being derived from pairing numbers:
+
+- **Regeneration is refused once any round leaves draft.** Rebuilding rewrites
+  boards from round 1, which is fine before anyone has seen them and not after.
+- **The roster is locked in practice** from the moment it is generated. A late
+  enrolment shifts every number after it; nothing enforces this yet beyond the
+  draft rule.
+- **Hand-made rounds are refused** for `cadence() === 'full'` once a schedule
+  exists (see the round-limit note above).
+
+Guards live in the engine because only it sees both the legs and the roster:
+fewer than two players, a category with one player (grouped variant), and
+`legs × field size > 255` all throw a `ConflictException` naming the real
+numbers. They run before the transaction, so a rejected generation deletes
+nothing.
 
 ### Member Authentication
 
