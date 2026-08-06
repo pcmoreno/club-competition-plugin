@@ -176,7 +176,7 @@ and impossible for four players), so the real ceiling belongs to the generator.
 conditional group-count field the settings form can't render yet.
 
 `roundLimit()` returns null for round-robin, and deliberately: the schedule is
-the round set, so `RoundController::store` refuses a hand-made round outright
+the round set, so `RoundService::createRound` refuses a hand-made round outright
 once a season with `cadence() === 'full'` has one — rather than capping at a
 number. Before there is a schedule the manual path stays open, so a failed
 generation can't leave the admin with no way to create a round at all.

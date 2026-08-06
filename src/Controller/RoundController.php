@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
-use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
-use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
@@ -39,7 +37,6 @@ class RoundController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
         private readonly RoundService $roundService,
-        private readonly SettingsResolver $settingsResolver,
     ) {
         parent::__construct($validator);
     }
@@ -126,22 +123,10 @@ class RoundController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
-            // A full-schedule tournament's rounds come from its generated fixture,
-            // so an extra one would sit outside the schedule. Before there is a
-            // schedule the manual path stays open, so a failed generation can
-            // never leave the admin with no way to create a round at all.
-            if ($season->pairing_system->cadence() === 'full' && $this->roundRepository->findBySeason($season->id) !== []) {
-                throw new ConflictException('This tournament’s rounds come from its generated schedule.');
-            }
-
             $input = CreateRoundRequest::fromRequest($request);
             $this->validate($input);
 
-            $round = $this->roundRepository->createNextForSeason(
-                season_id: $season->id,
-                date:      $input->date,
-                maxRounds: $this->settingsResolver->roundLimit($season),
-            );
+            $round = $this->roundService->createRound($season, $input->date);
 
             return $this->created($this->serializer->serialize($round, SerializerService::GROUP_ADMIN));
         });

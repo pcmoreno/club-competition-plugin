@@ -226,7 +226,8 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
-            ->addArgument(new Reference('pairing_engine_resolver'));
+            ->addArgument(new Reference('pairing_engine_resolver'))
+            ->addArgument(new Reference('settings_resolver'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
@@ -297,8 +298,7 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('round_service'))
-            ->addArgument(new Reference('settings_resolver'));
+            ->addArgument(new Reference('round_service'));
 
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)
