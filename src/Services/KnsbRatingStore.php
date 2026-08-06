@@ -36,7 +36,7 @@ class KnsbRatingStore
     private bool $cacheLoaded = false;
 
     /**
-     * @param string $legacyDir pre-0.3.3 location inside the plugin, migrated on first use
+     * @param string $legacyDir pre-0.4.0 location inside the plugin, migrated on first use
      */
     public function __construct(
         private readonly string $legacyDir,
@@ -148,7 +148,7 @@ class KnsbRatingStore
 
     /**
      * The storage directory, created and hardened on first use, with any
-     * pre-0.3.3 file moved in from the old plugin-dir location.
+     * pre-0.4.0 file moved in from the old plugin-dir location.
      */
     private function dir(): string
     {
