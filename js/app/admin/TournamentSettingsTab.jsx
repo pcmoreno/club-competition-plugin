@@ -372,12 +372,14 @@ function TiebreakConfig( {
 // A number that can also be "not set" — the null is a real choice, not an empty
 // box, so it gets its own toggle. Ticking it clears and disables the input;
 // unticking hands back an empty field to type into.
-function NullableNumberField( { field, value, onChange, disabled } ) {
+function NullableNumberField( { id, field, value, onChange, disabled } ) {
 	const isNull = value === null || value === undefined;
+	const nullId = `${ id }-null`;
 
 	return (
 		<div className="flex items-center gap-3">
 			<input
+				id={ id }
 				type="number"
 				min={ field.min ?? 1 }
 				max={ field.max }
@@ -392,6 +394,7 @@ function NullableNumberField( { field, value, onChange, disabled } ) {
 			/>
 			<span className="flex items-center gap-2 text-sm text-ink-3">
 				<input
+					id={ nullId }
 					type="checkbox"
 					checked={ isNull }
 					disabled={ disabled }
@@ -399,7 +402,7 @@ function NullableNumberField( { field, value, onChange, disabled } ) {
 						onChange( e.target.checked ? null : field.min ?? 1 )
 					}
 				/>
-				{ field.nullLabel }
+				<label htmlFor={ nullId }>{ field.nullLabel }</label>
 			</span>
 		</div>
 	);
@@ -407,13 +410,14 @@ function NullableNumberField( { field, value, onChange, disabled } ) {
 
 // Pairing settings are a flat list of fields rather than the grouped shape
 // scoring uses, so they render straight from the schema.
-function PairingField( { field, values, setValues, disabled } ) {
+function PairingField( { id, field, values, setValues, disabled } ) {
 	const value = values?.[ field.key ] ?? field.default ?? null;
 	const set = ( v ) => setValues( { ...values, [ field.key ]: v } );
 
 	if ( field.type === 'number' && field.nullable ) {
 		return (
 			<NullableNumberField
+				id={ id }
 				field={ field }
 				value={ value }
 				onChange={ set }
@@ -425,6 +429,7 @@ function PairingField( { field, values, setValues, disabled } ) {
 	if ( field.type === 'toggle' ) {
 		return (
 			<input
+				id={ id }
 				type="checkbox"
 				checked={ value === true }
 				disabled={ disabled }
@@ -436,6 +441,7 @@ function PairingField( { field, values, setValues, disabled } ) {
 	if ( field.type === 'select' ) {
 		return (
 			<select
+				id={ id }
 				className={ inputCls + ' pr-8' }
 				value={ value ?? '' }
 				disabled={ disabled }
@@ -457,6 +463,7 @@ function PairingField( { field, values, setValues, disabled } ) {
 
 	return (
 		<input
+			id={ id }
 			type="number"
 			min={ field.min }
 			max={ field.max }
@@ -472,8 +479,13 @@ function PairingField( { field, values, setValues, disabled } ) {
 // One labelled pairing knob. A checkbox reads as its own label, so a toggle puts
 // the control first instead of stacking an empty box under a heading.
 function PairingRow( { field, values, setValues, disabled } ) {
+	// Bound by htmlFor rather than by wrapping: a nullable number is two
+	// controls, and a wrapping label binds to the first one — the number input,
+	// which is disabled exactly when the null box is ticked.
+	const id = `pairing-${ field.key }`;
 	const control = (
 		<PairingField
+			id={ id }
 			field={ field }
 			values={ values }
 			setValues={ setValues }
@@ -482,17 +494,20 @@ function PairingRow( { field, values, setValues, disabled } ) {
 	);
 
 	return (
-		<label className="block">
+		<div>
 			{ field.type === 'toggle' ? (
 				<span className="flex items-center gap-2 text-sm text-ink-3">
 					{ control }
-					{ field.label }
+					<label htmlFor={ id }>{ field.label }</label>
 				</span>
 			) : (
 				<>
-					<span className="mb-1 block text-sm text-ink-3">
+					<label
+						htmlFor={ id }
+						className="mb-1 block text-sm text-ink-3"
+					>
 						{ field.label }
-					</span>
+					</label>
 					{ control }
 				</>
 			) }
@@ -501,7 +516,7 @@ function PairingRow( { field, values, setValues, disabled } ) {
 					{ field.hint }
 				</span>
 			) }
-		</label>
+		</div>
 	);
 }
 
