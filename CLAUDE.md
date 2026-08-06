@@ -207,10 +207,11 @@ Three things follow from the fixture being derived from pairing numbers:
   exists (see the round-limit note above).
 
 Guards live in the engine because only it sees both the legs and the roster:
-fewer than two players, a category with one player (grouped variant), and
-`legs × field size > 255` all throw a `ConflictException` naming the real
-numbers. They run before the transaction, so a rejected generation deletes
-nothing.
+fewer than two players, a category with one player (grouped variant), and a
+schedule longer than 255 rounds — legs × (N-1) for an even field and legs × N
+for an odd one, taken from the largest group — all throw a `ConflictException`
+naming the real numbers. They run before the transaction, so a rejected
+generation deletes nothing.
 
 ### Member Authentication
 
