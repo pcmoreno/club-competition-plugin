@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use SCS\Engine\Settings\ManualPairingSettings;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
+use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\BuchholzMethod;
 use SCS\Entity\Enum\ByeType;
+use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\StandingsColumn;
 use SCS\Entity\Enum\StandingsMetric;
 use SCS\Entity\Enum\TprMethod;
@@ -17,6 +18,10 @@ use SCS\Exception\ValidationException;
 // Strict gate on client-supplied settings JSON; returns the normalized array to store.
 final class SettingsValidator
 {
+    public function __construct(private readonly SettingsResolver $settingsResolver)
+    {
+    }
+
     /**
      * @param array<string,mixed> $input
      * @return array<string,mixed>
@@ -127,11 +132,21 @@ final class SettingsValidator
     }
 
     /**
+     * Pairing settings are per-system, so the system decides which class parses
+     * the blob. Every knob normalises rather than rejects, so there is nothing
+     * to collect errors from — the one failure is a system with no settings at
+     * all, where storing the payload would leave values no engine ever reads.
+     *
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function validatePairing(array $input): array
+    public function validatePairing(PairingSystem $system, array $input): array
     {
-        return ManualPairingSettings::fromArray($input)->getSettings();
+        $settings = $this->settingsResolver->pairingFor($system, $input);
+        if ($settings === null) {
+            throw new ValidationException(['pairing_settings' => 'Pairing settings for this system are not supported yet.']);
+        }
+
+        return $settings->getSettings();
     }
 }

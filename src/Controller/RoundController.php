@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace SCS\Controller;
 
-use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Exception\NotFoundException;
+use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
 use SCS\Repository\RoundRepository;
@@ -19,6 +19,7 @@ use SCS\Request\CreateRoundRequest;
 use SCS\Request\SaveAttendanceRequest;
 use SCS\Request\UpdateGameResultRequest;
 use SCS\Request\UpdatePairingRequest;
+use SCS\Request\UpdateRoundRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\RoundService;
@@ -36,7 +37,6 @@ class RoundController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
         private readonly RoundService $roundService,
-        private readonly SettingsResolver $settingsResolver,
     ) {
         parent::__construct($validator);
     }
@@ -126,13 +126,59 @@ class RoundController extends RestController
             $input = CreateRoundRequest::fromRequest($request);
             $this->validate($input);
 
-            $round = $this->roundRepository->createNextForSeason(
-                season_id: $season->id,
-                date:      $input->date,
-                maxRounds: $this->settingsResolver->roundLimit($season),
-            );
+            $round = $this->roundService->createRound($season, $input->date);
 
             return $this->created($this->serializer->serialize($round, SerializerService::GROUP_ADMIN));
+        });
+    }
+
+    /**
+     * Build the whole fixture at once. Only for a full-schedule system
+     * (round-robin); the service refuses anything else, and refuses to rebuild
+     * once a round has left draft.
+     */
+    public function generate(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('season_id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $rounds = $this->roundService->generateSchedule($season);
+
+            return $this->created([
+                'rounds' => array_map(
+                    fn ($round) => $this->serializer->serialize($round, SerializerService::GROUP_ADMIN),
+                    $rounds
+                ),
+            ]);
+        });
+    }
+
+    /**
+     * Set or clear the round's date. Not guarded on round status: the date is
+     * when the evening was played, not competition data, so correcting it after
+     * the fact is a legitimate admin fix.
+     */
+    public function update(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
+            }
+
+            $input = UpdateRoundRequest::fromRequest($request);
+            $this->validate($input);
+
+            if (!$input->dateProvided) {
+                throw new ValidationException(['fields' => 'No fields to update.']);
+            }
+
+            $this->roundRepository->update($round->id, ['date' => $input->date]);
+
+            return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
         });
     }
 

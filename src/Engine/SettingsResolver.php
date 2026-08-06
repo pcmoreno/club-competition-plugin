@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SCS\Engine;
 
 use SCS\Engine\Settings\ManualPairingSettings;
+use SCS\Engine\Settings\RoundRobinGroupsPairingSettings;
+use SCS\Engine\Settings\RoundRobinPairingSettings;
 use SCS\Engine\Settings\Setting\NumberOfRounds;
 use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
@@ -21,9 +23,22 @@ final class SettingsResolver
     // Null when the season's system has no pairing settings implemented yet.
     public function pairing(Season $season): ?TournamentPairingSettings
     {
-        return match ($season->pairing_system) {
-            PairingSystem::Manual => ManualPairingSettings::fromArray($season->pairing_settings ?? []),
-            default               => null,
+        return $this->pairingFor($season->pairing_system, $season->pairing_settings ?? []);
+    }
+
+    /**
+     * The same mapping keyed by system rather than season, so a submitted blob
+     * can be normalised before any season holds it (see SettingsValidator).
+     *
+     * @param array<string,mixed> $values
+     */
+    public function pairingFor(PairingSystem $system, array $values): ?TournamentPairingSettings
+    {
+        return match ($system) {
+            PairingSystem::Manual           => ManualPairingSettings::fromArray($values),
+            PairingSystem::RoundRobinFull   => RoundRobinPairingSettings::fromArray($values),
+            PairingSystem::RoundRobinGroups => RoundRobinGroupsPairingSettings::fromArray($values),
+            default                         => null,
         };
     }
 

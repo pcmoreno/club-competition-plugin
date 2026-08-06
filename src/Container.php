@@ -101,7 +101,8 @@ class Container
 
         $container->register('serializer_service', Services\SerializerService::class);
 
-        $container->register('settings_validator', Services\SettingsValidator::class);
+        $container->register('settings_validator', Services\SettingsValidator::class)
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('player_display_service', Services\PlayerDisplayService::class)
             ->addArgument(new Reference('season_player_repository'))
@@ -211,7 +212,8 @@ class Container
             ->addArgument(new Reference('player_score_calculator'))
             ->addArgument(new Reference('standings_calculator'));
 
-        $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class);
+        $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class)
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('settings_resolver', Engine\SettingsResolver::class);
 
@@ -223,7 +225,9 @@ class Container
             ->addArgument(new Reference('round_repository'))
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
-            ->addArgument(new Reference('standings_snapshot_repository'));
+            ->addArgument(new Reference('standings_snapshot_repository'))
+            ->addArgument(new Reference('pairing_engine_resolver'))
+            ->addArgument(new Reference('settings_resolver'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
@@ -294,8 +298,7 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('round_service'))
-            ->addArgument(new Reference('settings_resolver'));
+            ->addArgument(new Reference('round_service'));
 
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)

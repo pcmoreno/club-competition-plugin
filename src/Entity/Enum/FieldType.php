@@ -9,6 +9,7 @@ enum FieldType: string
 {
     case Number            = 'number';
     case Select            = 'select';
+    case Toggle            = 'toggle';
     case OrderedMultiSelect = 'ordered_multiselect';
     case KeyedNumberList   = 'keyed_number_list';
 }

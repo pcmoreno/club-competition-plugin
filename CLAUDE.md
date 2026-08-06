@@ -19,9 +19,10 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member invitations and auth (no WP account) | Built |
 | Member self-report absence | Built — see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
-| Keizer pairing and scoring | **Not implemented** — manual pairing only |
+| Keizer pairing and scoring | **Not implemented** — no Keizer engine |
+| Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Email notifications | Invites, password resets, absence notices |
-| Round dates in the admin UI | **Not implemented** — `rounds.date` exists, nothing writes it |
+| Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
 
 ## Architecture
@@ -111,10 +112,11 @@ it alone, and `PairingSystem::implementedValues()` excludes it, so neither
 `StandardScoring` (classical points + configurable tiebreaks) under
 `src/Engine/Scoring/`.
 
-No pairing **generator** exists for any system — `PairingEngineResolver` throws
-for everything except `manual`, so boards are hand-built whatever the season
-says. Pairing system and scoring system are separate axes here; don't read
-"Swiss is selectable" as "Swiss pairs itself".
+**Round-robin is the one system that pairs itself** —
+`RoundRobinPairing` (a `FullSchedulePairing`) builds the entire fixture as a
+FIDE Berger table, and `PairingEngineResolver` still throws for Swiss and
+Keizer, so those are hand-built. Pairing system and scoring system are separate
+axes here; don't read "Swiss is selectable" as "Swiss pairs itself".
 
 The seam is in place — implement `ScoringStrategyInterface` and register it in
 the resolver. The intended behaviour, for whoever builds it:
@@ -135,14 +137,18 @@ that round.
 Three axes, each a JSON column on `seasons` (`pairing_settings`,
 `scoring_settings`, `display_settings`), hydrated by `SettingsResolver` into
 typed objects that expose `getSettingsFields()` — a schema the admin Settings
-dialog renders the whole form from. Adding a knob means changing its settings
+tab (`TournamentSettingsTab`, on the tournament detail page) renders the whole
+form from. Adding a knob means changing its settings
 class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
-**`SettingsResolver::pairing()` returns null for every system except Manual**,
-so Swiss and round-robin seasons currently have no pairing settings at all —
-the endpoint sends `fields: null` and the dialog renders nothing for them.
+**`SettingsResolver::pairing()` returns null for Swiss and Keizer**, which have
+no pairing settings class yet — the endpoint sends `fields: null` and the tab
+renders nothing for them. Manual and both round-robins resolve. The mapping
+itself lives in `pairingFor(PairingSystem, array)`, keyed by system rather than
+season so `SettingsValidator` can normalise a submitted blob against the same
+match arm before any season holds it.
 
 Individual knobs live in `src/Engine/Settings/Setting/` as `SettingInterface`
 objects owning their key, schema and value coercion; settings classes
@@ -158,6 +164,54 @@ predates it reads as unlimited. It is **enforced**: `SettingsResolver::roundLimi
 reads it by key, and `RoundRepository::createNextForSeason` refuses a round past
 it — inside the same `forUpdate()` lock as the number it's checked against, so
 two concurrent appends can't overshoot.
+
+Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`; the grouped
+variant adds `Grouping`. **There is deliberately no round count** — it is
+legs × (N-1) for an even field and legs × N for an odd one — and no bye value,
+because the odd player out takes the `pairing_bye` that scoring already prices.
+`Legs` caps at a flat 100 because a Setting can't see the roster: what is
+actually bounded is legs × field size (100 legs is fine for a two-player match
+and impossible for four players), so the real ceiling belongs to the generator.
+`Grouping` only implements "the season's categories"; the rating splits need a
+conditional group-count field the settings form can't render yet.
+
+`roundLimit()` returns null for round-robin, and deliberately: the schedule is
+the round set, so `RoundService::createRound` refuses a hand-made round outright
+once a season with `cadence() === 'full'` has one — rather than capping at a
+number. Before there is a schedule the manual path stays open, so a failed
+generation can't leave the admin with no way to create a round at all.
+
+### Round-Robin Pairing
+
+`RoundRobinPairing` implements `FullSchedulePairing`: one call returns the whole
+fixture (`POST /seasons/{id}/rounds/generate` → `RoundService::generateSchedule`),
+persisted as a run of draft rounds with their games and pairing byes.
+
+The schedule is a **FIDE Berger table** and matches the published ones
+pair-for-pair and colour-for-colour — organisers check. One slot stays fixed
+while the rest rotate around it; its opponent in round *r* is *k*, every other
+pair is *(k+d, k−d)* around that rotation with the higher offset taking white,
+and the fixed slot alternates colour by round. An odd field plays as if one more
+player were present, and whoever draws that number sits out — exactly once each,
+recorded as a `pairing_bye` (present, not absent). Boards are ordered by highest
+seed in the pair, which is a presentation choice, not the table's own order.
+
+Three things follow from the fixture being derived from pairing numbers:
+
+- **Regeneration is refused once any round leaves draft.** Rebuilding rewrites
+  boards from round 1, which is fine before anyone has seen them and not after.
+- **The roster is locked in practice** from the moment it is generated. A late
+  enrolment shifts every number after it; nothing enforces this yet beyond the
+  draft rule.
+- **Hand-made rounds are refused** for `cadence() === 'full'` once a schedule
+  exists (see the round-limit note above).
+
+Guards live in the engine because only it sees both the legs and the roster:
+fewer than two players, a category with one player (grouped variant), and a
+schedule longer than 255 rounds — legs × (N-1) for an even field and legs × N
+for an odd one, taken from the largest group — all throw a `ConflictException`
+naming the real numbers. They run before the transaction, so a rejected
+generation deletes nothing.
 
 ### Member Authentication
 
@@ -189,10 +243,16 @@ Admins are separate (created via WP-CLI, stored in the `admins` table).
 Both `seasons` and `games` carry a `time_control` (`TimeControl` enum: blitz /
 rapid / classical, `NOT NULL DEFAULT 'classical'`). A game takes the season's
 value **at the moment it is paired** (`RoundService::addPairing`) rather than
-reading through to the season on display, so changing a running tournament's
-tempo doesn't rewrite games already played under the old one.
+reading through to the season on display, so a game keeps the tempo it was
+actually played under whatever happens to the season row afterwards.
 
-Nothing can set a game's tempo independently of its season yet — a single blitz
+**The season's tempo is fixed once it leaves preparation**, same rule as the
+pairing system: `SeasonController::update` rejects a change (the Basic details
+tab disables the select and says so). Otherwise one tournament would run half
+at one tempo and half at another — and a full-schedule system pairs every game
+up front, so a later change wouldn't reach any of them.
+
+Nothing can set a game's tempo independently of its season — a single blitz
 board inside a classical evening isn't expressible.
 
 ### Member Home and Absence Self-Report
@@ -239,8 +299,12 @@ classical season turns the absence into a bye that affects scoring. The reason i
 for it. Withdrawal removes only an `Absent` + `Personal` row; an admin
 re-classification is theirs to reverse.
 
-The picker is meant to read "Round 12 · Tue 9 Dec", but nothing in the admin UI
-writes `rounds.date` yet, so it currently degrades to the round number alone.
+The picker reads "Round 12 · Tue 9 Dec" once the round has a date, and degrades
+to the number alone when it doesn't — undated rounds sort last rather than
+dropping out. The date is set on the admin Pairings tab (`PATCH /rounds/{id}`),
+which is deliberately not guarded on round status: it records the evening a
+round was played, not competition data, so correcting it afterwards is a
+legitimate admin fix.
 
 ### Tournament Contacts
 

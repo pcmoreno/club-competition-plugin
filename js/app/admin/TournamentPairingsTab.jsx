@@ -15,9 +15,9 @@ import { keys } from '../api/keys';
 // ADMIN. Pairings tab of the tournament detail page (default tab while active).
 // A manual round + pairings manager: create/select a round, build the board by
 // dragging enrolled players (listed at the bottom) into White/Black slots, enter
-// results, and advance the round status. Automatic generation is cadence-aware
-// (per-round vs full schedule) but only Manual pairing exists today, so the
-// Generate control is a disabled placeholder for the auto engines.
+// results, and advance the round status. Automatic generation is cadence-aware:
+// a full-schedule system (round-robin) builds every round in one call, while the
+// per-round engines don't exist yet and keep a disabled placeholder.
 export function TournamentPairingsTab( { season, players } ) {
 	const queryClient = useQueryClient();
 	const [ selectedRoundId, setSelectedRoundId ] = useState( null );
@@ -27,6 +27,10 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ byeOver, setByeOver ] = useState( null );
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
 	const [ confirmReopen, setConfirmReopen ] = useState( false );
+	const [ confirmGenerate, setConfirmGenerate ] = useState( false );
+	// Held locally so the input doesn't snap back to the stored value between the
+	// change and the refetch that confirms it.
+	const [ dateDraft, setDateDraft ] = useState( null );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
 
@@ -122,9 +126,10 @@ export function TournamentPairingsTab( { season, players } ) {
 	const resultsOpen = round !== null && round.status === 'finalised';
 
 	// Clearing the builder whenever the round changes avoids a slot carrying a
-	// half-made pairing across rounds.
+	// half-made pairing across rounds; the date draft belongs to one round too.
 	useEffect( () => {
 		setBuilder( { white: null, black: null } );
+		setDateDraft( null );
 	}, [ currentRoundId ] );
 
 	const roundKey = keys.round( currentRoundId );
@@ -143,6 +148,30 @@ export function TournamentPairingsTab( { season, players } ) {
 				);
 				setSelectedRoundId( created.id );
 			}
+			queryClient.invalidateQueries( { queryKey: roundsKey } );
+		},
+	} );
+
+	// Full-schedule systems build every round at once. The backend refuses to
+	// rebuild once a round has left draft, so this can't rewrite boards players
+	// have already seen.
+	const generateSchedule = useMutation( {
+		mutationFn: () => api.post( `seasons/${ season.id }/rounds/generate`, {} ),
+		onSuccess: ( created ) => {
+			setConfirmGenerate( false );
+			setSelectedRoundId( created?.rounds?.[ 0 ]?.id ?? null );
+			queryClient.invalidateQueries( { queryKey: roundsKey } );
+			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+		},
+	} );
+
+	// Round dates are the only thing here that isn't competition data, so this
+	// stays open whatever the round's status — correcting the evening a round was
+	// played on is a legitimate fix after the fact.
+	const setRoundDate = useMutation( {
+		mutationFn: ( date ) => api.patch( `rounds/${ currentRoundId }`, { date } ),
+		onSuccess: () => {
+			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 		},
 	} );
@@ -340,26 +369,50 @@ export function TournamentPairingsTab( { season, players } ) {
 		return <Notice>Loading…</Notice>;
 	}
 
-	// No rounds yet — offer to create the first one.
+	// No rounds yet. A full-schedule tournament generates its whole fixture from
+	// the roster; anything else starts with one round and is paired by hand.
 	if ( ordered.length === 0 ) {
+		const isFullSchedule = season.cadence === 'full';
 		return (
 			<div className="space-y-4">
 				<p className="text-sm text-ink-3">
-					No rounds yet. Create the first round to start pairing.
+					{ isFullSchedule
+						? 'No rounds yet. Generate the schedule to lay out every round from the enrolled players.'
+						: 'No rounds yet. Create the first round to start pairing.' }
 				</p>
-				<button
-					type="button"
-					onClick={ () => createRound.mutate() }
-					disabled={ createRound.isPending }
-					className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
-				>
-					{ createRound.isPending
-						? 'Creating…'
-						: 'Create first round' }
-				</button>
-				{ createRound.isError && (
+				<div className="flex flex-wrap items-center gap-3">
+					{ isFullSchedule && (
+						<button
+							type="button"
+							onClick={ () => generateSchedule.mutate() }
+							disabled={ generateSchedule.isPending }
+							className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60"
+						>
+							{ generateSchedule.isPending
+								? 'Generating…'
+								: 'Generate all rounds' }
+						</button>
+					) }
+					<button
+						type="button"
+						onClick={ () => createRound.mutate() }
+						disabled={ createRound.isPending }
+						className={
+							isFullSchedule
+								? 'rounded border border-rule px-4 py-2 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40'
+								: 'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2 disabled:opacity-60'
+						}
+					>
+						{ createRound.isPending
+							? 'Creating…'
+							: 'Create first round' }
+					</button>
+				</div>
+				{ ( createRound.isError || generateSchedule.isError ) && (
 					<p className="text-sm text-loss">
-						{ errorMessage( createRound.error ) }
+						{ errorMessage(
+							generateSchedule.error || createRound.error
+						) }
 					</p>
 				) }
 			</div>
@@ -368,6 +421,8 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	const roundsFull = roundLimit !== null && ordered.length >= roundLimit;
 	const genLabel = generateLabel( season.cadence );
+	// A generated fixture is the whole round set, so it can't be extended by hand.
+	const canAddRound = season.cadence !== 'full';
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
 	// Match the backend's board numbering (max existing board + 1) so the
 	// builder shows the number the new pairing will actually get.
@@ -376,9 +431,11 @@ export function TournamentPairingsTab( { season, players } ) {
 
 	return (
 		<div className="space-y-6">
-			{ /* Round bar */ }
-			<div className="flex flex-wrap items-center gap-3 border-b border-rule pb-4">
-				<div className="flex flex-wrap items-center gap-1">
+			{ /* Round bar. The round list is its own flex column so a long
+			     schedule wraps within it instead of pushing the round actions
+			     onto a line of their own. */ }
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-rule pb-4">
+				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
 					{ ordered.map( ( r ) => (
 						<button
 							key={ r.id }
@@ -394,25 +451,38 @@ export function TournamentPairingsTab( { season, players } ) {
 							Round { r.round_number }
 						</button>
 					) ) }
+
+					{ roundsFull && (
+						<span className="ml-2 text-sm text-muted">
+							All { roundLimit } rounds created
+						</span>
+					) }
+					{ ! roundsFull && canAddRound && (
+						<button
+							type="button"
+							onClick={ () => createRound.mutate() }
+							disabled={ createRound.isPending }
+							className="ml-1 rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
+						>
+							{ createRound.isPending ? 'Adding…' : '+ New round' }
+						</button>
+					) }
 				</div>
 
-				{ roundsFull ? (
-					<span className="text-sm text-muted">
-						All { roundLimit } rounds created
-					</span>
-				) : (
-					<button
-						type="button"
-						onClick={ () => createRound.mutate() }
-						disabled={ createRound.isPending }
-						className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
-					>
-						{ createRound.isPending ? 'Adding…' : '+ New round' }
-					</button>
-				) }
-
-				<div className="ml-auto flex items-center gap-3">
-					{ genLabel && (
+				<div className="flex shrink-0 items-center gap-3">
+					{ genLabel && season.cadence === 'full' && (
+						<button
+							type="button"
+							onClick={ () => setConfirmGenerate( true ) }
+							disabled={ generateSchedule.isPending }
+							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
+						>
+							{ generateSchedule.isPending
+								? 'Generating…'
+								: genLabel }
+						</button>
+					) }
+					{ genLabel && season.cadence !== 'full' && (
 						<button
 							type="button"
 							disabled
@@ -451,15 +521,60 @@ export function TournamentPairingsTab( { season, players } ) {
 				</div>
 			</div>
 
-			{ season.cadence && season.cadence !== 'manual' && (
+			{ round && (
+				<div className="flex flex-wrap items-center gap-3">
+					<label className="flex items-center gap-2">
+						<span className="text-xs uppercase tracking-wide text-muted">
+							Date
+						</span>
+						{ /* Written on blur, not per keystroke: editing one
+						     segment of a filled date input changes the whole
+						     value, so typing December over August would save
+						     January on the way, and emptying a segment makes
+						     the value '' — which clears the stored date. */ }
+						<input
+							type="date"
+							value={ dateDraft ?? round.date ?? '' }
+							onChange={ ( e ) => setDateDraft( e.target.value ) }
+							onBlur={ ( e ) => {
+								if ( e.target.value !== ( round.date ?? '' ) ) {
+									setRoundDate.mutate( e.target.value );
+								}
+							} }
+							onKeyDown={ ( e ) => {
+								if ( e.key === 'Enter' ) {
+									e.currentTarget.blur();
+								}
+							} }
+							className="rounded border border-rule bg-paper px-2 py-1 text-sm text-ink disabled:opacity-60"
+						/>
+					</label>
+					{ ( dateDraft ?? round.date ) && (
+						<button
+							type="button"
+							onClick={ () => {
+								setDateDraft( '' );
+								setRoundDate.mutate( '' );
+							} }
+							disabled={ setRoundDate.isPending }
+							className="text-xs text-ink-3 hover:text-ink disabled:opacity-40"
+						>
+							Clear
+						</button>
+					) }
+					{ setRoundDate.isError && (
+						<span className="text-sm text-loss">
+							{ errorMessage( setRoundDate.error ) }
+						</span>
+					) }
+				</div>
+			) }
+
+			{ season.cadence === 'per-round' && (
 				<Notice>
-					This tournament uses{ ' ' }
-					{ season.cadence === 'full'
-						? 'a full-schedule'
-						: 'a per-round' }{ ' ' }
-					pairing system. Automatic generation and the manual-override
-					setting aren’t available yet — pairings can be entered by
-					hand below in the meantime.
+					This tournament pairs one round at a time from the standings.
+					That engine isn’t built yet — pairings can be entered by hand
+					below in the meantime.
 				</Notice>
 			) }
 
@@ -740,6 +855,32 @@ export function TournamentPairingsTab( { season, players } ) {
 					{ setStatus.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( setStatus.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
+
+			{ confirmGenerate && (
+				<ConfirmModal
+					title="Generate tournament pairings"
+					confirmLabel={
+						generateSchedule.isPending
+							? 'Generating…'
+							: 'Generate all rounds'
+					}
+					danger
+					busy={ generateSchedule.isPending }
+					onCancel={ () => setConfirmGenerate( false ) }
+					onConfirm={ () => generateSchedule.mutate() }
+				>
+					This lays out every round from the { players.length } enrolled
+					players and replaces the rounds already here. Only possible
+					while every round is still a draft — publish one and the
+					schedule is fixed. Enrolling a player afterwards won’t change
+					it.
+					{ generateSchedule.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( generateSchedule.error ) }
 						</span>
 					) }
 				</ConfirmModal>

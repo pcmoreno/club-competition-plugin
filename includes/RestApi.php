@@ -416,10 +416,23 @@ class RestApi
                 ],
             ]);
 
+            register_rest_route('scs/v1', '/seasons/(?P<season_id>\d+)/rounds/generate', [
+                'methods'             => 'POST',
+                'callback'            => [$rounds, 'generate'],
+                'permission_callback' => $isAdmin,
+            ]);
+
             register_rest_route('scs/v1', '/rounds/(?P<id>\d+)', [
-                'methods'             => 'GET',
-                'callback'            => [$rounds, 'show'],
-                'permission_callback' => '__return_true',
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [$rounds, 'show'],
+                    'permission_callback' => '__return_true',
+                ],
+                [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$rounds, 'update'],
+                    'permission_callback' => $isAdmin,
+                ],
             ]);
 
             register_rest_route('scs/v1', '/rounds/(?P<id>\d+)/status', [
