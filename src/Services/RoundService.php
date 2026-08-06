@@ -7,6 +7,7 @@ namespace SCS\Services;
 use SCS\Engine\Pairing\FullSchedulePairing;
 use SCS\Engine\PairingEngineResolver;
 use SCS\Engine\ScoringStrategyResolver;
+use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
@@ -37,7 +38,29 @@ final class RoundService
         private readonly AttendanceRepository $attendance,
         private readonly StandingsSnapshotRepository $snapshots,
         private readonly PairingEngineResolver $pairingEngines,
+        private readonly SettingsResolver $settings,
     ) {
+    }
+
+    /**
+     * Append a round to a season that pairs one at a time.
+     *
+     * A full-schedule tournament's rounds come from its generated fixture, so an
+     * extra one would sit outside the schedule. Before there is a schedule the
+     * manual path stays open, so a failed generation can never leave the admin
+     * with no way to create a round at all.
+     */
+    public function createRound(Season $season, ?string $date): Round
+    {
+        if ($season->pairing_system->cadence() === 'full' && $this->rounds->findBySeason($season->id) !== []) {
+            throw new ConflictException('This tournament’s rounds come from its generated schedule.');
+        }
+
+        return $this->rounds->createNextForSeason(
+            season_id: $season->id,
+            date:      $date,
+            maxRounds: $this->settings->roundLimit($season),
+        );
     }
 
     /**
@@ -79,6 +102,10 @@ final class RoundService
 
         return $this->transactions->transactional(function () use ($season, $existing, $schedule): array {
             if ($existing !== []) {
+                // No FK cascade, so clear the child rows first — snapshots
+                // included, or they outlive the round ids they point at and the
+                // read paths' inner join hides them.
+                $this->snapshots->deleteBySeason($season->id);
                 $this->games->deleteBySeason($season->id);
                 $this->attendance->deleteBySeason($season->id);
                 $this->rounds->deleteBySeason($season->id);
