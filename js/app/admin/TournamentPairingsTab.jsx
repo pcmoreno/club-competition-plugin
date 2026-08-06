@@ -527,13 +527,24 @@ export function TournamentPairingsTab( { season, players } ) {
 						<span className="text-xs uppercase tracking-wide text-muted">
 							Date
 						</span>
+						{ /* Written on blur, not per keystroke: editing one
+						     segment of a filled date input changes the whole
+						     value, so typing December over August would save
+						     January on the way, and emptying a segment makes
+						     the value '' — which clears the stored date. */ }
 						<input
 							type="date"
 							value={ dateDraft ?? round.date ?? '' }
-							disabled={ setRoundDate.isPending }
-							onChange={ ( e ) => {
-								setDateDraft( e.target.value );
-								setRoundDate.mutate( e.target.value );
+							onChange={ ( e ) => setDateDraft( e.target.value ) }
+							onBlur={ ( e ) => {
+								if ( e.target.value !== ( round.date ?? '' ) ) {
+									setRoundDate.mutate( e.target.value );
+								}
+							} }
+							onKeyDown={ ( e ) => {
+								if ( e.key === 'Enter' ) {
+									e.currentTarget.blur();
+								}
 							} }
 							className="rounded border border-rule bg-paper px-2 py-1 text-sm text-ink disabled:opacity-60"
 						/>
