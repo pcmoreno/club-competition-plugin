@@ -133,9 +133,10 @@ function Shell() {
 		matchPath( '/players/:id', path ) !== null ||
 		matchPath( '/seasons/:seasonId/players/:id', path ) !== null;
 	// Home spans every tournament the member is in, so scoping it to one would
-	// be meaningless.
+	// be meaningless. Nor do the auth screens scope anything — signing in or
+	// setting a password from an emailed link has no season to pick.
 	const showTournamentSwitcher =
-		! isAdminMode && ! isPlayerDetail && path !== '/home';
+		! AuthView && ! isAdminMode && ! isPlayerDetail && path !== '/home';
 
 	let body;
 	if ( AuthView ) {
