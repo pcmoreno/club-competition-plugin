@@ -39,6 +39,53 @@ class AdminRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function findByInviteTokenHash(string $hash): ?Admin
+    {
+        $row = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->where('invite_token = :hash')
+            ->setParameter('hash', $hash)
+            ->fetchAssociative();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
+    /**
+     * Every admin, whatever their status — the Admins tab lists pending invites
+     * alongside active accounts. Notification recipients come from
+     * findAllActive() instead.
+     *
+     * @return list<Admin>
+     */
+    public function findAll(): array
+    {
+        $rows = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->orderBy('name', 'ASC')
+            ->fetchAllAssociative();
+
+        return array_values(array_map($this->hydrate(...), $rows));
+    }
+
+    /**
+     * The first admin account ever created, by id. There is no role column and
+     * no created_by, so this is what "the admin who set the club up" resolves
+     * to — and it is the one account allowed to invite and delete others.
+     */
+    public function firstAdminId(): ?int
+    {
+        $id = $this->connection->createQueryBuilder()
+            ->select('id')
+            ->from(SCS_TABLE_PREFIX . 'admins')
+            ->orderBy('id', 'ASC')
+            ->setMaxResults(1)
+            ->fetchOne();
+
+        return $id === false ? null : (int)$id;
+    }
+
     /**
      * Every active admin — the recipients for notifications that go to "the
      * admins" rather than one person (a member declaring they can't play).
@@ -113,9 +160,34 @@ class AdminRepository
         return $this->findById((int)$this->connection->lastInsertId());
     }
 
+    /** An invited admin: no password until they follow their emailed link. */
+    public function createInvited(
+        string $name,
+        string $email,
+        string $inviteTokenHash,
+        \DateTimeImmutable $expiresAt,
+    ): Admin {
+        $this->connection->insert(SCS_TABLE_PREFIX . 'admins', [
+            'name'              => $name,
+            'email'             => $email,
+            'password_hash'     => null,
+            'status'            => AdminStatus::Invited->value,
+            'invite_token'      => $inviteTokenHash,
+            'invite_expires_at' => $expiresAt->format('Y-m-d H:i:s'),
+        ]);
+
+        return $this->findById((int)$this->connection->lastInsertId())
+            ?? throw new \RuntimeException('Admin vanished immediately after being inserted.');
+    }
+
     public function update(int $id, array $data): void
     {
         $this->connection->update(SCS_TABLE_PREFIX . 'admins', $data, [ 'id' => $id ]);
+    }
+
+    public function delete(int $id): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'admins', [ 'id' => $id ]);
     }
 
     private function hydrate(array $row): Admin
@@ -127,6 +199,8 @@ class AdminRepository
             password_hash:     $row['password_hash'],
             status:            AdminStatus::from($row['status']),
             created_at:        new \DateTimeImmutable($row['created_at']),
+            invite_token:      $row['invite_token'],
+            invite_expires_at: $row['invite_expires_at'] !== null ? new \DateTimeImmutable($row['invite_expires_at']) : null,
             token_valid_after: $row['token_valid_after'] !== null ? new \DateTimeImmutable($row['token_valid_after']) : null,
         );
     }

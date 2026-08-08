@@ -53,4 +53,15 @@ class SeasonContactRepository
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_contacts', [ 'season_id' => $seasonId ]);
     }
+
+    /**
+     * Drop a deleted admin from every tournament they were a contact of. There
+     * is no FK cascade, so without this the rows outlive the admin and a
+     * tournament's contact list quietly shrinks to fewer names than it holds —
+     * or, once ids are reused, to the wrong person.
+     */
+    public function deleteByAdmin(int $adminId): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'season_contacts', [ 'admin_id' => $adminId ]);
+    }
 }

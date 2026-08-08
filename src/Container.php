@@ -287,7 +287,12 @@ class Container
             ->setPublic(true)
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('admin_repository'))
-            ->addArgument(new Reference('serializer_service'));
+            ->addArgument(new Reference('member_repository'))
+            ->addArgument(new Reference('season_contact_repository'))
+            ->addArgument(new Reference('auth_service'))
+            ->addArgument(new Reference('auth_context_service'))
+            ->addArgument(new Reference('serializer_service'))
+            ->addArgument(new Reference('transaction_manager'));
 
         $container->register('round_controller', Controller\RoundController::class)
             ->setPublic(true)

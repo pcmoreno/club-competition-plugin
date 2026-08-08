@@ -381,7 +381,10 @@ export function AcceptInvite() {
 	return (
 		<SetPasswordForm
 			title="Activate your account"
-			intro="Set a password to finish creating your member account."
+			// Member and admin invites land on the same page with the same kind
+			// of token, and the page is deliberately told nothing about which —
+			// so the copy can't name one.
+			intro="Set a password to finish setting up your account."
 			endpoint="auth/accept-invite"
 			checkEndpoint="auth/invite-status"
 			successText="Account activated. You can now sign in."
