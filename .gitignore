@@ -22,9 +22,9 @@ Makefile
 _ide_helper.php
 
 # KNSB rating data — fetched at runtime (wp scs fetch-knsb-ratings) into
-# uploads/, never the plugin dir. This entry stays so a list left behind by a
-# pre-0.4.0 install (KnsbRatingStore migrates it on first use) can't be
-# committed by accident.
+# uploads/, never the plugin dir. This entry stays so a list left behind by an
+# older install (KnsbRatingStore migrates it on first use) can't be committed
+# by accident.
 /resources/KnsbRatings/*.json
 
 # OS
