@@ -14,6 +14,8 @@ use SCS\Engine\Settings\Setting\GameOutcomes;
 use SCS\Engine\Settings\Setting\InitialOrder;
 use SCS\Engine\Settings\Setting\Revaluation;
 use SCS\Engine\Settings\Setting\ScoreDecimals;
+use SCS\Engine\Settings\Setting\TiebreakConfig;
+use SCS\Engine\Settings\Setting\Tiebreakers;
 use SCS\Engine\Settings\Setting\TopValue;
 use SCS\Engine\Settings\Setting\Valuation;
 use SCS\Engine\Settings\Setting\ValueDecimals;
@@ -54,12 +56,6 @@ final class KeizerScoringSettings implements TournamentScoringSettings
 
     public const DEFAULT_GAME_OUTCOMES = ['win' => 1.0, 'draw' => 0.5, 'loss' => 0.0];
 
-    private const DEFAULT_TIEBREAK_CONFIG = [
-        'direct_encounter'   => ['maxGroup' => 2],
-        'buchholz'           => ['method' => 'classic'],
-        'performance_rating' => ['method' => 'fide_dp'],
-    ];
-
     /**
      * @param array<string,mixed>               $gameOutcomes
      * @param list<array<string,mixed>>         $byeTypes
@@ -83,11 +79,8 @@ final class KeizerScoringSettings implements TournamentScoringSettings
         private readonly RevaluationMode $revaluation = RevaluationMode::Classic,
         private readonly int $aalsmeerRounds = 0,
         private readonly int $aalsmeerOffset = 0,
-        private readonly array $tiebreakers = [
-            StandingsMetric::Wins,
-            StandingsMetric::PerformanceRating,
-        ],
-        private readonly array $tiebreakConfig = self::DEFAULT_TIEBREAK_CONFIG,
+        private readonly array $tiebreakers = Tiebreakers::DEFAULT,
+        private readonly array $tiebreakConfig = TiebreakConfig::DEFAULT,
     ) {
     }
 
@@ -238,8 +231,8 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             ScoreDecimals::KEY   => $this->scoreDecimals,
             AalsmeerRounds::KEY  => $this->aalsmeerRounds,
             AalsmeerOffset::KEY  => $this->aalsmeerOffset,
-            'tiebreakers'        => array_map(static fn (StandingsMetric $m) => $m->value, $this->tiebreakers),
-            'tiebreakConfig'     => $this->tiebreakConfig,
+            Tiebreakers::KEY     => array_map(static fn (StandingsMetric $m) => $m->value, $this->tiebreakers),
+            TiebreakConfig::KEY  => $this->tiebreakConfig,
         ];
     }
 
@@ -263,33 +256,13 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             (new ScoreDecimals())->field(),
             (new AalsmeerRounds())->field(),
             (new AalsmeerOffset())->field(),
+            (new Tiebreakers())->field(),
         ];
     }
 
     /** @param array<string,mixed> $values */
     public static function fromArray(array $values): static
     {
-        $defaults = new self();
-
-        $tiebreakers = isset($values['tiebreakers']) && is_array($values['tiebreakers'])
-            ? array_values(array_filter(array_map(
-                static fn ($v) => StandingsMetric::tryFrom((string)$v),
-                $values['tiebreakers']
-            )))
-            : $defaults->tiebreakers();
-
-        $tiebreakConfig = array_replace_recursive($defaults->tiebreakConfig, $values['tiebreakConfig'] ?? []);
-
-        $buchholz = BuchholzMethod::tryFrom((string)($tiebreakConfig['buchholz']['method'] ?? ''));
-        if ($buchholz === null || !$buchholz->isImplemented()) {
-            $tiebreakConfig['buchholz']['method'] = $defaults->buchholzMethod()->value;
-        }
-
-        $tpr = TprMethod::tryFrom((string)($tiebreakConfig['performance_rating']['method'] ?? ''));
-        if ($tpr === null || !$tpr->isImplemented()) {
-            $tiebreakConfig['performance_rating']['method'] = $defaults->tprMethod()->value;
-        }
-
         return new self(
             gameOutcomes:    (new GameOutcomes(self::DEFAULT_GAME_OUTCOMES))->normalise($values[GameOutcomes::KEY] ?? null),
             byeTypes:        (new ByeTypes(self::DEFAULT_BYE_TYPES))->normalise($values[ByeTypes::KEY] ?? null),
@@ -314,8 +287,8 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             revaluation:     (new Revaluation())->normalise($values[Revaluation::KEY] ?? null),
             aalsmeerRounds:  (new AalsmeerRounds())->normalise($values[AalsmeerRounds::KEY] ?? null),
             aalsmeerOffset:  (new AalsmeerOffset())->normalise($values[AalsmeerOffset::KEY] ?? null),
-            tiebreakers:     $tiebreakers ?: $defaults->tiebreakers(),
-            tiebreakConfig:  $tiebreakConfig,
+            tiebreakers:     (new Tiebreakers())->normalise($values[Tiebreakers::KEY] ?? null),
+            tiebreakConfig:  (new TiebreakConfig())->normalise($values[TiebreakConfig::KEY] ?? null),
         );
     }
 }
