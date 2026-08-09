@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Scoring\Keizer;
 
 use SCS\Engine\Settings\KeizerScoringSettings;
+use SCS\Entity\Enum\ValuationMethod;
 
 /**
  * Turns a ranking into the values its players are worth.
@@ -33,21 +34,52 @@ final class ValueLadder
             return [];
         }
 
-        $top    = (float)$settings->topValue();
-        $bottom = (float)$settings->bottomValue();
-
-        // A one-player ladder has no spread to divide, and the single rung is
-        // the top one.
-        $step     = $count > 1 ? ($top - $bottom) / ($count - 1) : 0.0;
-        $decimals = $settings->valueDecimals();
+        $decimals   = $settings->valueDecimals();
+        $multiplier = (float)$settings->valueMultiplier();
 
         $values = [];
         foreach ($rankedSeasonPlayerIds as $position => $seasonPlayerId) {
-            $value = $top - $step * $position;
+            $value = $multiplier * $this->rungValue($position, $count, $settings);
 
             $values[$seasonPlayerId] = $decimals === null ? $value : round($value, $decimals);
         }
 
         return $values;
+    }
+
+    /**
+     * What the rung at this position is worth, before the multiplier.
+     *
+     * Position range spreads the whole field between the two configured values,
+     * so its step depends on how many players there are — add a member and
+     * everyone's value shifts slightly. The stepped methods instead walk a fixed
+     * amount per group of rungs, which keeps a player's value stable as the
+     * field grows but lets the bottom of a large field fall a long way, or
+     * below zero.
+     */
+    private function rungValue(int $position, int $count, KeizerScoringSettings $settings): float
+    {
+        $top    = (float)$settings->topValue();
+        $bottom = (float)$settings->bottomValue();
+        $method = $settings->valuation();
+
+        if (!$method->usesStep()) {
+            // A one-player ladder has no spread to divide, and its single rung
+            // is the top one.
+            $step = $count > 1 ? ($top - $bottom) / ($count - 1) : 0.0;
+
+            return $top - $step * $position;
+        }
+
+        $rung = intdiv($position, max(1, $settings->valueStepEvery()));
+        $step = (float)$settings->valueStep();
+
+        if ($method === ValuationMethod::PositionFromBottom) {
+            $fromBottom = intdiv($count - 1 - $position, max(1, $settings->valueStepEvery()));
+
+            return $bottom + $step * $fromBottom;
+        }
+
+        return $top - $step * $rung;
     }
 }

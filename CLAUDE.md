@@ -144,9 +144,20 @@ awkward remainder in the middle of the field instead of dumping it on the
 weakest players. Standard and colour-aware algorithms are built; the weighted
 variants are exposed but coerce back to standard.
 
-**Rematches are not forbidden.** Over a season this size they're unavoidable —
-the club's own history has 107 in 444 games, the first in round 12. The gap is
-emergent from how hard the ranking churns, not a rule.
+**Rematches are discouraged, not forbidden.** `Pairing ▸ Values` sets a minimum
+gap (`roundsBetweenSamePairing`, 10) and a season maximum (`maxSamePairings`,
+4), and the engine treats both as penalties rather than filters — a thin field
+still gets a board. The oracle confirms both: its worst-repeated pair meets
+exactly four times, and 97 of 110 rematches respect the ten-round gap while 13
+break it, which is what a preference looks like in the data. The first rematch
+of the season falls in round 12, directly explained by the window.
+
+Colour has two caps on the same tab: `maxColorDifference` (2) bounds how far a
+player's colours drift from even, and `maxConsecutiveSameColor` (2) their
+longest run. A player at either cap has a **binding** claim that outranks the
+`colorPriority` rule; below it, `pickColorOnStrongerPreference` decides whether
+being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
+discounts the claim of someone whose colours are already even.
 
 **Categories are not a pairing input**, despite an earlier version of this file
 claiming a same-category preference. The oracle rules it out: A never plays C

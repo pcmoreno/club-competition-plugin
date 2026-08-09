@@ -7,16 +7,23 @@ namespace SCS\Engine\Settings;
 use SCS\Engine\Settings\Setting\AalsmeerOffset;
 use SCS\Engine\Settings\Setting\AalsmeerRounds;
 use SCS\Engine\Settings\Setting\AddInitialValue;
+use SCS\Engine\Settings\Setting\AssignValues;
 use SCS\Engine\Settings\Setting\BottomValue;
 use SCS\Engine\Settings\Setting\ByeTypes;
 use SCS\Engine\Settings\Setting\GameOutcomes;
 use SCS\Engine\Settings\Setting\InitialOrder;
+use SCS\Engine\Settings\Setting\Revaluation;
 use SCS\Engine\Settings\Setting\ScoreDecimals;
 use SCS\Engine\Settings\Setting\TopValue;
 use SCS\Engine\Settings\Setting\Valuation;
 use SCS\Engine\Settings\Setting\ValueDecimals;
+use SCS\Engine\Settings\Setting\ValueMultiplier;
+use SCS\Engine\Settings\Setting\ValueStep;
+use SCS\Engine\Settings\Setting\ValueStepEvery;
+use SCS\Entity\Enum\AssignValuesOn;
 use SCS\Entity\Enum\BuchholzMethod;
 use SCS\Entity\Enum\InitialValueOrder;
+use SCS\Entity\Enum\RevaluationMode;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\StandingsMetric;
 use SCS\Entity\Enum\TprMethod;
@@ -69,6 +76,11 @@ final class KeizerScoringSettings implements TournamentScoringSettings
         private readonly bool $addInitialValue = AddInitialValue::DEFAULT,
         private readonly ?int $valueDecimals = ValueDecimals::DEFAULT,
         private readonly ?int $scoreDecimals = ScoreDecimals::DEFAULT,
+        private readonly int $valueStep = ValueStep::DEFAULT,
+        private readonly int $valueStepEvery = ValueStepEvery::DEFAULT,
+        private readonly int $valueMultiplier = ValueMultiplier::DEFAULT,
+        private readonly AssignValuesOn $assignValuesOn = AssignValuesOn::Score,
+        private readonly RevaluationMode $revaluation = RevaluationMode::Classic,
         private readonly int $aalsmeerRounds = 0,
         private readonly int $aalsmeerOffset = 0,
         private readonly array $tiebreakers = [
@@ -97,6 +109,31 @@ final class KeizerScoringSettings implements TournamentScoringSettings
     public function initialOrder(): InitialValueOrder
     {
         return $this->initialOrder;
+    }
+
+    public function valueStep(): int
+    {
+        return $this->valueStep;
+    }
+
+    public function valueStepEvery(): int
+    {
+        return $this->valueStepEvery;
+    }
+
+    public function valueMultiplier(): int
+    {
+        return $this->valueMultiplier;
+    }
+
+    public function assignValuesOn(): AssignValuesOn
+    {
+        return $this->assignValuesOn;
+    }
+
+    public function revaluation(): RevaluationMode
+    {
+        return $this->revaluation;
     }
 
     public function addsInitialValue(): bool
@@ -191,6 +228,11 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             TopValue::KEY        => $this->topValue,
             BottomValue::KEY     => $this->bottomValue,
             InitialOrder::KEY    => $this->initialOrder->value,
+            ValueStep::KEY       => $this->valueStep,
+            ValueStepEvery::KEY  => $this->valueStepEvery,
+            ValueMultiplier::KEY => $this->valueMultiplier,
+            AssignValues::KEY    => $this->assignValuesOn->value,
+            Revaluation::KEY     => $this->revaluation->value,
             AddInitialValue::KEY => $this->addInitialValue,
             ValueDecimals::KEY   => $this->valueDecimals,
             ScoreDecimals::KEY   => $this->scoreDecimals,
@@ -211,6 +253,11 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             (new TopValue())->field(),
             (new BottomValue())->field(),
             (new InitialOrder())->field(),
+            (new ValueStep())->field(),
+            (new ValueStepEvery())->field(),
+            (new ValueMultiplier())->field(),
+            (new AssignValues())->field(),
+            (new Revaluation())->field(),
             (new AddInitialValue())->field(),
             (new ValueDecimals())->field(),
             (new ScoreDecimals())->field(),
@@ -260,6 +307,11 @@ final class KeizerScoringSettings implements TournamentScoringSettings
             scoreDecimals:   array_key_exists(ScoreDecimals::KEY, $values)
                 ? (new ScoreDecimals())->normalise($values[ScoreDecimals::KEY])
                 : ScoreDecimals::DEFAULT,
+            valueStep:       (new ValueStep())->normalise($values[ValueStep::KEY] ?? null),
+            valueStepEvery:  (new ValueStepEvery())->normalise($values[ValueStepEvery::KEY] ?? null),
+            valueMultiplier: (new ValueMultiplier())->normalise($values[ValueMultiplier::KEY] ?? null),
+            assignValuesOn:  (new AssignValues())->normalise($values[AssignValues::KEY] ?? null),
+            revaluation:     (new Revaluation())->normalise($values[Revaluation::KEY] ?? null),
             aalsmeerRounds:  (new AalsmeerRounds())->normalise($values[AalsmeerRounds::KEY] ?? null),
             aalsmeerOffset:  (new AalsmeerOffset())->normalise($values[AalsmeerOffset::KEY] ?? null),
             tiebreakers:     $tiebreakers ?: $defaults->tiebreakers(),

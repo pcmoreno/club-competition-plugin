@@ -10,11 +10,17 @@ use SCS\Engine\Settings\Setting\ByeChoice;
 use SCS\Engine\Settings\Setting\Colors;
 use SCS\Engine\Settings\Setting\ColorTiebreak;
 use SCS\Engine\Settings\Setting\GameCorrection;
+use SCS\Engine\Settings\Setting\IgnoreMildColourPrefs;
+use SCS\Engine\Settings\Setting\MaxColourDifference;
+use SCS\Engine\Settings\Setting\MaxRematches;
+use SCS\Engine\Settings\Setting\MaxSameColourRun;
 use SCS\Engine\Settings\Setting\NumberOfRounds;
 use SCS\Engine\Settings\Setting\PairingVariant;
+use SCS\Engine\Settings\Setting\RematchWindow;
 use SCS\Engine\Settings\Setting\ScoreCorrection;
 use SCS\Engine\Settings\Setting\SkipLimit;
 use SCS\Engine\Settings\Setting\StrictOrder;
+use SCS\Engine\Settings\Setting\StrongerPreferenceWins;
 use SCS\Entity\Enum\ColorPriority;
 use SCS\Entity\Enum\ColorRule;
 use SCS\Entity\Enum\KeizerPairingVariant;
@@ -41,8 +47,44 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly PairingByeChoice $byeChoice = PairingByeChoice::Random,
         private readonly ColorRule $colorRule = ColorRule::Alternating,
         private readonly ColorPriority $colorPriority = ColorPriority::HigherRanked,
+        private readonly bool $ignoreMildColourPrefs = IgnoreMildColourPrefs::DEFAULT,
+        private readonly bool $strongerPreferenceWins = StrongerPreferenceWins::DEFAULT,
+        private readonly int $rematchWindow = RematchWindow::DEFAULT,
+        private readonly int $maxRematches = MaxRematches::DEFAULT,
+        private readonly int $maxColourDifference = MaxColourDifference::DEFAULT,
+        private readonly int $maxSameColourRun = MaxSameColourRun::DEFAULT,
         private readonly ?int $numberOfRounds = null,
     ) {
+    }
+
+    public function ignoresMildColourPrefs(): bool
+    {
+        return $this->ignoreMildColourPrefs;
+    }
+
+    public function strongerPreferenceWins(): bool
+    {
+        return $this->strongerPreferenceWins;
+    }
+
+    public function rematchWindow(): int
+    {
+        return $this->rematchWindow;
+    }
+
+    public function maxRematches(): int
+    {
+        return $this->maxRematches;
+    }
+
+    public function maxColourDifference(): int
+    {
+        return $this->maxColourDifference;
+    }
+
+    public function maxSameColourRun(): int
+    {
+        return $this->maxSameColourRun;
     }
 
     public function variant(): KeizerPairingVariant
@@ -110,6 +152,12 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             ByeChoice::KEY       => $this->byeChoice->value,
             Colors::KEY          => $this->colorRule->value,
             ColorTiebreak::KEY   => $this->colorPriority->value,
+            IgnoreMildColourPrefs::KEY  => $this->ignoreMildColourPrefs,
+            StrongerPreferenceWins::KEY => $this->strongerPreferenceWins,
+            RematchWindow::KEY   => $this->rematchWindow,
+            MaxRematches::KEY    => $this->maxRematches,
+            MaxColourDifference::KEY => $this->maxColourDifference,
+            MaxSameColourRun::KEY    => $this->maxSameColourRun,
             NumberOfRounds::KEY  => $this->numberOfRounds,
         ];
     }
@@ -128,6 +176,12 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             (new ByeChoice())->field(),
             (new Colors())->field(),
             (new ColorTiebreak())->field(),
+            (new IgnoreMildColourPrefs())->field(),
+            (new StrongerPreferenceWins())->field(),
+            (new RematchWindow())->field(),
+            (new MaxRematches())->field(),
+            (new MaxColourDifference())->field(),
+            (new MaxSameColourRun())->field(),
             (new NumberOfRounds())->field(),
         ];
     }
@@ -152,6 +206,12 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             byeChoice:       (new ByeChoice())->normalise($values[ByeChoice::KEY] ?? null),
             colorRule:       (new Colors())->normalise($values[Colors::KEY] ?? null),
             colorPriority:   (new ColorTiebreak())->normalise($values[ColorTiebreak::KEY] ?? null),
+            ignoreMildColourPrefs:  (new IgnoreMildColourPrefs())->normalise($values[IgnoreMildColourPrefs::KEY] ?? null),
+            strongerPreferenceWins: (new StrongerPreferenceWins())->normalise($values[StrongerPreferenceWins::KEY] ?? null),
+            rematchWindow:   (new RematchWindow())->normalise($values[RematchWindow::KEY] ?? null),
+            maxRematches:    (new MaxRematches())->normalise($values[MaxRematches::KEY] ?? null),
+            maxColourDifference: (new MaxColourDifference())->normalise($values[MaxColourDifference::KEY] ?? null),
+            maxSameColourRun:    (new MaxSameColourRun())->normalise($values[MaxSameColourRun::KEY] ?? null),
             numberOfRounds:  (new NumberOfRounds())->normalise($values[NumberOfRounds::KEY] ?? null),
         );
     }

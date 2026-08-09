@@ -36,10 +36,19 @@ enum ValuationMethod: string
         };
     }
 
-    // The stepped and rating-derived methods need value step / reference score
-    // fields the settings form has no way to reveal conditionally yet.
+    // The rating-derived methods need reference-score fields the settings form
+    // has no way to reveal conditionally yet.
     public function isImplemented(): bool
     {
-        return $this === self::PositionRange;
+        return $this === self::PositionRange
+            || $this === self::PositionFromTop
+            || $this === self::PositionFromBottom;
+    }
+
+    // The stepped methods walk a fixed step per rung; the range method derives
+    // its own from the spread and the size of the field.
+    public function usesStep(): bool
+    {
+        return $this === self::PositionFromTop || $this === self::PositionFromBottom;
     }
 }
