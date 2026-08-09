@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use SCS\Engine\Pairing\KeizerPairing;
 use SCS\Engine\Settings\KeizerPairingSettings;
+use SCS\Entity\Enum\CategoryPairingMode;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
@@ -79,6 +80,13 @@ final class KeizerPairingTest extends TestCase
         self::assertSame(11, $result->byes[0]['season_player_id'], 'The bye should go to the only player who has not had one.');
     }
 
+    /**
+     * Colours alternate — tested with the rematch window switched off.
+     *
+     * With the window on, as it is by default, the engine refuses to pair 1
+     * against 2 a second time, so the board changes and there is nothing left
+     * to say about whose turn it is for white. The window has its own tests.
+     */
     #[Test]
     public function it_alternates_colours_from_the_previous_game(): void
     {
@@ -90,12 +98,131 @@ final class KeizerPairingTest extends TestCase
             $this->game(2, 3, 4),
         ];
 
-        $result = $this->pair($roster, $history, $this->standings($roster));
+        $result = $this->pair(
+            $roster,
+            $history,
+            $this->standings($roster),
+            new KeizerPairingSettings(rematchWindow: 0),
+        );
 
         foreach ($result->pairings as $pairing) {
             self::assertContains($pairing['white'], [2, 4], 'A player who had black should be given white.');
             self::assertContains($pairing['black'], [1, 3], 'A player who had white should be given black.');
         }
+    }
+
+    #[Test]
+    public function it_avoids_repeating_a_pairing_inside_the_window(): void
+    {
+        $result = $this->pair(
+            $this->roster(4),
+            [$this->game(1, 1, 2), $this->game(2, 3, 4)],
+            $this->standings($this->roster(4)),
+        );
+
+        $met = $this->pairsMade($result);
+
+        self::assertNotContains('1v2', $met, 'These two met last round and the window has not passed.');
+        self::assertNotContains('3v4', $met, 'These two met last round and the window has not passed.');
+    }
+
+    #[Test]
+    public function it_repeats_a_pairing_once_the_window_has_passed(): void
+    {
+        // A one-round window is satisfied by the round just played, so the
+        // ranking gets its way again and neighbours meet.
+        $result = $this->pair(
+            $this->roster(4),
+            [$this->game(1, 1, 2), $this->game(2, 3, 4)],
+            $this->standings($this->roster(4)),
+            new KeizerPairingSettings(rematchWindow: 1),
+        );
+
+        $met = $this->pairsMade($result);
+
+        self::assertContains('1v2', $met);
+        self::assertContains('3v4', $met);
+    }
+
+    #[Test]
+    public function it_never_pairs_across_more_categories_than_allowed(): void
+    {
+        // Three categories interleaved through the ranking, so pairing on
+        // proximity alone would put an A against a C constantly.
+        $roster = [];
+        $id     = 0;
+        foreach (['A', 'B', 'C', 'A', 'B', 'C', 'A', 'B', 'C', 'A', 'B', 'C'] as $category) {
+            $id++;
+            $roster[] = new SeasonPlayer(
+                id:          $id,
+                season_id:   1,
+                player_id:   $id,
+                category:    $category,
+                elo_rating:  2000 - $id * 25,
+                enrolled_at: new \DateTimeImmutable('2026-09-01'),
+            );
+        }
+
+        $result = $this->pair($roster, [], $this->standings($roster), null, ['A', 'B', 'C']);
+
+        $position = ['A' => 0, 'B' => 1, 'C' => 2];
+        $of       = [];
+        foreach ($roster as $player) {
+            $of[$player->id] = $position[$player->category];
+        }
+
+        self::assertCount(6, $result->pairings);
+        foreach ($result->pairings as $pairing) {
+            self::assertLessThanOrEqual(
+                1,
+                abs($of[$pairing['white']] - $of[$pairing['black']]),
+                'An A must never be paired against a C.'
+            );
+        }
+    }
+
+    #[Test]
+    public function it_ignores_categories_when_the_limit_is_off(): void
+    {
+        $roster = [
+            $this->categorised(1, 'A', 2100),
+            $this->categorised(2, 'C', 1200),
+        ];
+
+        $result = $this->pair(
+            $roster,
+            [],
+            $this->standings($roster),
+            new KeizerPairingSettings(categoryPairing: CategoryPairingMode::Free),
+            ['A', 'B', 'C'],
+        );
+
+        self::assertCount(1, $result->pairings, 'With no limit the two must still get a game.');
+    }
+
+    private function categorised(int $id, string $category, int $rating): SeasonPlayer
+    {
+        return new SeasonPlayer(
+            id:          $id,
+            season_id:   1,
+            player_id:   $id,
+            category:    $category,
+            elo_rating:  $rating,
+            enrolled_at: new \DateTimeImmutable('2026-09-01'),
+        );
+    }
+
+    /** @return list<string> */
+    private function pairsMade(\SCS\Engine\Pairing\PairingResult $result): array
+    {
+        $met = [];
+        foreach ($result->pairings as $pairing) {
+            $pair = [$pairing['white'], $pairing['black']];
+            sort($pair);
+            $met[] = implode('v', $pair);
+        }
+
+        return $met;
     }
 
     #[Test]
@@ -129,10 +256,10 @@ final class KeizerPairingTest extends TestCase
      * @param list<Game>              $history
      * @param list<StandingsSnapshot> $standings
      */
-    private function pair(array $roster, array $history, array $standings, ?KeizerPairingSettings $settings = null): \SCS\Engine\Pairing\PairingResult
+    private function pair(array $roster, array $history, array $standings, ?KeizerPairingSettings $settings = null, array $categories = []): \SCS\Engine\Pairing\PairingResult
     {
         return (new KeizerPairing($settings ?? new KeizerPairingSettings()))
-            ->pairNextRound($this->season(), $roster, $history, $standings);
+            ->pairNextRound($this->season($categories), $roster, $history, $standings);
     }
 
     /** @return list<SeasonPlayer> */
@@ -200,7 +327,8 @@ final class KeizerPairingTest extends TestCase
         );
     }
 
-    private function season(): Season
+    /** @param list<string> $categories */
+    private function season(array $categories = []): Season
     {
         return new Season(
             id:             1,
@@ -210,7 +338,7 @@ final class KeizerPairingTest extends TestCase
             end_date:       null,
             pairing_system: PairingSystem::Keizer,
             status:         SeasonStatus::Active,
-            categories:     [],
+            categories:     $categories,
             created_at:     new \DateTimeImmutable('2026-09-01'),
         );
     }
