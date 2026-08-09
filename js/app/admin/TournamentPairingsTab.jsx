@@ -165,6 +165,15 @@ export function TournamentPairingsTab( { season, players } ) {
 		},
 	} );
 
+	// Per-round systems pair the selected round from the standings. The backend
+	// refuses a round that already has games, so this can't quietly discard a
+	// board an admin has adjusted by hand.
+	const generatePairings = useMutation( {
+		mutationFn: () =>
+			api.post( `rounds/${ currentRoundId }/pairings/generate`, {} ),
+		onSuccess: invalidateRound,
+	} );
+
 	// Round dates are the only thing here that isn't competition data, so this
 	// stays open whatever the round's status — correcting the evening a round was
 	// played on is a legitimate fix after the fact.
@@ -485,11 +494,22 @@ export function TournamentPairingsTab( { season, players } ) {
 					{ genLabel && season.cadence !== 'full' && (
 						<button
 							type="button"
-							disabled
-							title="Automatic pairing isn’t available yet — build the board by hand below."
-							className="rounded border border-rule px-3 py-1.5 text-sm text-muted opacity-60"
+							onClick={ () => generatePairings.mutate() }
+							disabled={
+								generatePairings.isPending ||
+								! editable ||
+								games.length > 0
+							}
+							title={
+								games.length > 0
+									? 'This round already has pairings. Remove them to generate again.'
+									: undefined
+							}
+							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
-							{ genLabel }
+							{ generatePairings.isPending
+								? 'Pairing…'
+								: genLabel }
 						</button>
 					) }
 					<span className="text-xs uppercase tracking-wide text-muted">
@@ -570,12 +590,8 @@ export function TournamentPairingsTab( { season, players } ) {
 				</div>
 			) }
 
-			{ season.cadence === 'per-round' && (
-				<Notice>
-					This tournament pairs one round at a time from the standings.
-					That engine isn’t built yet — pairings can be entered by hand
-					below in the meantime.
-				</Notice>
+			{ generatePairings.isError && (
+				<Notice>{ errorMessage( generatePairings.error ) }</Notice>
 			) }
 
 			{ ! editable && round && (

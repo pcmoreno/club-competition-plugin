@@ -19,7 +19,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member invitations and auth (no WP account) | Built |
 | Member self-report absence | Built — see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
-| Keizer pairing and scoring | **Not implemented** — no Keizer engine |
+| Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
@@ -101,36 +101,57 @@ in the UI.
 
 ## Key Concepts
 
-### Keizer Pairing System — NOT IMPLEMENTED YET
+### Keizer
 
-The Keizer system is the headline goal, but **no Keizer engine exists**. What
-gates a season is whether its *scoring* can be computed, and **Keizer is the only
-system that can't**: `ScoringStrategyResolver` throws a `ConflictException` for
-it alone, and `PairingSystem::implementedValues()` excludes it, so neither
-`CreateSeasonRequest` nor `UpdateSeasonRequest` accepts it. `swiss`,
-`round-robin-full` and `round-robin-groups` *are* selectable and score fine as
-`StandardScoring` (classical points + configurable tiebreaks) under
-`src/Engine/Scoring/`.
+Every pairing system is now selectable — `ScoringStrategyResolver` builds a
+strategy for both scoring systems, so nothing gates a season any more. `swiss`
+still has no pairing engine and is hand-built; Keizer and both round-robins
+generate their own boards.
 
-**Round-robin is the one system that pairs itself** —
-`RoundRobinPairing` (a `FullSchedulePairing`) builds the entire fixture as a
-FIDE Berger table, and `PairingEngineResolver` still throws for Swiss and
-Keizer, so those are hand-built. Pairing system and scoring system are separate
-axes here; don't read "Swiss is selectable" as "Swiss pairs itself".
+**Scoring** (`src/Engine/Scoring/KeizerScoring.php`):
 
-The seam is in place — implement `ScoringStrategyInterface` and register it in
-the resolver. The intended behaviour, for whoever builds it:
+```
+score = OwnV + Aalsmeer(round) × OwnV
+      + Σ games     Par(result) × OppV
+      + Σ absences  Par(reason) × OwnV
+```
 
-- Players paired by **Keizer score proximity** (not Elo)
-- **Category preference**: same-category pairings before cross-category
-- **Color balance**: player with fewer white games gets white
-- **No repeat pairings** within season (when possible)
-- **Odd count**: lowest-ranked player gets bye
-- **Retroactive recalculation**: scores recalculate after every round as opponent rankings shift (this is Keizer's defining feature)
+`Par` is the shared `gameOutcomes` / `byeTypes` knobs — the same numbers
+standard scoring adds to a total, here used as coefficients. Values come from a
+**Position range** ladder (`ValueLadder`): top of the ranking takes `topValue`,
+bottom takes `bottomValue`, everyone linear between, rounded. Defaults are
+200/100, fitted to the club's own history.
 
-Note this conflicts with immutable standings snapshots (see below): a completed
-round's snapshot is published history and is only rewritten by re-completing
-that round.
+Two things to know:
+
+- **The whole season is re-priced every round**, not incremented — a win against
+  someone who has since climbed is worth more today. This costs nothing, because
+  `computeStandings` already receives every game played so far.
+- **Two populations.** The ladder spans everyone *enrolled*; the standings list
+  only those who have played or taken a bye. Values depend on how many rungs
+  exist, so counting only participants would move everyone's value whenever a
+  new member debuted.
+
+Values come from the previous round's ranking (Sevilla's `Revaluation: Classic`
+— one pass, not an iteration to a fixed point), so **Keizer is sequential**:
+completing round N when N−1 has no snapshot throws a `ConflictException`.
+
+**Pairing** (`src/Engine/Pairing/KeizerPairing.php`, a `PerRoundPairing`) sorts
+by Keizer score or by Sevilla's damped percentage
+`(wins + ½ draws + SC) / (games + GC)`, then pairs neighbours. It works in from
+**both ends** by default rather than straight down the list, which keeps the
+awkward remainder in the middle of the field instead of dumping it on the
+weakest players. Standard and colour-aware algorithms are built; the weighted
+variants are exposed but coerce back to standard.
+
+**Rematches are not forbidden.** Over a season this size they're unavoidable —
+the club's own history has 107 in 444 games, the first in round 12. The gap is
+emergent from how hard the ranking churns, not a rule.
+
+Absence recording is load-bearing under Keizer in a way it never was under
+standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
+missing player as club duty or personal is worth a third of their own value —
+a bigger swing than most single games.
 
 ### Engine Settings
 
@@ -143,9 +164,9 @@ class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
-**`SettingsResolver::pairing()` returns null for Swiss and Keizer**, which have
-no pairing settings class yet — the endpoint sends `fields: null` and the tab
-renders nothing for them. Manual and both round-robins resolve. The mapping
+**`SettingsResolver::pairing()` returns null for Swiss**, which has no pairing
+settings class — the endpoint sends `fields: null` and the tab renders nothing.
+Manual, Keizer and both round-robins resolve. The mapping
 itself lives in `pairingFor(PairingSystem, array)`, keyed by system rather than
 season so `SettingsValidator` can normalise a submitted blob against the same
 match arm before any season holds it.
@@ -592,11 +613,24 @@ SiteGround provides automated backups. Always verify deployments don't break exi
 
 ## Testing
 
-**There is no test suite yet.** phpunit is installed (`composer test`) and
-`tests/Unit` / `tests/Integration` exist locally, but they are empty — and since
-git can't track empty directories, a fresh clone has no `tests/` at all.
+**There is a test suite, but only for the engine.** `phpunit.xml` and
+`tests/Unit/Engine/` cover Keizer scoring and pairing; everything else is still
+verified by hand. `composer test` runs it.
 
-Until that changes, verification is: `npm run lint`, `vendor/bin/phpstan`,
+The Keizer tests are fixture-driven: `tests/Unit/Engine/Scoring/Fixture/`
+loads `fixtures/competition_2025_2026.json` — the club's real season, with the
+scores that were actually published — and replays round 1 against it. That
+matters because a wrong Keizer score is still a plausible-looking one, so
+nothing else can catch a numeric drift.
+
+Round 1 is asserted within a tolerance of ±2 points, deliberately: the ladder is
+a straight ramp, so a player one rung out shifts by ~1.7, and Sevilla's opening
+order can't be rebuilt now the competition file is gone. Later rounds are *not*
+asserted — the fixture records games and byes but not absences, and an absence
+is worth a third to two thirds of a player's own value every round they miss, so
+drift accumulates with the season rather than staying put.
+
+Otherwise verification is: `npm run lint`, `vendor/bin/phpstan`,
 `vendor/bin/php-cs-fixer`, and hands-on testing in the UI. Don't write throwaway
 CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
