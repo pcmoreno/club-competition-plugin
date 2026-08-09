@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace SCS\Engine;
 
+use SCS\Engine\Pairing\KeizerPairing;
 use SCS\Engine\Pairing\ManualPairing;
 use SCS\Engine\Pairing\PairingEngineInterface;
 use SCS\Engine\Pairing\RoundRobinPairing;
+use SCS\Engine\Settings\KeizerPairingSettings;
 use SCS\Engine\Settings\RoundRobinSettings;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Season;
@@ -24,6 +26,14 @@ final class PairingEngineResolver
         switch ($season->pairing_system) {
             case PairingSystem::Manual:
                 return new ManualPairing();
+
+            case PairingSystem::Keizer:
+                $keizer = $this->settings->pairing($season);
+                if (!$keizer instanceof KeizerPairingSettings) {
+                    throw new ConflictException('This tournament has no Keizer settings to pair from.');
+                }
+
+                return new KeizerPairing($keizer);
 
             case PairingSystem::RoundRobinFull:
             case PairingSystem::RoundRobinGroups:
