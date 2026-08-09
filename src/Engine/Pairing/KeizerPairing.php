@@ -8,6 +8,8 @@ use SCS\Engine\Settings\KeizerPairingSettings;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\ColorPriority;
 use SCS\Entity\Enum\ColorRule;
+use SCS\Entity\Enum\ColorTieAward;
+use SCS\Entity\Enum\ColorTieCriterion;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\KeizerPairingVariant;
 use SCS\Entity\Enum\PairingAlgorithm;
@@ -76,7 +78,7 @@ final class KeizerPairing implements PerRoundPairing
         $pairings = [];
         $board    = 1;
         foreach ($pairs as [$a, $b]) {
-            [$white, $black] = $this->assignColours($a, $b, $colours, $rank);
+            [$white, $black] = $this->assignColours($a, $b, $colours, $rank, $board);
 
             $pairings[] = ['white' => $white->id, 'black' => $black->id, 'board' => $board++];
         }
@@ -385,20 +387,35 @@ final class KeizerPairing implements PerRoundPairing
      * @param  array<int,int>                                   $rank
      * @return array{0:SeasonPlayer,1:SeasonPlayer}
      */
-    private function assignColours(SeasonPlayer $a, SeasonPlayer $b, array $colours, array $rank): array
+    private function assignColours(SeasonPlayer $a, SeasonPlayer $b, array $colours, array $rank, int $board): array
     {
         $wantsA = $this->wantsWhite($a, $colours);
         $wantsB = $this->wantsWhite($b, $colours);
 
-        if ($wantsA !== $wantsB && $wantsA !== null && $wantsB !== null) {
-            return $wantsA ? [$a, $b] : [$b, $a];
+        // Nobody has a claim at all — an opening round, or two players both back
+        // from an absence. The tiebreak picks who is favoured and the award says
+        // what they get, which alternating spreads evenly down the sheet rather
+        // than handing white to every favoured player.
+        if ($wantsA === null && $wantsB === null) {
+            $favoured = $this->colourTieWinner($a, $b, $rank);
+            $white    = $this->tieAwardIsWhite($board);
+            $other    = $favoured->id === $a->id ? $b : $a;
+
+            return $white ? [$favoured, $other] : [$other, $favoured];
         }
 
-        if ($wantsA !== null && $wantsB === null) {
-            return $wantsA ? [$a, $b] : [$b, $a];
+        // Only one of them has a claim, so it goes unopposed.
+        if ($wantsA === null || $wantsB === null) {
+            $served = $wantsA === null ? $b : $a;
+            $wants  = $wantsA ?? $wantsB;
+            $other  = $served->id === $a->id ? $b : $a;
+
+            return $wants ? [$served, $other] : [$other, $served];
         }
-        if ($wantsB !== null && $wantsA === null) {
-            return $wantsB ? [$b, $a] : [$a, $b];
+
+        // Opposite claims: both get what they are owed.
+        if ($wantsA !== $wantsB) {
+            return $wantsA ? [$a, $b] : [$b, $a];
         }
 
         // Both want the same colour. A player who has hit a cap outranks the
@@ -416,7 +433,7 @@ final class KeizerPairing implements PerRoundPairing
 
         if ($decisive && $urgencyA !== $urgencyB) {
             $served = $urgencyA > $urgencyB ? $a : $b;
-            $wants  = $this->wantsWhite($served, $colours) ?? true;
+            $wants  = $served->id === $a->id ? $wantsA : $wantsB;
             $other  = $served->id === $a->id ? $b : $a;
 
             return $wants ? [$served, $other] : [$other, $served];
@@ -427,9 +444,7 @@ final class KeizerPairing implements PerRoundPairing
         $preferred = $this->preferredPlayer($a, $b, $rank);
         $other     = $preferred->id === $a->id ? $b : $a;
 
-        // Null on both sides means an opening round with no history at all, and
-        // then the preferred player simply opens with white.
-        $wants = ($preferred->id === $a->id ? $wantsA : $wantsB) ?? true;
+        $wants = $preferred->id === $a->id ? $wantsA : $wantsB;
 
         return $wants ? [$preferred, $other] : [$other, $preferred];
     }
@@ -453,6 +468,37 @@ final class KeizerPairing implements PerRoundPairing
 
         // Alternating: whatever they had last time, they want the other.
         return $entry['last'] === null ? null : !$entry['last'];
+    }
+
+    /**
+     * Which player the colour tiebreak favours when neither has a claim.
+     *
+     * @param array<int,int> $rank
+     */
+    private function colourTieWinner(SeasonPlayer $a, SeasonPlayer $b, array $rank): SeasonPlayer
+    {
+        return match ($this->settings->colorTie()) {
+            ColorTieCriterion::HigherRanked => ($rank[$a->id] ?? PHP_INT_MAX) <= ($rank[$b->id] ?? PHP_INT_MAX) ? $a : $b,
+            ColorTieCriterion::HigherRated  => $a->elo_rating >= $b->elo_rating ? $a : $b,
+            // Seeded from the pair itself so the same board always resolves the
+            // same way, however often it is regenerated.
+            ColorTieCriterion::Random       => crc32($a->id . ':' . $b->id) % 2 === 0 ? $a : $b,
+            // Enrolment order is our pairing number: the order the field was
+            // written down in, which results never change.
+            default                         => ($a->enrolled_at <=> $b->enrolled_at ?: $a->id <=> $b->id) <= 0 ? $a : $b,
+        };
+    }
+
+    // Whether the favoured player on this board takes white.
+    private function tieAwardIsWhite(int $board): bool
+    {
+        return match ($this->settings->colorTieAward()) {
+            ColorTieAward::White  => true,
+            ColorTieAward::Black  => false,
+            ColorTieAward::Alternate => $board % 2 === 1
+                ? $this->settings->firstBoardColour()->startsWhite()
+                : !$this->settings->firstBoardColour()->startsWhite(),
+        };
     }
 
     /** @param array<int,int> $rank */

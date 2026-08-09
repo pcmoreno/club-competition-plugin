@@ -8,6 +8,7 @@ use SCS\Engine\Settings\Setting\Algorithm;
 use SCS\Engine\Settings\Setting\BottomUpPairing;
 use SCS\Engine\Settings\Setting\ByeChoice;
 use SCS\Engine\Settings\Setting\Colors;
+use SCS\Engine\Settings\Setting\ColorTie;
 use SCS\Engine\Settings\Setting\ColorTiebreak;
 use SCS\Engine\Settings\Setting\GameCorrection;
 use SCS\Engine\Settings\Setting\IgnoreMildColourPrefs;
@@ -23,6 +24,9 @@ use SCS\Engine\Settings\Setting\StrictOrder;
 use SCS\Engine\Settings\Setting\StrongerPreferenceWins;
 use SCS\Entity\Enum\ColorPriority;
 use SCS\Entity\Enum\ColorRule;
+use SCS\Entity\Enum\ColorTieAward;
+use SCS\Entity\Enum\ColorTieCriterion;
+use SCS\Entity\Enum\FirstBoardColour;
 use SCS\Entity\Enum\KeizerPairingVariant;
 use SCS\Entity\Enum\PairingAlgorithm;
 use SCS\Entity\Enum\PairingByeChoice;
@@ -47,6 +51,9 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly PairingByeChoice $byeChoice = PairingByeChoice::Random,
         private readonly ColorRule $colorRule = ColorRule::Alternating,
         private readonly ColorPriority $colorPriority = ColorPriority::HigherRanked,
+        private readonly ColorTieCriterion $colorTie = ColorTieCriterion::LowerPairingNumber,
+        private readonly ColorTieAward $colorTieAward = ColorTieAward::Alternate,
+        private readonly FirstBoardColour $firstBoardColour = FirstBoardColour::Automatic,
         private readonly bool $ignoreMildColourPrefs = IgnoreMildColourPrefs::DEFAULT,
         private readonly bool $strongerPreferenceWins = StrongerPreferenceWins::DEFAULT,
         private readonly int $rematchWindow = RematchWindow::DEFAULT,
@@ -55,6 +62,21 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly int $maxSameColourRun = MaxSameColourRun::DEFAULT,
         private readonly ?int $numberOfRounds = null,
     ) {
+    }
+
+    public function colorTie(): ColorTieCriterion
+    {
+        return $this->colorTie;
+    }
+
+    public function colorTieAward(): ColorTieAward
+    {
+        return $this->colorTieAward;
+    }
+
+    public function firstBoardColour(): FirstBoardColour
+    {
+        return $this->firstBoardColour;
     }
 
     public function ignoresMildColourPrefs(): bool
@@ -152,6 +174,9 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             ByeChoice::KEY       => $this->byeChoice->value,
             Colors::KEY          => $this->colorRule->value,
             ColorTiebreak::KEY   => $this->colorPriority->value,
+            ColorTie::KEY               => $this->colorTie->value,
+            ColorTie::AWARD_KEY         => $this->colorTieAward->value,
+            ColorTie::FIRST_BOARD_KEY   => $this->firstBoardColour->value,
             IgnoreMildColourPrefs::KEY  => $this->ignoreMildColourPrefs,
             StrongerPreferenceWins::KEY => $this->strongerPreferenceWins,
             RematchWindow::KEY   => $this->rematchWindow,
@@ -176,6 +201,9 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             (new ByeChoice())->field(),
             (new Colors())->field(),
             (new ColorTiebreak())->field(),
+            (new ColorTie())->field(),
+            (new ColorTie())->awardField(),
+            (new ColorTie())->firstBoardField(),
             (new IgnoreMildColourPrefs())->field(),
             (new StrongerPreferenceWins())->field(),
             (new RematchWindow())->field(),
@@ -206,6 +234,9 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             byeChoice:       (new ByeChoice())->normalise($values[ByeChoice::KEY] ?? null),
             colorRule:       (new Colors())->normalise($values[Colors::KEY] ?? null),
             colorPriority:   (new ColorTiebreak())->normalise($values[ColorTiebreak::KEY] ?? null),
+            colorTie:         (new ColorTie())->normalise($values[ColorTie::KEY] ?? null),
+            colorTieAward:    (new ColorTie())->normaliseAward($values[ColorTie::AWARD_KEY] ?? null),
+            firstBoardColour: (new ColorTie())->normaliseFirstBoard($values[ColorTie::FIRST_BOARD_KEY] ?? null),
             ignoreMildColourPrefs:  (new IgnoreMildColourPrefs())->normalise($values[IgnoreMildColourPrefs::KEY] ?? null),
             strongerPreferenceWins: (new StrongerPreferenceWins())->normalise($values[StrongerPreferenceWins::KEY] ?? null),
             rematchWindow:   (new RematchWindow())->normalise($values[RematchWindow::KEY] ?? null),

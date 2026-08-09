@@ -27,7 +27,11 @@ final class ByeChoice implements SettingInterface
             'hint'    => 'Nobody takes a second bye until everyone has had one, whichever rule is chosen.',
             'default' => PairingByeChoice::Random->value,
             'options' => array_map(
-                static fn (PairingByeChoice $c) => ['value' => $c->value, 'label' => $c->label()],
+                static fn (PairingByeChoice $c) => [
+                    'value'       => $c->value,
+                    'label'       => $c->label(),
+                    'implemented' => $c->isImplemented(),
+                ],
                 PairingByeChoice::cases()
             ),
         ];
@@ -35,6 +39,8 @@ final class ByeChoice implements SettingInterface
 
     public function normalise(mixed $raw): PairingByeChoice
     {
-        return PairingByeChoice::tryFrom(is_string($raw) ? $raw : '') ?? PairingByeChoice::Random;
+        $choice = PairingByeChoice::tryFrom(is_string($raw) ? $raw : '');
+
+        return $choice !== null && $choice->isImplemented() ? $choice : PairingByeChoice::Random;
     }
 }
