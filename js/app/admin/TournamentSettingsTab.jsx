@@ -476,6 +476,34 @@ function PairingField( { id, field, values, setValues, disabled } ) {
 	);
 }
 
+// Fields that only qualify the one before them — how many categories apart, how
+// far the alternation starts from — say so in the schema and are laid out beside
+// it rather than under it, so the pair reads as the one question it is.
+function inlineRows( fields ) {
+	const rows = [];
+	fields.forEach( ( f ) => {
+		if ( f.inline && rows.length > 0 ) {
+			rows[ rows.length - 1 ].push( f );
+		} else {
+			rows.push( [ f ] );
+		}
+	} );
+	return rows;
+}
+
+// A knob can depend on another one's value: a count of categories means nothing
+// while there is no limit to count, so it greys out instead of inviting a number
+// that would be ignored.
+function isEnabled( field, values ) {
+	if ( ! field.enabledBy ) {
+		return true;
+	}
+	const current = values?.[ field.enabledBy.key ];
+	return current === undefined
+		? true
+		: current === field.enabledBy.value;
+}
+
 // One labelled pairing knob. A checkbox reads as its own label, so a toggle puts
 // the control first instead of stacking an empty box under a heading.
 function PairingRow( { field, values, setValues, disabled } ) {
@@ -748,14 +776,24 @@ export function TournamentSettingsTab( { season } ) {
 						Pairing
 					</SectionTitle>
 					<div className="flex flex-col gap-3">
-						{ pairingFields.map( ( f ) => (
-							<PairingRow
-								key={ f.key }
-								field={ f }
-								values={ pairing }
-								setValues={ editPairing }
-								disabled={ save.isPending }
-							/>
+						{ inlineRows( pairingFields ).map( ( row ) => (
+							<div
+								key={ row[ 0 ].key }
+								className="flex flex-wrap items-start gap-4"
+							>
+								{ row.map( ( f ) => (
+									<PairingRow
+										key={ f.key }
+										field={ f }
+										values={ pairing }
+										setValues={ editPairing }
+										disabled={
+											save.isPending ||
+											! isEnabled( f, pairing )
+										}
+									/>
+								) ) }
+							</div>
 						) ) }
 					</div>
 				</section>

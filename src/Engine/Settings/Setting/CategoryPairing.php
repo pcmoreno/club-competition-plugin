@@ -59,13 +59,18 @@ final class CategoryPairing implements SettingInterface
     {
         return [
             'key'     => self::DISTANCE_KEY,
-            'label'   => '…how many categories apart',
+            'label'   => '…how many apart',
             'type'    => FieldType::Number->value,
-            'hint'    => 'One means own category or the next one either way. No effect when there is no limit.',
+            'hint'    => 'One means own category or the next one either way.',
             'default' => self::DEFAULT_DISTANCE,
             'min'     => 1,
             'max'     => self::MAX_DISTANCE,
             'step'    => 1,
+            // Reads as a continuation of the limit above, and means nothing
+            // without it, so it sits alongside and greys out when there is no
+            // limit to be a number of.
+            'inline'    => true,
+            'enabledBy' => ['key' => self::KEY, 'value' => CategoryPairingMode::Adjacent->value],
         ];
     }
 
