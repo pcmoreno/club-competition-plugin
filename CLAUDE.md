@@ -159,14 +159,31 @@ longest run. A player at either cap has a **binding** claim that outranks the
 being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
 discounts the claim of someone whose colours are already even.
 
-**Categories are not a pairing input**, despite an earlier version of this file
-claiming a same-category preference. The oracle rules it out: A never plays C
-(zero of 444 games), and in the games that do cross a category the stronger
-player averages the 24th percentile of their own category against the 72nd of
-the weaker one — the bottom of A meeting the top of B. Categories here are
-rating bands, so pairing by strength reproduces them for free; 70% of games land
-inside one without anything enforcing it. Categories still drive grouped
-round-robin (`GroupingMode::Categories`) and the standings filter.
+**Categories do constrain pairing** — a player may meet their own category or an
+adjacent one, never a category two steps away. `KeizerPairing` does not yet
+enforce this; it is the next thing to build.
+
+The oracle is unambiguous. Across 444 games: `C-C 148`, `B-B 102`, `A-B 78`,
+`A-A 63`, `B-C 53`, and **`A-C` exactly zero**. That is not a side effect of
+pairing by strength, which was this file's previous claim:
+
+- An A player sat **directly next to** a C player in the standings **378 times**
+  over the season — more often than A sat next to A — and within three ranks
+  1116 times. Proximity pairing would have produced A-C games constantly.
+- Nor is it a width limit. The widest game played was **525 rating points**
+  (C vs C), while the *closest possible* A-vs-C pairing is **202**. Thirty games
+  were played at a rating-order distance of 14 or more, topping out at 24; the
+  closest possible A-C is 15.
+
+So wide gaps are acceptable inside a category or between neighbours, and
+impossible across two — which only a category rule produces.
+
+One loose end: paired players are markedly closer in **rating order**
+(median gap 5, max 24) than in **Keizer-score order** (median 9, max 43). The
+pairing order may not be the score at all. Deliberately not acted on yet.
+
+Categories also drive grouped round-robin (`GroupingMode::Categories`) and the
+standings filter.
 
 Absence recording is load-bearing under Keizer in a way it never was under
 standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
