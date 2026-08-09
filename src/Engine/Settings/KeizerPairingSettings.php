@@ -7,6 +7,7 @@ namespace SCS\Engine\Settings;
 use SCS\Engine\Settings\Setting\Algorithm;
 use SCS\Engine\Settings\Setting\BottomUpPairing;
 use SCS\Engine\Settings\Setting\ByeChoice;
+use SCS\Engine\Settings\Setting\CategoryPairing;
 use SCS\Engine\Settings\Setting\Colors;
 use SCS\Engine\Settings\Setting\ColorTie;
 use SCS\Engine\Settings\Setting\ColorTiebreak;
@@ -22,6 +23,7 @@ use SCS\Engine\Settings\Setting\ScoreCorrection;
 use SCS\Engine\Settings\Setting\SkipLimit;
 use SCS\Engine\Settings\Setting\StrictOrder;
 use SCS\Engine\Settings\Setting\StrongerPreferenceWins;
+use SCS\Entity\Enum\CategoryPairingMode;
 use SCS\Entity\Enum\ColorPriority;
 use SCS\Entity\Enum\ColorRule;
 use SCS\Entity\Enum\ColorTieAward;
@@ -51,6 +53,8 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly PairingByeChoice $byeChoice = PairingByeChoice::Random,
         private readonly ColorRule $colorRule = ColorRule::Alternating,
         private readonly ColorPriority $colorPriority = ColorPriority::HigherRanked,
+        private readonly CategoryPairingMode $categoryPairing = CategoryPairingMode::Adjacent,
+        private readonly int $categoryDistance = CategoryPairing::DEFAULT_DISTANCE,
         private readonly ColorTieCriterion $colorTie = ColorTieCriterion::LowerPairingNumber,
         private readonly ColorTieAward $colorTieAward = ColorTieAward::Alternate,
         private readonly FirstBoardColour $firstBoardColour = FirstBoardColour::Automatic,
@@ -62,6 +66,16 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly int $maxSameColourRun = MaxSameColourRun::DEFAULT,
         private readonly ?int $numberOfRounds = null,
     ) {
+    }
+
+    public function categoryPairing(): CategoryPairingMode
+    {
+        return $this->categoryPairing;
+    }
+
+    public function categoryDistance(): int
+    {
+        return $this->categoryDistance;
     }
 
     public function colorTie(): ColorTieCriterion
@@ -174,6 +188,8 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             ByeChoice::KEY       => $this->byeChoice->value,
             Colors::KEY          => $this->colorRule->value,
             ColorTiebreak::KEY   => $this->colorPriority->value,
+            CategoryPairing::KEY          => $this->categoryPairing->value,
+            CategoryPairing::DISTANCE_KEY => $this->categoryDistance,
             ColorTie::KEY               => $this->colorTie->value,
             ColorTie::AWARD_KEY         => $this->colorTieAward->value,
             ColorTie::FIRST_BOARD_KEY   => $this->firstBoardColour->value,
@@ -201,6 +217,8 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             (new ByeChoice())->field(),
             (new Colors())->field(),
             (new ColorTiebreak())->field(),
+            (new CategoryPairing())->field(),
+            (new CategoryPairing())->distanceField(),
             (new ColorTie())->field(),
             (new ColorTie())->awardField(),
             (new ColorTie())->firstBoardField(),
@@ -234,6 +252,8 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             byeChoice:       (new ByeChoice())->normalise($values[ByeChoice::KEY] ?? null),
             colorRule:       (new Colors())->normalise($values[Colors::KEY] ?? null),
             colorPriority:   (new ColorTiebreak())->normalise($values[ColorTiebreak::KEY] ?? null),
+            categoryPairing:   (new CategoryPairing())->normalise($values[CategoryPairing::KEY] ?? null),
+            categoryDistance:  (new CategoryPairing())->normaliseDistance($values[CategoryPairing::DISTANCE_KEY] ?? null),
             colorTie:         (new ColorTie())->normalise($values[ColorTie::KEY] ?? null),
             colorTieAward:    (new ColorTie())->normaliseAward($values[ColorTie::AWARD_KEY] ?? null),
             firstBoardColour: (new ColorTie())->normaliseFirstBoard($values[ColorTie::FIRST_BOARD_KEY] ?? null),

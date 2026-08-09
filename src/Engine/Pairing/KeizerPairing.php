@@ -6,6 +6,7 @@ namespace SCS\Engine\Pairing;
 
 use SCS\Engine\Settings\KeizerPairingSettings;
 use SCS\Entity\Enum\ByeType;
+use SCS\Entity\Enum\CategoryPairingMode;
 use SCS\Entity\Enum\ColorPriority;
 use SCS\Entity\Enum\ColorRule;
 use SCS\Entity\Enum\ColorTieAward;
@@ -67,7 +68,10 @@ final class KeizerPairing implements PerRoundPairing
         $meetings = $this->meetings($history);
         $rank     = $this->rankIndex($order);
 
-        $pairs = $this->pairs($order, $colours, $meetings, $rank);
+        $categories = $this->categoryOrder($season->categories);
+
+        $pairs = $this->pairs($order, $colours, $meetings, $rank, $categories);
+        $pairs = $this->repairCategories($pairs, $categories);
 
         // Board 1 is the pair containing the highest ranked player, which is
         // what an organiser expects reading down the sheet — the order boards
@@ -184,9 +188,10 @@ final class KeizerPairing implements PerRoundPairing
      * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
      * @param  array<string,array{count:int,last:int}>          $meetings
      * @param  array<int,int>                           $rank
+     * @param  array<string,int>                        $categories
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
      */
-    private function pairs(array $order, array $colours, array $meetings, array $rank): array
+    private function pairs(array $order, array $colours, array $meetings, array $rank, array $categories): array
     {
         $paired = [];
         $pairs  = [];
@@ -197,7 +202,7 @@ final class KeizerPairing implements PerRoundPairing
                 continue;
             }
 
-            $opponent = $this->findOpponent($order, $index, $paired, $colours, $meetings);
+            $opponent = $this->findOpponent($order, $index, $paired, $colours, $meetings, $categories);
             if ($opponent === null) {
                 continue;
             }
@@ -255,8 +260,9 @@ final class KeizerPairing implements PerRoundPairing
      * @param array<int,true>                          $paired
      * @param array<int,array{last:?bool,balance:int,run:int}> $colours
      * @param array<string,array{count:int,last:int}>          $meetings
+     * @param array<string,int>                                $categories
      */
-    private function findOpponent(array $order, int $index, array $paired, array $colours, array $meetings): ?SeasonPlayer
+    private function findOpponent(array $order, int $index, array $paired, array $colours, array $meetings, array $categories): ?SeasonPlayer
     {
         $player     = $order[$index];
         $candidates = [];
@@ -269,6 +275,7 @@ final class KeizerPairing implements PerRoundPairing
                 'distance' => abs($position - $index),
                 'below'    => $position > $index,
                 'rematch'  => $this->rematchPenalty($player, $candidate, $meetings),
+                'category' => $this->categoryPenalty($player, $candidate, $categories),
             ];
         }
 
@@ -281,7 +288,12 @@ final class KeizerPairing implements PerRoundPairing
         // the colour look-ahead that belongs to the aware variants. A penalty
         // rather than a filter, so a thin field still gets a board rather than
         // no game at all.
-        usort($candidates, static fn (array $a, array $b) => $a['rematch'] <=> $b['rematch']
+        // Category first: the club's season has 444 games and not one crosses two
+        // categories, so this is the firmest of the three. Still a ranking rather
+        // than a filter, so a category left with an odd player out gets a board
+        // instead of somebody sitting there with no game.
+        usort($candidates, static fn (array $a, array $b) => $a['category'] <=> $b['category']
+            ?: $a['rematch'] <=> $b['rematch']
             ?: $a['distance'] <=> $b['distance']
             ?: ($b['below'] <=> $a['below']));
 
@@ -299,7 +311,7 @@ final class KeizerPairing implements PerRoundPairing
 
         if ($wants !== null) {
             foreach (array_slice($candidates, 0, $this->settings->limit() + 1) as $candidate) {
-                if ($candidate['rematch'] > $best) {
+                if ($candidate['rematch'] > $best || $candidate['category'] > $candidates[0]['category']) {
                     break;
                 }
                 if ($this->wantsWhite($candidate['player'], $colours) === !$wants) {
@@ -309,6 +321,117 @@ final class KeizerPairing implements PerRoundPairing
         }
 
         return $candidates[0]['player'];
+    }
+
+    /**
+     * Trade players between boards until nobody is paired outside their
+     * category limit.
+     *
+     * Choosing opponents one at a time is greedy, so it can strand the last few
+     * players with only distant opponents left — which showed up as seven
+     * cross-category boards over the club's season, where their own history has
+     * none. A swap between two boards fixes that without disturbing anything
+     * else: every player still has exactly one game, and only the two boards
+     * involved change.
+     *
+     * Swaps are accepted only when they strictly reduce the total breach, so
+     * this terminates. A field that genuinely cannot be paired inside its
+     * categories — an odd number of players in one, and nobody adjacent to
+     * trade with — keeps the pairing it had rather than losing a board.
+     *
+     * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}> $pairs
+     * @param  array<string,int>                          $categories
+     * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
+     */
+    private function repairCategories(array $pairs, array $categories): array
+    {
+        if ($this->settings->categoryPairing() === CategoryPairingMode::Free) {
+            return $pairs;
+        }
+
+        $breach = fn (array $pair): int => $this->categoryPenalty($pair[0], $pair[1], $categories);
+
+        // Bounded by the number of boards: each pass either fixes one or stops.
+        for ($pass = 0, $limit = count($pairs) * count($pairs); $pass < $limit; $pass++) {
+            $improved = false;
+
+            foreach ($pairs as $i => $pair) {
+                if ($breach($pair) === 0) {
+                    continue;
+                }
+
+                foreach ($pairs as $j => $other) {
+                    if ($i === $j) {
+                        continue;
+                    }
+
+                    $before = $breach($pair) + $breach($other);
+
+                    foreach ([[$pair[0], $other[0], $pair[1], $other[1]], [$pair[0], $other[1], $pair[1], $other[0]]] as [$keep, $taken, $given, $left]) {
+                        $swapA = [$keep, $taken];
+                        $swapB = [$given, $left];
+
+                        if ($breach($swapA) + $breach($swapB) >= $before) {
+                            continue;
+                        }
+
+                        $pairs[$i] = $swapA;
+                        $pairs[$j] = $swapB;
+                        $improved  = true;
+
+                        break 3;
+                    }
+                }
+            }
+
+            if (!$improved) {
+                break;
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * How far outside the category limit this pairing would reach.
+     *
+     * Zero when it is within the limit, or when either player has no category —
+     * categories are optional per season, and there is no distance to measure
+     * from someone who isn't in one.
+     *
+     * @param array<string,int> $categories category => position in the season's own order
+     */
+    private function categoryPenalty(SeasonPlayer $a, SeasonPlayer $b, array $categories): int
+    {
+        if ($this->settings->categoryPairing() === CategoryPairingMode::Free) {
+            return 0;
+        }
+
+        $from = $categories[$a->category ?? ''] ?? null;
+        $to   = $categories[$b->category ?? ''] ?? null;
+        if ($from === null || $to === null) {
+            return 0;
+        }
+
+        return max(0, abs($from - $to) - $this->settings->categoryDistance());
+    }
+
+    /**
+     * The season's categories in their own order, which is what "adjacent"
+     * means — the admin lists them strongest first, and the distance between
+     * two is how far apart they sit in that list.
+     *
+     * @param  array<mixed>      $categories
+     * @return array<string,int>
+     */
+    private function categoryOrder(array $categories): array
+    {
+        $order = [];
+        foreach (array_values($categories) as $position => $category) {
+            $order[(string)$category] = $position;
+        }
+
+        return $order;
     }
 
     /**
