@@ -15,6 +15,7 @@ use SCS\Entity\Game;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Entity\SeasonPlayer;
+use SCS\Entity\StandingsSnapshot;
 
 /**
  * A shipped season fixture, loaded as entities.
@@ -171,6 +172,41 @@ final class SeasonFixture
         }
 
         return $rows;
+    }
+
+    /**
+     * The published standings after a round, as snapshot entities.
+     *
+     * Feeding these in as the previous round sidesteps our inability to
+     * reconstruct Sevilla's opening order: from round two the ladder is ordered
+     * by the round before, and here that order is the club's own.
+     *
+     * @return list<StandingsSnapshot>
+     */
+    public function publishedSnapshots(int $number): array
+    {
+        $snapshots = [];
+        foreach ($this->rounds[$number]['standings'] as $row) {
+            $snapshots[] = new StandingsSnapshot(
+                id:               0,
+                season_id:        1,
+                round_id:         $number,
+                season_player_id: $this->playerIds[$row['name']],
+                rank:             (int)$row['rank'],
+                keizer_score:     (int)$row['keizer_score'],
+                classical_points: 0.0,
+                wins:             (int)($row['wins'] ?? 0),
+                draws:            (int)($row['draws'] ?? 0),
+                losses:           (int)($row['losses'] ?? 0),
+                games:            (int)($row['games'] ?? 0),
+                byes:             (int)($row['byes'] ?? 0),
+                color_balance:    (int)($row['color_balance'] ?? 0),
+                tpr:              isset($row['tpr']) ? (int)$row['tpr'] : null,
+                scores:           [],
+            );
+        }
+
+        return $snapshots;
     }
 
     private function result(?string $result): ?GameResult
