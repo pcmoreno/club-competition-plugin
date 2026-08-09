@@ -86,7 +86,7 @@ class AdminController extends RestController
 
             // AuthService rejects an address that already backs a member login.
             try {
-                $admin = $this->authService->inviteAdmin($input->name, $input->email);
+                $admin = $this->authService->inviteAdmin($input->name, $input->email, $this->clientIp());
             } catch (UniqueConstraintViolationException) {
                 // Lost the race against a concurrent invite of the same address.
                 throw new ConflictException('That email address is already in use.');
@@ -113,7 +113,7 @@ class AdminController extends RestController
             $this->validate($input);
 
             try {
-                $updated = $this->authService->resendAdminInvite($admin, $input->email);
+                $updated = $this->authService->resendAdminInvite($admin, $input->email, $this->clientIp());
             } catch (UniqueConstraintViolationException) {
                 throw new ConflictException('That email address is already in use.');
             }

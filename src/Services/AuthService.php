@@ -26,6 +26,13 @@ class AuthService
     private const RESET_MAX_ATTEMPTS_PER_IP       = 10;
     private const RESET_DECAY_SECONDS             = 3600; // 1 hour
 
+    // Admin invites mail a caller-supplied address, and a resend rewrites the
+    // pending admin's address to whatever is submitted — so both are metered
+    // even though only the first admin can reach them.
+    private const ADMIN_INVITE_MAX_PER_ADDRESS = 3;
+    private const ADMIN_INVITE_MAX_PER_IP      = 10;
+    private const ADMIN_INVITE_DECAY_SECONDS   = 3600; // 1 hour
+
     /**
      * Argon2id hash of a discarded 256-bit random value — never a real
      * account's password, and its plaintext was never captured or stored
@@ -211,6 +218,24 @@ class AuthService
         throw new UnauthorizedException('Invalid credentials.');
     }
 
+    // Hit unconditionally before the work, like initiatePasswordReset, so the
+    // counter meters attempts against unknown addresses too.
+    private function throttleAdminInvite(string $email, string $ip): void
+    {
+        $ipKey    = 'admin_invite_ip_' . $ip;
+        $emailKey = 'admin_invite_email_' . strtolower($email);
+
+        if ($this->rateLimiter->tooManyAttempts($ipKey, self::ADMIN_INVITE_MAX_PER_IP)
+            || $this->rateLimiter->tooManyAttempts($emailKey, self::ADMIN_INVITE_MAX_PER_ADDRESS)) {
+            $this->logAuthEvent('admin invite blocked (rate limit)', $email, $ip);
+
+            throw new TooManyRequestsException('Too many admin invites sent. Please try again later.');
+        }
+
+        $this->rateLimiter->hit($ipKey, self::ADMIN_INVITE_DECAY_SECONDS);
+        $this->rateLimiter->hit($emailKey, self::ADMIN_INVITE_DECAY_SECONDS);
+    }
+
     // One address, one login. attemptLogin resolves members first, so an address
     // in both tables silently locks the admin out of their own account.
     private function assertNotAnAdminAddress(string $email): void
@@ -288,9 +313,10 @@ class AuthService
      * Throws a UniqueConstraintViolationException if the email is already an
      * admin; the caller maps that to a conflict.
      */
-    public function inviteAdmin(string $name, string $email): Admin
+    public function inviteAdmin(string $name, string $email, string $ip): Admin
     {
         $this->assertNotAMemberAddress($email);
+        $this->throttleAdminInvite($email, $ip);
 
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
@@ -307,9 +333,10 @@ class AuthService
      * lapsed or mistyped invite would be unrecoverable — the email column is
      * unique, so the same address can't simply be invited again.
      */
-    public function resendAdminInvite(Admin $admin, string $email): Admin
+    public function resendAdminInvite(Admin $admin, string $email, string $ip): Admin
     {
         $this->assertNotAMemberAddress($email);
+        $this->throttleAdminInvite($email, $ip);
 
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');

@@ -123,9 +123,13 @@ async function request(
 			await fetchCsrfToken();
 			return request( method, path, { body, signal, params }, false );
 		}
-		// Not on login: a wrong password is also a 401 and must not be treated
-		// as an expired session.
-		if ( res.status === 401 && path !== 'auth/login' ) {
+		// Only when the server says the session itself is gone. Permission
+		// callbacks answer with WP_Error('not_authenticated'), which carries a
+		// `code`; a controller's 401 means the submitted credentials were wrong
+		// (a bad login, a mistyped current password) and returns { error } with
+		// none. Keying on the path instead used to sign the user out for typing
+		// their current password wrong.
+		if ( res.status === 401 && payload?.code === 'not_authenticated' ) {
 			onUnauthenticated?.();
 		}
 		throw new ApiError( res.status, payload );
