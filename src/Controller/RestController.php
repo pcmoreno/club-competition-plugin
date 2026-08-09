@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Exception\ConflictException;
+use SCS\Exception\ForbiddenException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\TooManyRequestsException;
 use SCS\Exception\UnauthorizedException;
@@ -40,6 +41,8 @@ abstract class RestController
             return $this->error($e->getMessage(), \WP_Http::NOT_FOUND);
         } catch (UnauthorizedException $e) {
             return $this->error($e->getMessage(), \WP_Http::UNAUTHORIZED);
+        } catch (ForbiddenException $e) {
+            return $this->error($e->getMessage(), \WP_Http::FORBIDDEN);
         } catch (ConflictException $e) {
             return $this->error($e->getMessage(), \WP_Http::CONFLICT);
         } catch (TooManyRequestsException $e) {

@@ -211,6 +211,28 @@ class AuthService
         throw new UnauthorizedException('Invalid credentials.');
     }
 
+    // One address, one login. attemptLogin resolves members first, so an address
+    // in both tables silently locks the admin out of their own account.
+    private function assertNotAnAdminAddress(string $email): void
+    {
+        if ($this->adminRepository->findByEmail($email) !== null) {
+            throw new ConflictException(sprintf(
+                'The address "%s" already signs in as an admin. A member account needs its own address, because a shared one would lock the admin out.',
+                $email
+            ));
+        }
+    }
+
+    private function assertNotAMemberAddress(string $email): void
+    {
+        if ($this->memberRepository->findByEmail($email) !== null) {
+            throw new ConflictException(sprintf(
+                'The address "%s" is already a member login. An admin account needs its own address, because a shared one would always sign in as the member.',
+                $email
+            ));
+        }
+    }
+
     /**
      * Create a member account for a player and email them an invite to set a
      * password. Only the SHA-256 hash of the token is stored (matching the
@@ -222,6 +244,8 @@ class AuthService
      */
     public function inviteMember(int $playerId, string $email): Member
     {
+        $this->assertNotAnAdminAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 
@@ -239,6 +263,8 @@ class AuthService
      */
     public function resendInvite(Member $member, string $email): Member
     {
+        $this->assertNotAnAdminAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 
@@ -264,6 +290,8 @@ class AuthService
      */
     public function inviteAdmin(string $name, string $email): Admin
     {
+        $this->assertNotAMemberAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 
@@ -281,6 +309,8 @@ class AuthService
      */
     public function resendAdminInvite(Admin $admin, string $email): Admin
     {
+        $this->assertNotAMemberAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 

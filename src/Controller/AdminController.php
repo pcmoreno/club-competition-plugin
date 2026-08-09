@@ -8,10 +8,9 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use SCS\Entity\Admin;
 use SCS\Entity\Enum\AdminStatus;
 use SCS\Exception\ConflictException;
+use SCS\Exception\ForbiddenException;
 use SCS\Exception\NotFoundException;
-use SCS\Exception\UnauthorizedException;
 use SCS\Repository\AdminRepository;
-use SCS\Repository\MemberRepository;
 use SCS\Repository\SeasonContactRepository;
 use SCS\Request\InviteAdminRequest;
 use SCS\Request\ResendAdminInviteRequest;
@@ -38,7 +37,6 @@ class AdminController extends RestController
     public function __construct(
         ValidatorInterface $validator,
         private readonly AdminRepository $adminRepository,
-        private readonly MemberRepository $memberRepository,
         private readonly SeasonContactRepository $seasonContactRepository,
         private readonly AuthService $authService,
         private readonly AuthContextService $authContext,
@@ -85,8 +83,8 @@ class AdminController extends RestController
             if ($this->adminRepository->findByEmail($input->email) !== null) {
                 throw new ConflictException(sprintf('An admin with email "%s" already exists.', $input->email));
             }
-            $this->requireEmailFreeOfMemberAccount($input->email);
 
+            // AuthService rejects an address that already backs a member login.
             try {
                 $admin = $this->authService->inviteAdmin($input->name, $input->email);
             } catch (UniqueConstraintViolationException) {
@@ -98,11 +96,9 @@ class AdminController extends RestController
         });
     }
 
-    /**
-     * Re-send a pending invite with a fresh token, optionally to a corrected
-     * address. Only for an admin who hasn't accepted yet: an active account has
-     * a password and should use the password-reset flow instead.
-     */
+    // Re-send a pending invite with a fresh token, optionally to a corrected
+    // address. Refused once accepted — and there is no admin password reset, so
+    // recovery from there is delete + re-invite, losing their contact rows.
     public function invite(\WP_REST_Request $request): \WP_REST_Response
     {
         return $this->handle(function () use ($request) {
@@ -115,11 +111,6 @@ class AdminController extends RestController
 
             $input = ResendAdminInviteRequest::fromRequest($request);
             $this->validate($input);
-
-            // The resend may correct the address, so it needs the same check.
-            if ($input->email !== $admin->email) {
-                $this->requireEmailFreeOfMemberAccount($input->email);
-            }
 
             try {
                 $updated = $this->authService->resendAdminInvite($admin, $input->email);
@@ -169,27 +160,6 @@ class AdminController extends RestController
             + ['is_super_admin' => $admin->id === $this->adminRepository->firstAdminId()];
     }
 
-    /**
-     * Refuse an address that already signs in as a member.
-     *
-     * Members and admins are separate tables with separate passwords, and
-     * AuthService::attemptLogin checks members first — so an address that is
-     * both would always resolve to the member account. The admin account would
-     * be unreachable: its password fails against the member's hash, and the
-     * member password logs them in as a member. Since most admins are also
-     * players, this is the likely case rather than an exotic one, and it has to
-     * fail here with a reason rather than silently produce a dead account.
-     */
-    private function requireEmailFreeOfMemberAccount(string $email): void
-    {
-        if ($this->memberRepository->findByEmail($email) !== null) {
-            throw new ConflictException(sprintf(
-                'The address "%s" is already a member login. An admin account needs its own address, because a shared one would always sign in as the member.',
-                $email
-            ));
-        }
-    }
-
     private function requireAdmin(int $id): Admin
     {
         $admin = $this->adminRepository->findById($id);
@@ -200,18 +170,15 @@ class AdminController extends RestController
         return $admin;
     }
 
-    /**
-     * The route's permission callback already proved ROLE_ADMIN and a valid CSRF
-     * token; this is the narrower gate on top. Enforced here rather than only
-     * hidden in the UI — the endpoints are reachable by any signed-in admin.
-     */
+    // The narrower gate on top of $isAdmin, enforced here rather than only
+    // hidden in the UI — the routes are reachable by any signed-in admin.
     private function requireSuperAdmin(): void
     {
         $claims  = $this->authContext->currentClaims();
         $firstId = $this->adminRepository->firstAdminId();
 
         if ($claims === null || $firstId === null || $claims['sub'] !== $firstId) {
-            throw new UnauthorizedException('Only the first admin account can manage admins.');
+            throw new ForbiddenException('Only the first admin account can manage admins.');
         }
     }
 }

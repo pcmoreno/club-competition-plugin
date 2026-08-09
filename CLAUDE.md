@@ -271,14 +271,32 @@ This is a deliberate stopgap, not a role system. It exists because production
 can't run WP-CLI and a second admin was otherwise unreachable; an invited admin
 can do everything the inviter can except invite further admins.
 
-**An admin account needs an address no member uses.** The two are separate
-tables with separate passwords, and `attemptLogin` checks members first — so a
-shared address always resolves to the member account, leaving the admin one
-unreachable (its password fails against the member hash; the member password
-signs them in as a member). Most admins are also players, so this is the common
-case, not an exotic one: `AdminController` refuses such an invite outright
-rather than minting a dead account. The real fix is one identity with roles
-attached, which is a much larger change.
+**One address, one login.** Members and admins are separate tables with separate
+passwords, and `attemptLogin` checks members first — so an address in both
+resolves to the member account and leaves the admin one unreachable (its
+password fails against the member hash; the member password signs them in as a
+member). Nothing surfaces the collision; the admin simply can't log in.
+
+Enforced on **both** sides, in `AuthService` rather than the controllers so a
+new caller can't introduce a third way in: `assertNotAMemberAddress` guards the
+two admin invite paths, `assertNotAnAdminAddress` the two member ones. Guarding
+only the admin side was not enough — a member invite can be re-sent onto an
+arbitrary address, including an existing admin's, and `revokeMember` and
+`resendInvite` both keep `password_hash`. Any admin could therefore have locked
+the first admin out permanently, and with them the only account able to manage
+admins. The real fix is one identity with roles attached, which is a much larger
+change.
+
+Note this guards new collisions only. A row pair that already shares an address
+stays shadowed until one of them is changed.
+
+**Admins have no password reset.** `initiatePasswordReset` and `resetPassword`
+resolve through `MemberRepository` alone, and `admins` has no `reset_token` /
+`reset_expires_at` columns — so "forgot password" mails an admin nothing. This
+did not matter while every admin password was typed in by whoever ran
+`wp scs create-admin`; it does now that invited admins, whose password only they
+know, are the normal case. Recovery today is the first admin deleting and
+re-inviting the account, which also drops its tournament-contact rows.
 
 Removal is a **delete**, not a status flip — the row goes, along with the
 account's `season_contacts` rows (no FK cascade), inside one transaction. Their

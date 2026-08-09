@@ -287,7 +287,6 @@ class Container
             ->setPublic(true)
             ->addArgument(new Reference('validator'))
             ->addArgument(new Reference('admin_repository'))
-            ->addArgument(new Reference('member_repository'))
             ->addArgument(new Reference('season_contact_repository'))
             ->addArgument(new Reference('auth_service'))
             ->addArgument(new Reference('auth_context_service'))
