@@ -148,6 +148,15 @@ variants are exposed but coerce back to standard.
 the club's own history has 107 in 444 games, the first in round 12. The gap is
 emergent from how hard the ranking churns, not a rule.
 
+**Categories are not a pairing input**, despite an earlier version of this file
+claiming a same-category preference. The oracle rules it out: A never plays C
+(zero of 444 games), and in the games that do cross a category the stronger
+player averages the 24th percentile of their own category against the 72nd of
+the weaker one — the bottom of A meeting the top of B. Categories here are
+rating bands, so pairing by strength reproduces them for free; 70% of games land
+inside one without anything enforcing it. Categories still drive grouped
+round-robin (`GroupingMode::Categories`) and the standings filter.
+
 Absence recording is load-bearing under Keizer in a way it never was under
 standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
 missing player as club duty or personal is worth a third of their own value —
