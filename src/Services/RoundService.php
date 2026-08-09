@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Services;
 
 use SCS\Engine\Pairing\FullSchedulePairing;
+use SCS\Engine\Pairing\PerRoundPairing;
 use SCS\Engine\PairingEngineResolver;
 use SCS\Engine\ScoringStrategyResolver;
 use SCS\Engine\SettingsResolver;
@@ -144,6 +145,119 @@ final class RoundService
 
             return $created;
         });
+    }
+
+    /**
+     * Build one round's boards from the standings.
+     *
+     * The counterpart to generateSchedule for systems that pair a round at a
+     * time. Only players who are actually present are paired: an absence
+     * recorded before the board is built takes that player out of it, which is
+     * the whole reason the attendance window comes first.
+     *
+     * Refused if the round already has games. Regenerating over a board an
+     * admin has adjusted by hand would silently discard that work, and clearing
+     * the round first is an explicit act.
+     *
+     * @return list<Game>
+     */
+    public function pairRound(Round $round): array
+    {
+        $this->requireEditableRound($round);
+
+        $season = $this->seasons->findById($round->season_id);
+        if ($season === null) {
+            throw new NotFoundException('Season not found for round.');
+        }
+
+        $engine = $this->pairingEngines->resolve($season);
+        if (!$engine instanceof PerRoundPairing) {
+            throw new ConflictException('This tournament lays out its whole schedule at once, not a round at a time.');
+        }
+
+        if ($this->games->findByRound($round->id) !== []) {
+            throw new ConflictException('This round already has pairings. Remove them before generating new ones.');
+        }
+
+        $result = $engine->pairNextRound(
+            $season,
+            $this->presentPlayers($round),
+            $this->gamesBefore($season->id, $round),
+            array_values($this->snapshots->findLatestForSeason($season->id)),
+        );
+
+        return $this->transactions->transactional(function () use ($round, $season, $result): array {
+            $games = [];
+            foreach ($result->pairings as $pairing) {
+                $games[] = $this->games->create(
+                    $round->id,
+                    $pairing['white'],
+                    $pairing['black'],
+                    $pairing['board'],
+                    null,
+                    $season->time_control,
+                );
+            }
+
+            // Saved one at a time rather than through saveMany, which opens a
+            // transaction of its own and would nest inside this one.
+            foreach ($result->byes as $bye) {
+                $this->attendance->save(
+                    $round->id,
+                    $bye['season_player_id'],
+                    AttendanceStatus::Present,
+                    ByeType::from($bye['bye_type']),
+                );
+            }
+
+            return $games;
+        });
+    }
+
+    /**
+     * The roster minus anyone recorded absent for this round.
+     *
+     * Absence is opt-out: a player with no attendance row at all is assumed to
+     * be coming, because the club pairs on the expectation that people turn up
+     * and only hears about the ones who can't.
+     *
+     * @return list<\SCS\Entity\SeasonPlayer>
+     */
+    private function presentPlayers(Round $round): array
+    {
+        $absent = [];
+        foreach ($this->attendance->findByRound($round->id) as $row) {
+            if ($row->status === AttendanceStatus::Absent) {
+                $absent[$row->season_player_id] = true;
+            }
+        }
+
+        $present = [];
+        foreach ($this->seasonPlayers->findBySeason($round->season_id) as $player) {
+            if (!isset($absent[$player->id])) {
+                $present[] = $player;
+            }
+        }
+
+        return $present;
+    }
+
+    /**
+     * Every game played in earlier rounds, for colour history and rematches.
+     *
+     * @return list<Game>
+     */
+    private function gamesBefore(int $seasonId, Round $round): array
+    {
+        $games = [];
+        foreach ($this->rounds->findBySeason($seasonId) as $earlier) {
+            if ($earlier->round_number >= $round->round_number) {
+                continue;
+            }
+            $games = array_merge($games, $this->games->findByRound($earlier->id));
+        }
+
+        return $games;
     }
 
     public function addPairing(int $roundId, int $white, int $black, ?int $board): Game
