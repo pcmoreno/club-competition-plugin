@@ -127,7 +127,7 @@ class SeasonController extends RestController
             // The metric the season ranks by (StandingsMetric value, e.g. 'points'
             // or 'sonneborn_berger'); each row exposes its value as rank_score so
             // callers don't need to know which column to read.
-            $rankByKey = $this->settingsResolver->scoring($season)?->getSettings()['rankBy'] ?? null;
+            $rankByKey = $this->settingsResolver->scoring($season)->getSettings()['rankBy'] ?? null;
 
             $standings = array_map(function ($s) use ($display, $previousRank, $rankByKey) {
                 $d = $display[$s->season_player_id] ?? null;
@@ -346,8 +346,8 @@ class SeasonController extends RestController
                     'fields' => $pairing?->getSettingsFields(),
                 ],
                 'scoring' => [
-                    'values' => $scoring?->getSettings(),
-                    'fields' => $scoring?->getSettingsFields(),
+                    'values' => $scoring->getSettings(),
+                    'fields' => $scoring->getSettingsFields(),
                 ],
                 'display' => [
                     'values' => $display->getSettings(),

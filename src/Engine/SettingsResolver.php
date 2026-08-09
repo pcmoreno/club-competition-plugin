@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Engine;
 
+use SCS\Engine\Settings\KeizerScoringSettings;
 use SCS\Engine\Settings\ManualPairingSettings;
 use SCS\Engine\Settings\RoundRobinGroupsPairingSettings;
 use SCS\Engine\Settings\RoundRobinPairingSettings;
@@ -42,8 +43,8 @@ final class SettingsResolver
         };
     }
 
-    // Null for systems whose scoring isn't implemented yet (Keizer).
-    public function scoring(Season $season): ?TournamentScoringSettings
+    // Every scoring system has settings — both of them are implemented.
+    public function scoring(Season $season): TournamentScoringSettings
     {
         return $this->scoringFor($season->pairing_system, $season->scoring_settings ?? []);
     }
@@ -54,11 +55,11 @@ final class SettingsResolver
      *
      * @param array<string,mixed> $values
      */
-    public function scoringFor(PairingSystem $system, array $values): ?TournamentScoringSettings
+    public function scoringFor(PairingSystem $system, array $values): TournamentScoringSettings
     {
         return match ($system->scoringSystem()) {
             ScoringSystem::Standard => StandardScoringSettings::fromArray($values),
-            ScoringSystem::Keizer   => null,
+            ScoringSystem::Keizer   => KeizerScoringSettings::fromArray($values),
         };
     }
 

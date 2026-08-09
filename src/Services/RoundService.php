@@ -235,7 +235,14 @@ final class RoundService
         // leave a partial standings table (some players, ranks with holes), and
         // findLatestForSeason picks the highest round_number with *any*
         // snapshot, so that fragment would become the published standings.
-        $this->transactions->transactional(function () use ($season, $roster, $seasonRounds, $targets, $strategy): void {
+        // Keizer prices every round against the one before it, so the cascade
+        // has to hand each target the ranking it steps forward from. Rounds are
+        // rewritten oldest first, so a target's predecessor is either one we
+        // just computed here or the stored snapshot of a round we aren't
+        // touching.
+        $computed = [];
+
+        $this->transactions->transactional(function () use ($season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
             foreach ($targets as $target) {
                 // Standard scoring is cumulative over all games/attendance up to this round.
                 /** @var list<\SCS\Entity\Game> $games */
@@ -250,7 +257,13 @@ final class RoundService
                     $attendance = array_merge($attendance, $this->attendance->findByRound($r->id));
                 }
 
-                $snapshots = $strategy->computeStandings($season, $target, $roster, $games, $attendance);
+                $previousRound = $this->roundBefore($seasonRounds, $target);
+                $previous      = $previousRound === null
+                    ? []
+                    : array_values($computed[$previousRound->id] ?? $this->snapshots->findByRound($previousRound->id));
+
+                $snapshots            = $strategy->computeStandings($season, $target, $roster, $games, $attendance, $previous);
+                $computed[$target->id] = $snapshots;
 
                 $this->snapshots->deleteByRound($target->id);
                 foreach ($snapshots as $snapshot) {
@@ -327,6 +340,27 @@ final class RoundService
         }
 
         $this->rounds->updateStatus($round->id, RoundStatus::Finalised);
+    }
+
+    /**
+     * The round immediately before this one by number, which is not simply the
+     * previous array element — a season can have gaps once rounds are deleted.
+     *
+     * @param list<Round> $rounds
+     */
+    private function roundBefore(array $rounds, Round $target): ?Round
+    {
+        $previous = null;
+        foreach ($rounds as $round) {
+            if ($round->round_number >= $target->round_number) {
+                continue;
+            }
+            if ($previous === null || $round->round_number > $previous->round_number) {
+                $previous = $round;
+            }
+        }
+
+        return $previous;
     }
 
     private function requireGame(int $gameId): Game

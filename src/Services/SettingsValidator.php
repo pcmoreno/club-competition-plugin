@@ -32,11 +32,7 @@ final class SettingsValidator
     public function validateScoring(PairingSystem $system, array $input): array
     {
         $settings = $this->settingsResolver->scoringFor($system, $input);
-        if ($settings === null) {
-            throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
-        }
-
-        $errors = [];
+        $errors   = [];
 
         foreach ($input['gameOutcomes'] ?? [] as $key => $value) {
             if (!is_numeric($value)) {

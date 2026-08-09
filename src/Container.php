@@ -208,9 +208,12 @@ class Container
 
         $container->register('standings_calculator', Engine\Scoring\StandingsCalculator::class);
 
+        $container->register('value_ladder', Engine\Scoring\Keizer\ValueLadder::class);
+
         $container->register('scoring_strategy_resolver', Engine\ScoringStrategyResolver::class)
             ->addArgument(new Reference('player_score_calculator'))
-            ->addArgument(new Reference('standings_calculator'));
+            ->addArgument(new Reference('standings_calculator'))
+            ->addArgument(new Reference('value_ladder'));
 
         $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class)
             ->addArgument(new Reference('settings_resolver'));

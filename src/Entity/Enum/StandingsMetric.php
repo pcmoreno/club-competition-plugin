@@ -13,6 +13,7 @@ enum StandingsMetric: string
     case Buchholz         = 'buchholz';
     case Wins             = 'wins';
     case DirectEncounter  = 'direct_encounter';
+    case KeizerScore      = 'keizer_score';
 
     public function label(): string
     {
@@ -23,7 +24,15 @@ enum StandingsMetric: string
             self::Buchholz          => 'Buchholz',
             self::Wins              => 'Wins',
             self::DirectEncounter   => 'Direct encounter',
+            self::KeizerScore       => 'Value',
         };
+    }
+
+    // The Keizer score isn't offered as a choice anywhere: it's what a Keizer
+    // season ranks by unconditionally, and it reads zero in any other system.
+    public function isSelectable(): bool
+    {
+        return $this !== self::KeizerScore;
     }
 
     // Direct encounter is tiebreak-only: it compares a tied group against itself,

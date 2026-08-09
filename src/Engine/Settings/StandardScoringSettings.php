@@ -190,10 +190,10 @@ final class StandardScoringSettings implements TournamentScoringSettings
     /** @return list<array<string,string>> */
     private static function metricOptions(): array
     {
-        return array_map(
+        return array_values(array_map(
             static fn (StandingsMetric $m) => ['value' => $m->value, 'label' => $m->label()],
-            StandingsMetric::cases()
-        );
+            array_filter(StandingsMetric::cases(), static fn (StandingsMetric $m) => $m->isSelectable())
+        ));
     }
 
     // rankBy excludes the tiebreak-only metrics (see StandingsMetric::canRankBy).
