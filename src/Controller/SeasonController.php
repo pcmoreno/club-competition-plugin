@@ -6,7 +6,6 @@ namespace SCS\Controller;
 
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\PairingSystem;
-use SCS\Entity\Enum\ScoringSystem;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
@@ -398,10 +397,9 @@ class SeasonController extends RestController
             if ($scoringLocked) {
                 throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
             }
-            if ($newSystem->scoringSystem() !== ScoringSystem::Standard) {
-                throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
-            }
-            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
+            // Whether this system has scoring settings at all is the validator's
+            // call now — it resolves the class that will parse the blob.
+            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($newSystem, $input->scoring_settings));
         }
 
         if ($input->display_settings !== null) {

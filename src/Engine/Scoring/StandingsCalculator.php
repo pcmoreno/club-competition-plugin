@@ -16,7 +16,7 @@ final class StandingsCalculator
     public function rank(array $playerScores, ScoringContext $context): array
     {
         $settings = $context->settings;
-        $criteria = array_merge([$settings->rankBy], $settings->tiebreakers);
+        $criteria = array_merge([$settings->rankBy()], $settings->tiebreakers());
 
         $ordered = $this->resolve($playerScores, $criteria, $context);
 

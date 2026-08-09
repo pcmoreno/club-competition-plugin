@@ -45,8 +45,19 @@ final class SettingsResolver
     // Null for systems whose scoring isn't implemented yet (Keizer).
     public function scoring(Season $season): ?TournamentScoringSettings
     {
-        return match ($season->pairing_system->scoringSystem()) {
-            ScoringSystem::Standard => StandardScoringSettings::fromArray($season->scoring_settings ?? []),
+        return $this->scoringFor($season->pairing_system, $season->scoring_settings ?? []);
+    }
+
+    /**
+     * The same mapping keyed by system, so a submitted blob can be normalised
+     * against the class that will actually read it — see SettingsValidator.
+     *
+     * @param array<string,mixed> $values
+     */
+    public function scoringFor(PairingSystem $system, array $values): ?TournamentScoringSettings
+    {
+        return match ($system->scoringSystem()) {
+            ScoringSystem::Standard => StandardScoringSettings::fromArray($values),
             ScoringSystem::Keizer   => null,
         };
     }

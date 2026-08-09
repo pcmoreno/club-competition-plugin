@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\BuchholzMethod;
@@ -23,11 +22,20 @@ final class SettingsValidator
     }
 
     /**
+     * Scoring settings are per-system for the same reason pairing settings are:
+     * the system decides which class parses the blob. Normalising a Keizer
+     * payload through the standard class would silently drop every Keizer knob.
+     *
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function validateScoring(array $input): array
+    public function validateScoring(PairingSystem $system, array $input): array
     {
+        $settings = $this->settingsResolver->scoringFor($system, $input);
+        if ($settings === null) {
+            throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
+        }
+
         $errors = [];
 
         foreach ($input['gameOutcomes'] ?? [] as $key => $value) {
@@ -55,7 +63,7 @@ final class SettingsValidator
         // The engine assigns the reserved bye types itself, so they must survive any client payload.
         if (isset($input['byeTypes']) && is_array($input['byeTypes'])) {
             $keys    = array_column(array_filter($input['byeTypes'], 'is_array'), 'key');
-            $missing = array_diff(StandardScoringSettings::reservedByeKeys(), $keys);
+            $missing = array_diff($settings->reservedByeKeys(), $keys);
             if ($missing !== []) {
                 $errors['byeTypes'] = sprintf('Reserved bye type(s) cannot be removed: %s.', implode(', ', $missing));
             }
@@ -108,7 +116,7 @@ final class SettingsValidator
             throw new ValidationException($errors);
         }
 
-        return StandardScoringSettings::fromArray($input)->getSettings();
+        return $settings->getSettings();
     }
 
     /**
