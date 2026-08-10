@@ -94,10 +94,11 @@ fixtures/            Shipped season fixtures (JSON), imported via the admin Impo
 dev/                 Local Docker env, design/spec notes (page-inventory.md, engine-architecture.md)
 ```
 
-`tests/Unit` and `tests/Integration` exist locally but are empty, so git doesn't
-carry them — a fresh clone has no `tests/` at all. phpunit is installed
-(`composer test`) but **no tests are written yet**; changes are verified by hand
-in the UI.
+`tests/Unit/Engine/` is tracked and covers Keizer scoring and pairing, run with
+`composer test`. There is no `tests/Integration` in git, and `phpunit.xml` no
+longer declares one: PHPUnit treats a missing testsuite directory as a fatal
+error, so a clean clone could not run the suite at all. Everything outside the
+engine is still verified by hand in the UI.
 
 ## Key Concepts
 
@@ -353,7 +354,12 @@ offered to accounts with a linked player.
 paired** — not by round status:
 
 - not on a board — the absence is recorded outright (`Absent` +
-  `ByeType::Personal`, **not** a scored bye) and can be withdrawn.
+  `ByeType::Personal`) and can be withdrawn. Under standard scoring that is
+  worth nothing; **under Keizer it is not** — `personal` defaults to 0.3333 of
+  the player's own value, so a member's own self-report becomes scored
+  competition data. Keizer plus classical is the club's configuration and the
+  absence flow is classical-only, so this is the normal case rather than a
+  corner of it.
 - already paired — **nothing is written**; the admins are emailed with the board
   and opponent and re-pair themselves. A member action must never mutate a
   pairing: the opponent's board would change under them.

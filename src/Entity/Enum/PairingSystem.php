@@ -21,10 +21,12 @@ enum PairingSystem: string
         };
     }
 
-    // Selectable for a season. Automatic pairing generation is unavailable for
-    // every system (the admin builds boards by hand), so what actually gates a
-    // season is whether its scoring can be computed — without that, completing
-    // a round throws and the season is stuck. Keizer is the one that can't.
+    // Selectable for a season. What gates one is whether its scoring can be
+    // computed — without that, completing a round throws and the season is
+    // stuck — and every system now scores, so this currently admits all of
+    // them. It stays as the place to say no when a system is added that can't
+    // yet. Whether a system can *pair* itself is a separate question, and a
+    // separate method: see generatesPairings() below.
     public function isImplemented(): bool
     {
         return $this->scoringSystem()->isImplemented();

@@ -38,9 +38,13 @@ use SCS\Entity\Enum\ValuationMethod;
  *     score = OwnV + Σ games Par(result) × OppV + Σ absences Par(reason) × OwnV
  *
  * The Par values are the shared GameOutcomes and ByeTypes knobs — the same
- * numbers standard scoring adds to a total, here used as coefficients. Only the
- * defaults differ, and only for the pairing bye: a full point in a Swiss event,
- * two thirds in a ladder one.
+ * numbers standard scoring adds to a total, here used as coefficients. Game
+ * outcomes keep their defaults; all three bye types change, because a fraction
+ * of own value is a different quantity from a share of a point: the pairing bye
+ * 1.0 to 0.6667, club duty 0.5 to 0.6667, and personal absence 0.0 to 0.3333.
+ * That last one is the one to know about — an absence a member reported
+ * themselves scores nothing under standard scoring and a third of their value
+ * here.
  */
 final class KeizerScoringSettings implements TournamentScoringSettings
 {

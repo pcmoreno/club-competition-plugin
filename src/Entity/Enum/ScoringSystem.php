@@ -9,6 +9,8 @@ enum ScoringSystem: string
     case Standard = 'standard';
     case Keizer   = 'keizer';
 
+    // Both systems compute, so nothing is gated today. Kept as the seam that
+    // refuses a scoring system added before its strategy exists.
     public function isImplemented(): bool
     {
         return true;
