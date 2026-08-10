@@ -102,6 +102,16 @@ class AttendanceRepository
         ]);
     }
 
+    // Scoped to one type so regenerating a round clears the byes the engine
+    // assigned last time without touching an absence the admin recorded.
+    public function deleteByRoundAndByeType(int $round_id, ByeType $bye_type): void
+    {
+        $this->connection->delete(SCS_TABLE_PREFIX . 'attendance', [
+            'round_id' => $round_id,
+            'bye_type' => $bye_type->value,
+        ]);
+    }
+
     public function deleteBySeason(int $season_id): void
     {
         // Attendance references a round, not the season directly. Multi-table

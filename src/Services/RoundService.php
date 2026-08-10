@@ -187,6 +187,14 @@ final class RoundService
         );
 
         return $this->transactions->transactional(function () use ($round, $season, $result): array {
+            // The bye is a row, not a board, so removing the pairings to
+            // regenerate leaves it behind — and save() upserts one player
+            // rather than replacing the round's set. Once the field changes
+            // shape the bye can land elsewhere, or nowhere, while last time's
+            // holder keeps a row saying they sat out. Scoring counts games and
+            // byes from separate tables, so they would be priced for both.
+            $this->attendance->deleteByRoundAndByeType($round->id, ByeType::PairingBye);
+
             $games = [];
             foreach ($result->pairings as $pairing) {
                 $games[] = $this->games->create(
