@@ -33,7 +33,7 @@ final class MaxSameColourRun implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Most games in a row with one colour',
             'type'    => FieldType::Number->value,
-            'hint'    => 'A run longer than this is avoided where the pairing allows it.',
+            'hint'    => 'How many games in a row a player may have the same colour. Below 2 leaves too little room to pair.',
             'default' => self::DEFAULT,
             'min'     => 1,
             'max'     => self::MAX,

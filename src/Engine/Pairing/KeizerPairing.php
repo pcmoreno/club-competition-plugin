@@ -297,7 +297,24 @@ final class KeizerPairing implements PerRoundPairing
             ?: $a['distance'] <=> $b['distance']
             ?: ($b['below'] <=> $a['below']));
 
-        if ($this->settings->algorithm() !== PairingAlgorithm::ColorAware) {
+        $wants = $this->wantsWhite($player, $colours);
+
+        // Both caps are bounds, not preferences — Sevilla states them as "may
+        // not exceed" and warns that setting either below 2 can leave it unable
+        // to pair at all, which only a constraint on opponent choice can do.
+        // Ours is consulted in assignColours, after the board exists, where the
+        // only move left is which of the two players to overrule. So when the
+        // obvious board would put a capped player past their limit, look for
+        // someone else whatever the algorithm. Opportunistic colour improvement
+        // stays with the aware variants; enforcement doesn't.
+        $capClash = $wants !== null
+            && $this->wantsWhite($candidates[0]['player'], $colours) === $wants
+            && max(
+                $this->colourUrgency($player, $colours),
+                $this->colourUrgency($candidates[0]['player'], $colours),
+            ) === 3;
+
+        if ($this->settings->algorithm() !== PairingAlgorithm::ColorAware && !$capClash) {
             return $candidates[0]['player'];
         }
 
@@ -305,12 +322,19 @@ final class KeizerPairing implements PerRoundPairing
         // colour, so neither player has to be overruled. Never past a candidate
         // with a worse rematch standing, and never further than the limit,
         // which is what stops this trading a sensible board for a colour
-        // nobody minds.
-        $wants = $this->wantsWhite($player, $colours);
-        $best  = $candidates[0]['rematch'];
+        // nobody minds. A thin field still gets a board — we are more permissive
+        // than Sevilla, which would rather refuse to pair.
+        $best = $candidates[0]['rematch'];
+
+        // The limit is a budget for improving a colour nobody minds, so a cap
+        // breach ignores it and scans the lot. That is not unbounded: the sort
+        // leaves rematch non-decreasing, so the break below stops at the end of
+        // the candidates that are equally good on category and rematch — the
+        // search is over boards no worse than the one it would have taken.
+        $reach = $capClash ? $candidates : array_slice($candidates, 0, $this->settings->limit() + 1);
 
         if ($wants !== null) {
-            foreach (array_slice($candidates, 0, $this->settings->limit() + 1) as $candidate) {
+            foreach ($reach as $candidate) {
                 if ($candidate['rematch'] > $best || $candidate['category'] > $candidates[0]['category']) {
                     break;
                 }

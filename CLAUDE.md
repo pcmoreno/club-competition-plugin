@@ -159,6 +159,18 @@ longest run. A player at either cap has a **binding** claim that outranks the
 being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
 discounts the claim of someone whose colours are already even.
 
+Both caps are bounds rather than preferences, which is how Sevilla states them —
+"may not exceed", and setting either below 2 can leave it unable to pair at all.
+So they also constrain **who is paired**, not only who is overruled once a board
+exists: when the obvious opponent would push a capped player past their limit,
+`findOpponent` looks for someone else whatever the algorithm, and ignores
+`limit` while doing it — that budget is for improving colours nobody minds. The
+search still stops at the end of the candidates that are equally good on
+category and rematch, so it never buys colour with a worse board. A thin field
+can still leave a player over cap: we are more permissive than Sevilla, which
+would rather refuse to pair. Reaching for colour when nobody is at a cap remains
+the colour-aware algorithm's job alone.
+
 **Categories constrain pairing**, as the firmest of the three preferences rather
 than as a filter. Category distance is the first sort key in `findOpponent`,
 ahead of rematch and rank proximity, and it bounds the colour-aware look-ahead —

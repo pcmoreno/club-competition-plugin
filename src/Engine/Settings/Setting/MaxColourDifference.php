@@ -34,7 +34,7 @@ final class MaxColourDifference implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Most colour imbalance',
             'type'    => FieldType::Number->value,
-            'hint'    => 'How many more games of one colour than the other a player may accumulate.',
+            'hint'    => 'How many more games of one colour than the other a player may accumulate. Below 2 leaves too little room to pair.',
             'default' => self::DEFAULT,
             'min'     => 1,
             'max'     => self::MAX,
