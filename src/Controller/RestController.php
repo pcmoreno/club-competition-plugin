@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Exception\ConflictException;
+use SCS\Exception\ForbiddenException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\TooManyRequestsException;
 use SCS\Exception\UnauthorizedException;
@@ -40,6 +41,8 @@ abstract class RestController
             return $this->error($e->getMessage(), \WP_Http::NOT_FOUND);
         } catch (UnauthorizedException $e) {
             return $this->error($e->getMessage(), \WP_Http::UNAUTHORIZED);
+        } catch (ForbiddenException $e) {
+            return $this->error($e->getMessage(), \WP_Http::FORBIDDEN);
         } catch (ConflictException $e) {
             return $this->error($e->getMessage(), \WP_Http::CONFLICT);
         } catch (TooManyRequestsException $e) {
@@ -72,5 +75,21 @@ abstract class RestController
     protected function error(string $message, int $status): \WP_REST_Response
     {
         return new \WP_REST_Response(['error' => $message], $status);
+    }
+
+    /**
+     * REMOTE_ADDR only — X-Forwarded-For is attacker-controllable unless the
+     * immediate hop is a known, trusted proxy, which isn't configured here.
+     * Used solely as a rate-limit key, not for authorization decisions.
+     *
+     * TODO(proxy): behind SiteGround's TLS-terminating proxy REMOTE_ADDR may be
+     * the shared proxy address rather than the real client, which would collapse
+     * the per-IP counter into a single global one. Pending a prod check; if so,
+     * resolve the client from a trusted-proxy X-Forwarded-For hop here. The
+     * per-account counters are a partial backstop meanwhile.
+     */
+    protected function clientIp(): string
+    {
+        return (string)($_SERVER['REMOTE_ADDR'] ?? '');
     }
 }

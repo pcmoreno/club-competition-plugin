@@ -22,6 +22,23 @@ class EmailNotificationService
         return wp_mail($email, $subject, $body);
     }
 
+    /**
+     * Same link and same accept-invite page as a member invite, different copy:
+     * the recipient is being handed the admin side of the site, and should know
+     * that before they set a password.
+     */
+    public function sendAdminInvite(string $email, string $token): bool
+    {
+        $url = $this->frontendUrl('/accept-invite?token=' . urlencode($token));
+
+        $subject = 'You have been invited as an administrator — Schaakclub Santpoort';
+        $body    = "You've been invited to help manage Schaakclub Santpoort's competition portal.\n\n"
+            . "Set your password to activate your administrator account:\n{$url}\n\n"
+            . "This link expires in 7 days.";
+
+        return wp_mail($email, $subject, $body);
+    }
+
     public function sendPasswordReset(string $email, string $token): bool
     {
         $url = $this->frontendUrl('/reset-password?token=' . urlencode($token));

@@ -17,10 +17,15 @@ import { keys } from '../api/keys';
 // contacts existed. The hint below says so, so an empty list doesn't read as
 // "nobody will be told".
 export function ContactsField( { value, onChange } ) {
-	const { data: admins = [], isLoading } = useQuery( {
+	const { data: allAdmins = [], isLoading } = useQuery( {
 		queryKey: keys.admins(),
 		queryFn: () => api.get( 'admins' ),
 	} );
+
+	// GET /admins carries every account so the Admins tab can list pending
+	// invites; only active ones belong here. An invited admin hasn't accepted
+	// yet, and a revoked one is filtered out again at send time anyway.
+	const admins = allAdmins.filter( ( a ) => a.status === 'active' );
 
 	// Which of these admins is the signed-in one, so their row can say so.
 	// Shares the cache entry AuthProvider already fills, so it costs nothing.
