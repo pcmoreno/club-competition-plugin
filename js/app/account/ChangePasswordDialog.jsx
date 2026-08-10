@@ -12,8 +12,8 @@ const ghostBtn =
 
 // User-facing text is authored here, keyed on status, rather than surfacing
 // the backend's message (which stays detailed for logging). A 401 from this
-// endpoint can only mean the current password didn't match — an invalid
-// session is rejected earlier by the permission callback (403).
+// endpoint can only mean the current password didn't match — a dead session is
+// rejected earlier, by the permission callback.
 function errorMessage( err ) {
 	if ( err instanceof ApiError && err.status === 401 ) {
 		return 'Current password is incorrect.';

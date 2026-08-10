@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace SCS\Command;
 
-use SCS\Repository\AdminRepository;
+use SCS\Exception\ConflictException;
 use SCS\Services\AuthService;
 
 class CreateAdminCommand
 {
-    public function __construct(private readonly AdminRepository $adminRepository)
+    public function __construct(private readonly AuthService $authService)
     {
     }
 
@@ -33,15 +33,13 @@ class CreateAdminCommand
             \WP_CLI::error('--password is required and must be at least 8 characters.');
         }
 
-        if ($this->adminRepository->findByEmail($email) !== null) {
-            \WP_CLI::error(sprintf('An admin with email "%s" already exists.', $email));
-        }
+        try {
+            $admin = $this->authService->createAdmin($name, $email, $password);
+        } catch (ConflictException $e) {
+            \WP_CLI::error($e->getMessage());
 
-        $admin = $this->adminRepository->create(
-            $name,
-            $email,
-            AuthService::hashPassword($password),
-        );
+            return;
+        }
 
         \WP_CLI::success(sprintf('Admin created: %s <%s> (id %d).', $admin->name, $admin->email, $admin->id));
     }

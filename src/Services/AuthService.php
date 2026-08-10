@@ -26,6 +26,13 @@ class AuthService
     private const RESET_MAX_ATTEMPTS_PER_IP       = 10;
     private const RESET_DECAY_SECONDS             = 3600; // 1 hour
 
+    // Admin invites mail a caller-supplied address, and a resend rewrites the
+    // pending admin's address to whatever is submitted — so both are metered
+    // even though only the first admin can reach them.
+    private const ADMIN_INVITE_MAX_PER_ADDRESS = 3;
+    private const ADMIN_INVITE_MAX_PER_IP      = 10;
+    private const ADMIN_INVITE_DECAY_SECONDS   = 3600; // 1 hour
+
     /**
      * Argon2id hash of a discarded 256-bit random value — never a real
      * account's password, and its plaintext was never captured or stored
@@ -101,6 +108,16 @@ class AuthService
         if ($this->adminRepository->countAll() > 0) {
             throw new ConflictException('Admin setup is already complete.');
         }
+
+        return $this->createAdmin($name, $email, $password);
+    }
+
+    // The password is chosen up front here, unlike the invite paths. An admin at
+    // a member's address would be born unreachable: attemptLogin resolves members
+    // first and never falls through to the admin branch.
+    public function createAdmin(string $name, string $email, string $password): Admin
+    {
+        $this->assertNotAMemberAddress($email);
         if ($this->adminRepository->findByEmail($email) !== null) {
             throw new ConflictException(sprintf('An admin with email "%s" already exists.', $email));
         }
@@ -182,8 +199,11 @@ class AuthService
             ];
         }
 
+        // password_hash !== null excludes an invited admin who hasn't set one
+        // yet, exactly as above — they fall through to the dummy verify rather
+        // than being compared against null.
         $admin = $this->adminRepository->findByEmail($email);
-        if ($admin !== null) {
+        if ($admin !== null && $admin->password_hash !== null) {
             if (!password_verify($password, $admin->password_hash)) {
                 throw new UnauthorizedException('Invalid credentials.');
             }
@@ -208,6 +228,46 @@ class AuthService
         throw new UnauthorizedException('Invalid credentials.');
     }
 
+    // Hit unconditionally before the work, like initiatePasswordReset, so the
+    // counter meters attempts against unknown addresses too.
+    private function throttleAdminInvite(string $email, string $ip): void
+    {
+        $ipKey    = 'admin_invite_ip_' . $ip;
+        $emailKey = 'admin_invite_email_' . strtolower($email);
+
+        if ($this->rateLimiter->tooManyAttempts($ipKey, self::ADMIN_INVITE_MAX_PER_IP)
+            || $this->rateLimiter->tooManyAttempts($emailKey, self::ADMIN_INVITE_MAX_PER_ADDRESS)) {
+            $this->logAuthEvent('admin invite blocked (rate limit)', $email, $ip);
+
+            throw new TooManyRequestsException('Too many admin invites sent. Please try again later.');
+        }
+
+        $this->rateLimiter->hit($ipKey, self::ADMIN_INVITE_DECAY_SECONDS);
+        $this->rateLimiter->hit($emailKey, self::ADMIN_INVITE_DECAY_SECONDS);
+    }
+
+    // One address, one login. attemptLogin resolves members first, so an address
+    // in both tables silently locks the admin out of their own account.
+    private function assertNotAnAdminAddress(string $email): void
+    {
+        if ($this->adminRepository->findByEmail($email) !== null) {
+            throw new ConflictException(sprintf(
+                'The address "%s" already signs in as an admin. A member account needs its own address, because a shared one would lock the admin out.',
+                $email
+            ));
+        }
+    }
+
+    private function assertNotAMemberAddress(string $email): void
+    {
+        if ($this->memberRepository->findByEmail($email) !== null) {
+            throw new ConflictException(sprintf(
+                'The address "%s" is already a member login. An admin account needs its own address, because a shared one would always sign in as the member.',
+                $email
+            ));
+        }
+    }
+
     /**
      * Create a member account for a player and email them an invite to set a
      * password. Only the SHA-256 hash of the token is stored (matching the
@@ -219,6 +279,8 @@ class AuthService
      */
     public function inviteMember(int $playerId, string $email): Member
     {
+        $this->assertNotAnAdminAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 
@@ -236,6 +298,8 @@ class AuthService
      */
     public function resendInvite(Member $member, string $email): Member
     {
+        $this->assertNotAnAdminAddress($email);
+
         $token     = bin2hex(random_bytes(32));
         $expiresAt = new \DateTimeImmutable('+7 days');
 
@@ -251,12 +315,65 @@ class AuthService
     }
 
     /**
+     * Invite someone to become an admin, mirroring inviteMember: the account row
+     * exists immediately but holds no password, so it can't sign in until the
+     * emailed link is followed. Only the first admin may call this — the check
+     * is in AdminController, since it's an authorization rule, not an account one.
+     *
+     * Throws a UniqueConstraintViolationException if the email is already an
+     * admin; the caller maps that to a conflict.
+     */
+    public function inviteAdmin(string $name, string $email, string $ip): Admin
+    {
+        $this->assertNotAMemberAddress($email);
+        $this->throttleAdminInvite($email, $ip);
+
+        $token     = bin2hex(random_bytes(32));
+        $expiresAt = new \DateTimeImmutable('+7 days');
+
+        $admin = $this->adminRepository->createInvited($name, $email, self::hashToken($token), $expiresAt);
+        $this->emailNotificationService->sendAdminInvite($email, $token);
+
+        return $admin;
+    }
+
+    /**
+     * Re-send an admin invite: fresh token (the old link stops working), reset
+     * expiry, and the email may be corrected in the same step. Without this a
+     * lapsed or mistyped invite would be unrecoverable — the email column is
+     * unique, so the same address can't simply be invited again.
+     */
+    public function resendAdminInvite(Admin $admin, string $email, string $ip): Admin
+    {
+        $this->assertNotAMemberAddress($email);
+        $this->throttleAdminInvite($email, $ip);
+
+        $token     = bin2hex(random_bytes(32));
+        $expiresAt = new \DateTimeImmutable('+7 days');
+
+        $this->adminRepository->update($admin->id, [
+            'email'             => $email,
+            'status'            => AdminStatus::Invited->value,
+            'invite_token'      => self::hashToken($token),
+            'invite_expires_at' => $expiresAt->format('Y-m-d H:i:s'),
+        ]);
+        $this->emailNotificationService->sendAdminInvite($email, $token);
+
+        return $this->adminRepository->findById($admin->id)
+            ?? throw new \RuntimeException('Admin disappeared while its invite was being re-sent.');
+    }
+
+    /**
      * Check an invite token without consuming it, so the accept-invite page can
      * show a friendly landing before asking for a password. Distinguishes a bad
      * / already-used token ("invalid") from a still-recognised but lapsed one
      * ("expired"). This endpoint is public (a signed-out invitee hits it), so it
      * deliberately returns no member data — only the yes/no validity — to avoid
      * disclosing the invitee's email to anyone holding the link.
+     *
+     * Members and admins are invited with the same kind of token and the same
+     * link, so both tables are consulted; which one the token belongs to is
+     * deliberately not reported, for the same reason the email isn't.
      *
      * @return array{valid: bool, reason?: string}
      */
@@ -266,23 +383,34 @@ class AuthService
             return ['valid' => false, 'reason' => 'invalid'];
         }
 
-        $member = $this->memberRepository->findByInviteTokenHash(self::hashToken($token));
-        if ($member === null) {
+        // Member or Admin — both carry the same two invite columns, and all the
+        // caller is told is whether the link still works.
+        $hash    = self::hashToken($token);
+        $invited = $this->memberRepository->findByInviteTokenHash($hash)
+            ?? $this->adminRepository->findByInviteTokenHash($hash);
+
+        if ($invited === null) {
             return ['valid' => false, 'reason' => 'invalid'];
         }
-        if ($member->invite_expires_at === null || $member->invite_expires_at < new \DateTimeImmutable()) {
+        if ($invited->invite_expires_at === null || $invited->invite_expires_at < new \DateTimeImmutable()) {
             return ['valid' => false, 'reason' => 'expired'];
         }
 
         return ['valid' => true];
     }
 
+    /** Members first, then admins — one endpoint and one page serve both. */
     public function acceptInvite(string $token, string $password): void
     {
-        $member = $this->memberRepository->findByInviteTokenHash(self::hashToken($token));
+        $hash   = self::hashToken($token);
+        $member = $this->memberRepository->findByInviteTokenHash($hash);
+
         if ($member === null) {
-            throw new NotFoundException('Invalid or expired invite link.');
+            $this->acceptAdminInvite($hash, $password);
+
+            return;
         }
+
         if ($member->invite_expires_at < new \DateTimeImmutable()) {
             throw new UnauthorizedException('Invite link has expired.');
         }
@@ -292,6 +420,26 @@ class AuthService
             'invite_token'      => null,
             'invite_expires_at' => null,
             'status'            => MemberStatus::Active->value,
+            'token_valid_after' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /** Setting the password is what turns an invited admin into an active one. */
+    private function acceptAdminInvite(string $hash, string $password): void
+    {
+        $admin = $this->adminRepository->findByInviteTokenHash($hash);
+        if ($admin === null) {
+            throw new NotFoundException('Invalid or expired invite link.');
+        }
+        if ($admin->invite_expires_at === null || $admin->invite_expires_at < new \DateTimeImmutable()) {
+            throw new UnauthorizedException('Invite link has expired.');
+        }
+
+        $this->adminRepository->update($admin->id, [
+            'password_hash'     => self::hashPassword($password),
+            'invite_token'      => null,
+            'invite_expires_at' => null,
+            'status'            => AdminStatus::Active->value,
             'token_valid_after' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
     }
@@ -372,8 +520,10 @@ class AuthService
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
         if ($claims['role'] === Role::Admin->value) {
+            // As with members below, a null hash means the account was invited
+            // but never activated: there is no current password to verify.
             $admin = $this->adminRepository->findById($claims['sub']);
-            if ($admin === null) {
+            if ($admin === null || $admin->password_hash === null) {
                 throw new UnauthorizedException('Account not found.');
             }
             if (!password_verify($currentPassword, $admin->password_hash)) {

@@ -247,22 +247,6 @@ class AuthController extends RestController
     }
 
     /**
-     * REMOTE_ADDR only — X-Forwarded-For is attacker-controllable unless the
-     * immediate hop is a known, trusted proxy, which isn't configured here.
-     * Used solely as a rate-limit key, not for authorization decisions.
-     *
-     * TODO(proxy): behind SiteGround's TLS-terminating proxy REMOTE_ADDR may be
-     * the shared proxy address rather than the real client, which would collapse
-     * the per-IP counter into a single global one. Pending a prod check; if so,
-     * resolve the client from a trusted-proxy X-Forwarded-For hop here. The
-     * per-account counters are a partial backstop meanwhile.
-     */
-    private function clientIp(): string
-    {
-        return (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    }
-
-    /**
      * Two cookies: the httpOnly JWT that authorizes everything, and a readable
      * hint the frontend uses to know who it is at first paint.
      *

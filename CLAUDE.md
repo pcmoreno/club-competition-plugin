@@ -17,6 +17,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member home page (`/home`) | Built |
 | Admin: rounds, manual pairings, results | Built |
 | Member invitations and auth (no WP account) | Built |
+| Admin invitations | Built — first admin only, see below |
 | Member self-report absence | Built — see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
@@ -318,7 +319,80 @@ protection doesn't apply here: caches skip logged-in users by spotting
 `wordpress_logged_in_*`, which our members never get. Session data travels by
 cookie for exactly this reason.
 
-Admins are separate (created via WP-CLI, stored in the `admins` table).
+Admins are separate accounts in the `admins` table — see below.
+
+### Admin Accounts
+
+Admins are **not** WordPress users and not members. Three ways one comes to
+exist, in the order they were built:
+
+1. `wp scs create-admin` — the documented path, and unreachable on production,
+   which has no convenient CLI.
+2. `POST /auth/bootstrap-admin` — public, and inert the moment any admin row
+   exists. It creates *one* account and can never create a second.
+3. **Invitation from the Admins tab** — `POST /admins`, the only path that grows
+   the list on a live site.
+
+Invitation reuses the member invite machinery wholesale: same 7-day token
+(SHA-256 hashed at rest), same `/accept-invite` page, same
+`POST /auth/accept-invite`. `AuthService::acceptInvite` and `inviteTokenStatus`
+check members first and then admins, so one link shape serves both and the reply
+never says which kind of account a token belongs to. `admins.password_hash` is
+therefore **nullable** — an invited admin has none until they follow their link,
+and `AuthContextService` requires `Active`, so they can't sign in meanwhile.
+
+**Only the first admin can invite or delete.** There is no role column and no
+`created_by`, so "first" is derived: the lowest id
+(`AdminRepository::firstAdminId`). Every admin sees the tab and the list; the
+write routes are `$isAdmin` like any other and then narrowed again inside
+`AdminController::requireSuperAdmin`, because hiding a button is not a
+permission. `GET /admins` reports `is_super_admin` per row so the frontend
+doesn't re-derive the rule.
+
+This is a deliberate stopgap, not a role system. It exists because production
+can't run WP-CLI and a second admin was otherwise unreachable; an invited admin
+can do everything the inviter can except invite further admins.
+
+**One address, one login.** Members and admins are separate tables with separate
+passwords, and `attemptLogin` checks members first — so an address in both
+resolves to the member account and leaves the admin one unreachable (its
+password fails against the member hash; the member password signs them in as a
+member). Nothing surfaces the collision; the admin simply can't log in.
+
+Enforced on **both** sides, in `AuthService` rather than the controllers so a
+new caller can't introduce a third way in: `assertNotAMemberAddress` guards the
+two admin invite paths plus `createAdmin` — which is how both `bootstrap-admin`
+and `wp scs create-admin` reach the table, so no path mints an admin without it
+— and `assertNotAnAdminAddress` the two member ones. Guarding
+only the admin side was not enough — a member invite can be re-sent onto an
+arbitrary address, including an existing admin's, and `revokeMember` and
+`resendInvite` both keep `password_hash`. Any admin could therefore have locked
+the first admin out permanently, and with them the only account able to manage
+admins. The real fix is one identity with roles attached, which is a much larger
+change.
+
+Note this guards new collisions only. A row pair that already shares an address
+stays shadowed until one of them is changed.
+
+**Admins have no password reset.** `initiatePasswordReset` and `resetPassword`
+resolve through `MemberRepository` alone, and `admins` has no `reset_token` /
+`reset_expires_at` columns — so "forgot password" mails an admin nothing. This
+did not matter while every admin password was typed in by whoever ran
+`wp scs create-admin`; it does now that invited admins, whose password only they
+know, are the normal case. Recovery today is the first admin deleting and
+re-inviting the account, which also drops its tournament-contact rows.
+
+Removal is a **delete**, not a status flip — the row goes, along with the
+account's `season_contacts` rows (no FK cascade), inside one transaction. Their
+session dies with it: `AuthContextService` re-reads the account per request and
+fails closed. The first admin is refused, which — since only they can delete —
+also stops them deleting themselves and leaving nobody able to invite.
+`AdminStatus::Revoked` remains in the enum and nothing sets it.
+
+`GET /admins` returns **every** admin whatever the status, because the tab lists
+pending invites. The tournament-contacts picker reads the same endpoint and
+filters to `active` in `ContactsField` — an admin who hasn't accepted yet
+shouldn't be pickable as a notification recipient.
 
 ### Time Control
 
@@ -429,7 +503,7 @@ hardcode `wp_scs_`.
 - `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
 - `…scs_season_contacts` — which admins a tournament's notifications go to
 - `…scs_members` — non-WordPress member accounts
-- `…scs_admins` — plugin admins
+- `…scs_admins` — plugin admins (invitable; `password_hash` is nullable)
 - `…scs_players` — the person registry, shared across seasons
 
 **Multiple seasons can be `active` at once** — a season also models a mid-season
@@ -728,6 +802,7 @@ See `src/Services/KnsbRatingListFetcher.php`, `KnsbRatingStore.php`,
 
 Via `wp_mail()` (uses WP Mail SMTP plugin on production):
 - Member invites
+- Admin invites — same link and page, different copy
 - Password resets
 - Absence notices — a member saying they can't play a round
 

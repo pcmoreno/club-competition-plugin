@@ -4,11 +4,13 @@ import { AdminLayout } from './AdminLayout';
 import { Tournaments } from './Tournaments';
 import { TournamentDetail } from './TournamentDetail';
 import { Players } from './Players';
+import { Admins } from './Admins';
 import { Settings } from './Settings';
 
 const ROUTES = {
 	'/admin/tournaments': Tournaments,
 	'/admin/players': Players,
+	'/admin/admins': Admins,
 	'/admin/settings': Settings,
 };
 

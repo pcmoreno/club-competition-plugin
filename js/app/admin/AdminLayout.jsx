@@ -3,13 +3,14 @@ import { Page } from '../layout/Page';
 
 // Admin sub-app shell. While any /admin route is active the public/member
 // SubNav is hidden and replaced by this admin headerbar (same horizontal tab
-// style): Tournaments · Players · Settings, with an "Exit Admin Mode" action
-// on the right that returns to the viewer. Content renders in the page column
-// below, via `children`.
+// style): Tournaments · Players · Admins · Settings, with an "Exit Admin Mode"
+// action on the right that returns to the viewer. Content renders in the page
+// column below, via `children`.
 
 const NAV = [
 	{ to: '/admin/tournaments', label: 'Tournaments' },
 	{ to: '/admin/players', label: 'Players' },
+	{ to: '/admin/admins', label: 'Admins' },
 	{ to: '/admin/settings', label: 'Settings' },
 ];
 

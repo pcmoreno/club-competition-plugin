@@ -292,13 +292,39 @@ class RestApi
             ]);
 
             // ── Admins ────────────────────────────────────────────────────────
-            // Names and email addresses of the plugin's own admins, for the
-            // tournament-contacts picker. Admin-gated, and read-only — accounts
-            // are still created through WP-CLI or the bootstrap endpoint.
+            // The plugin's own admin accounts: the Admins tab and the
+            // tournament-contacts picker both read this list.
+            //
+            // The writes are $isAdmin like any other, and then narrowed again
+            // inside the controller to the first admin only — WP-CLI isn't
+            // reachable on production, so this is how a second admin comes to
+            // exist at all, and it shouldn't hand every admin that power.
             register_rest_route('scs/v1', '/admins', [
-                'methods'             => 'GET',
-                'callback'            => [$admins, 'index'],
-                'permission_callback' => $isAdminRead,
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [$admins, 'index'],
+                    'permission_callback' => $isAdminRead,
+                ],
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$admins, 'store'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
+            // Re-send a pending admin invite (fresh token, correctable email).
+            register_rest_route('scs/v1', '/admins/(?P<id>\d+)/invite', [
+                'methods'             => 'POST',
+                'callback'            => [$admins, 'invite'],
+                'permission_callback' => $isAdmin,
+            ]);
+
+            // Delete an admin outright. Not a status flip: the row goes, along
+            // with their tournament-contact rows.
+            register_rest_route('scs/v1', '/admins/(?P<id>\d+)', [
+                'methods'             => 'DELETE',
+                'callback'            => [$admins, 'destroy'],
+                'permission_callback' => $isAdmin,
             ]);
 
             // ── Seasons ───────────────────────────────────────────────────────

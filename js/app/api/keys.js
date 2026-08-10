@@ -50,7 +50,8 @@ export const keys = {
 	// The signed-in member's own view (GET /me/home).
 	home: () => [ 'me-home' ],
 
-	// The plugin's own admin accounts (GET /admins), for the contacts picker.
+	// The plugin's own admin accounts (GET /admins) — every status, shared by
+	// the Admins tab and the contacts picker (which filters to active).
 	admins: () => [ 'admins' ],
 
 	// Account / setup
