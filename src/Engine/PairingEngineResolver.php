@@ -45,6 +45,9 @@ final class PairingEngineResolver
                 return new RoundRobinPairing($settings);
 
             default:
+                // Manual resolves above but produces nothing, so the systems
+                // this arm refuses are exactly those the enum's
+                // generatesPairings() reports false for. Change one, change both.
                 throw new ConflictException(sprintf(
                     'Automatic pairing is not available for %s yet — build the board by hand.',
                     $season->pairing_system->value

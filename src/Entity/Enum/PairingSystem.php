@@ -50,4 +50,16 @@ enum PairingSystem: string
             default                                      => 'per-round',
         };
     }
+
+    // Whether an engine will actually produce a board, which is a different
+    // question from cadence: Swiss is per-round like Keizer and has no engine.
+    // Keep in step with PairingEngineResolver::resolve() — its default arm
+    // refuses exactly the systems that answer false here.
+    public function generatesPairings(): bool
+    {
+        return match ($this) {
+            self::Keizer, self::RoundRobinFull, self::RoundRobinGroups => true,
+            default                                                    => false,
+        };
+    }
 }

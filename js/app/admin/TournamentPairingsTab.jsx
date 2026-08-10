@@ -498,12 +498,15 @@ export function TournamentPairingsTab( { season, players } ) {
 							disabled={
 								generatePairings.isPending ||
 								! editable ||
-								games.length > 0
+								games.length > 0 ||
+								! season.generates_pairings
 							}
 							title={
-								games.length > 0
-									? 'This round already has pairings. Remove them to generate again.'
-									: undefined
+								! season.generates_pairings
+									? 'Automatic pairing isn’t available for this system yet — build the board by hand below.'
+									: games.length > 0
+										? 'This round already has pairings. Remove them to generate again.'
+										: undefined
 							}
 							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
@@ -592,6 +595,13 @@ export function TournamentPairingsTab( { season, players } ) {
 
 			{ generatePairings.isError && (
 				<Notice>{ errorMessage( generatePairings.error ) }</Notice>
+			) }
+
+			{ ! season.generates_pairings && season.cadence !== 'manual' && (
+				<Notice>
+					That engine isn’t built yet — pairings can be entered by
+					hand
+				</Notice>
 			) }
 
 			{ ! editable && round && (
