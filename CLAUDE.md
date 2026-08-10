@@ -159,9 +159,20 @@ longest run. A player at either cap has a **binding** claim that outranks the
 being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
 discounts the claim of someone whose colours are already even.
 
-**Categories do constrain pairing** — a player may meet their own category or an
-adjacent one, never a category two steps away. `KeizerPairing` does not yet
-enforce this; it is the next thing to build.
+**Categories constrain pairing**, as the firmest of the three preferences rather
+than as a filter. Category distance is the first sort key in `findOpponent`,
+ahead of rematch and rank proximity, and it bounds the colour-aware look-ahead —
+which never reaches past a candidate sitting in a further category. Choosing
+opponents one at a time is greedy and can strand the last few players, so
+`repairCategories` then trades players between boards for as long as that
+strictly reduces the total breach. `categoryPairing` defaults to `adjacent` at
+`categoryDistance` 1 — own category or the next one either way — and `free`
+switches it off. A player with no category is never constrained, categories
+being optional per season.
+
+Because it ranks rather than filters, a field that genuinely can't be paired
+inside its categories keeps a breaching board instead of losing a game: the
+repair pass accepts only strictly-improving swaps, and then gives up.
 
 The oracle is unambiguous. Across 444 games: `C-C 148`, `B-B 102`, `A-B 78`,
 `A-A 63`, `B-C 53`, and **`A-C` exactly zero**. That is not a side effect of
