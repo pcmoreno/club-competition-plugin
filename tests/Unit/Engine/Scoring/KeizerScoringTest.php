@@ -112,7 +112,7 @@ final class KeizerScoringTest extends TestCase
     #[Test]
     public function it_refuses_a_round_whose_predecessor_has_no_standings(): void
     {
-        $this->expectExceptionMessageMatches('/can only be completed after the round before it/');
+        $this->expectExceptionMessageMatches('/scores against the standings of the round before it/');
 
         $this->computeRound(2, []);
     }

@@ -321,8 +321,8 @@ final class RoundService
     }
 
     /**
-     * Freeze the standings for a round, and for every later round already
-     * completed.
+     * Mark a round complete and freeze its standings, along with every later
+     * round already completed.
      *
      * Standings are cumulative, so a correction in round 3 also moves rounds 4
      * and 5. Recomputing only the round being completed is what made a
@@ -364,7 +364,14 @@ final class RoundService
         // touching.
         $computed = [];
 
-        $this->transactions->transactional(function () use ($season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
+        $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
+            // Inside the transaction with the scoring, not before it. Scoring
+            // can refuse — Keizer prices a round against the one before it and
+            // throws when that has no standings — and a status committed
+            // separately would survive the refusal, leaving the round locked
+            // and complete with nothing published behind it.
+            $this->rounds->updateStatus($round->id, RoundStatus::Complete);
+
             foreach ($targets as $target) {
                 // Standard scoring is cumulative over all games/attendance up to this round.
                 /** @var list<\SCS\Entity\Game> $games */

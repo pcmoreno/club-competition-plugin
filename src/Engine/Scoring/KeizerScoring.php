@@ -51,9 +51,14 @@ final class KeizerScoring implements ScoringStrategyInterface
         // last round's ranking, so there is no way to score round five while
         // round four is still open. A 409 the admin can read beats silently
         // laddering off the opening order and publishing wrong numbers.
+        //
+        // What is actually missing is the standings, which is not quite the
+        // same as the round being open: one completed with nobody playing
+        // produces none either. The message covers both rather than naming a
+        // cause it can't distinguish from here.
         if ($round->round_number > 1 && $previousStandings === []) {
             throw new ConflictException(sprintf(
-                'Round %d can only be completed after the round before it, which sets the player values it scores against.',
+                'Round %d scores against the standings of the round before it, and there are none. Complete that round first — or if it is already complete, reopen it and enter its results.',
                 $round->round_number
             ));
         }

@@ -227,12 +227,14 @@ class RoundController extends RestController
                 return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
             }
 
-            $this->roundRepository->updateStatus($round->id, $newStatus);
-
             // Completing a round freezes its standings snapshot, and refreshes
             // every later completed round's — they accumulate this one's games.
+            // The service owns that status write so it shares a transaction
+            // with the scoring that can refuse it.
             if ($newStatus === RoundStatus::Complete) {
                 $this->roundService->completeRound($round);
+            } else {
+                $this->roundRepository->updateStatus($round->id, $newStatus);
             }
 
             return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
