@@ -317,7 +317,7 @@ class Container
 
         $container->register('create_admin_command', Command\CreateAdminCommand::class)
             ->setPublic(true)
-            ->addArgument(new Reference('admin_repository'));
+            ->addArgument(new Reference('auth_service'));
 
         $container->register('fetch_knsb_ratings_command', Command\FetchKnsbRatingsCommand::class)
             ->setPublic(true)

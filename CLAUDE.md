@@ -279,7 +279,9 @@ member). Nothing surfaces the collision; the admin simply can't log in.
 
 Enforced on **both** sides, in `AuthService` rather than the controllers so a
 new caller can't introduce a third way in: `assertNotAMemberAddress` guards the
-two admin invite paths, `assertNotAnAdminAddress` the two member ones. Guarding
+two admin invite paths plus `createAdmin` — which is how both `bootstrap-admin`
+and `wp scs create-admin` reach the table, so no path mints an admin without it
+— and `assertNotAnAdminAddress` the two member ones. Guarding
 only the admin side was not enough — a member invite can be re-sent onto an
 arbitrary address, including an existing admin's, and `revokeMember` and
 `resendInvite` both keep `password_hash`. Any admin could therefore have locked

@@ -108,6 +108,16 @@ class AuthService
         if ($this->adminRepository->countAll() > 0) {
             throw new ConflictException('Admin setup is already complete.');
         }
+
+        return $this->createAdmin($name, $email, $password);
+    }
+
+    // The password is chosen up front here, unlike the invite paths. An admin at
+    // a member's address would be born unreachable: attemptLogin resolves members
+    // first and never falls through to the admin branch.
+    public function createAdmin(string $name, string $email, string $password): Admin
+    {
+        $this->assertNotAMemberAddress($email);
         if ($this->adminRepository->findByEmail($email) !== null) {
             throw new ConflictException(sprintf('An admin with email "%s" already exists.', $email));
         }
