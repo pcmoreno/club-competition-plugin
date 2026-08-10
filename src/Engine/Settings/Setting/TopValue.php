@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Settings\Setting;
 
 use SCS\Entity\Enum\FieldType;
+use SCS\Entity\Enum\ValuationMethod;
 
 /**
  * What the top of the ranking is worth.
@@ -40,6 +41,10 @@ final class TopValue implements SettingInterface
             'min'     => 1,
             'max'     => self::MAX,
             'step'    => 1,
+            'enabledBy' => ['key' => Valuation::KEY, 'value' => [
+                ValuationMethod::PositionRange->value,
+                ValuationMethod::PositionFromTop->value,
+            ]],
         ];
     }
 

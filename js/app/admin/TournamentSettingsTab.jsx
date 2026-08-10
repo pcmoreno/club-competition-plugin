@@ -499,9 +499,15 @@ function isEnabled( field, values ) {
 		return true;
 	}
 	const current = values?.[ field.enabledBy.key ];
-	return current === undefined
-		? true
-		: current === field.enabledBy.value;
+	if ( current === undefined ) {
+		return true;
+	}
+	// A list where more than one value keeps the field alive — the ladder's top
+	// value is read by two of the three valuation methods, not one.
+	const wanted = field.enabledBy.value;
+	return Array.isArray( wanted )
+		? wanted.includes( current )
+		: current === wanted;
 }
 
 // One labelled pairing knob. A checkbox reads as its own label, so a toggle puts
@@ -655,6 +661,37 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 						setValues( { ...values, tiebreakConfig } )
 					}
 				/>
+			</section>
+		);
+	}
+
+	// Anything else is a plain list of knobs — the same shape the pairing tab
+	// renders, so it goes through the same row. A settings class adding one
+	// needs nothing here.
+	if ( Array.isArray( group.fields ) && group.fields.some( ( f ) => f.key ) ) {
+		return (
+			<section>
+				<SectionTitle>{ group.label }</SectionTitle>
+				<div className="flex flex-col gap-3">
+					{ inlineRows( group.fields ).map( ( row ) => (
+						<div
+							key={ row[ 0 ].key }
+							className="flex flex-wrap items-start gap-4"
+						>
+							{ row.map( ( f ) => (
+								<PairingRow
+									key={ f.key }
+									field={ f }
+									values={ values }
+									setValues={ setValues }
+									disabled={
+										disabled || ! isEnabled( f, values )
+									}
+								/>
+							) ) }
+						</div>
+					) ) }
+				</div>
 			</section>
 		);
 	}

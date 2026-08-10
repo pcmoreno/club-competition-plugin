@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Settings\Setting;
 
 use SCS\Entity\Enum\FieldType;
+use SCS\Entity\Enum\ValuationMethod;
 
 /**
  * How many players share each rung before the value drops.
@@ -34,11 +35,15 @@ final class ValueStepEvery implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Players per rung',
             'type'    => FieldType::Number->value,
-            'hint'    => 'How many players share a value before it steps down. Not used by the position-range method.',
+            'hint'    => 'How many players share a value before it steps down.',
             'default' => self::DEFAULT,
             'min'     => 1,
             'max'     => self::MAX,
             'step'    => 1,
+            'enabledBy' => ['key' => Valuation::KEY, 'value' => [
+                ValuationMethod::PositionFromTop->value,
+                ValuationMethod::PositionFromBottom->value,
+            ]],
         ];
     }
 

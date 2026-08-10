@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Settings\Setting;
 
 use SCS\Entity\Enum\FieldType;
+use SCS\Entity\Enum\ValuationMethod;
 
 /**
  * How much value separates one rung from the next.
@@ -33,11 +34,15 @@ final class ValueStep implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Value step',
             'type'    => FieldType::Number->value,
-            'hint'    => 'How much a player’s value drops per rung. Not used by the position-range method.',
+            'hint'    => 'How much a player’s value drops per rung.',
             'default' => self::DEFAULT,
             'min'     => 1,
             'max'     => self::MAX,
             'step'    => 1,
+            'enabledBy' => ['key' => Valuation::KEY, 'value' => [
+                ValuationMethod::PositionFromTop->value,
+                ValuationMethod::PositionFromBottom->value,
+            ]],
         ];
     }
 

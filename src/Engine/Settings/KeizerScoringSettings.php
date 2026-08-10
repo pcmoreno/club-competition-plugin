@@ -27,6 +27,7 @@ use SCS\Entity\Enum\BuchholzMethod;
 use SCS\Entity\Enum\InitialValueOrder;
 use SCS\Entity\Enum\RevaluationMode;
 use SCS\Entity\Enum\ScoringOutcome;
+use SCS\Entity\Enum\ScoringSettingsGroup;
 use SCS\Entity\Enum\StandingsMetric;
 use SCS\Entity\Enum\TprMethod;
 use SCS\Entity\Enum\ValuationMethod;
@@ -246,21 +247,45 @@ final class KeizerScoringSettings implements TournamentScoringSettings
         return [
             (new GameOutcomes(self::DEFAULT_GAME_OUTCOMES))->field(),
             (new ByeTypes(self::DEFAULT_BYE_TYPES))->field(),
-            (new Valuation())->field(),
-            (new TopValue())->field(),
-            (new BottomValue())->field(),
-            (new InitialOrder())->field(),
-            (new ValueStep())->field(),
-            (new ValueStepEvery())->field(),
-            (new ValueMultiplier())->field(),
-            (new AssignValues())->field(),
-            (new Revaluation())->field(),
-            (new AddInitialValue())->field(),
-            (new ValueDecimals())->field(),
-            (new ScoreDecimals())->field(),
-            (new AalsmeerRounds())->field(),
-            (new AalsmeerOffset())->field(),
+            self::group(ScoringSettingsGroup::Calculation, [
+                (new AddInitialValue())->field(),
+            ]),
+            // Selects first, then the numbers they govern — which of the
+            // numbers apply depends on the valuation method, and each says so
+            // through enabledBy rather than by disappearing.
+            self::group(ScoringSettingsGroup::PlayerValuation, [
+                (new Valuation())->field(),
+                (new AssignValues())->field(),
+                (new InitialOrder())->field(),
+                (new Revaluation())->field(),
+                (new TopValue())->field(),
+                (new BottomValue())->field(),
+                (new ValueStep())->field(),
+                (new ValueStepEvery())->field(),
+                (new ValueMultiplier())->field(),
+            ]),
+            self::group(ScoringSettingsGroup::Rounding, [
+                (new ValueDecimals())->field(),
+                (new ScoreDecimals())->field(),
+            ]),
+            self::group(ScoringSettingsGroup::Aalsmeer, [
+                (new AalsmeerRounds())->field(),
+                (new AalsmeerOffset())->field(),
+            ]),
             (new Tiebreakers())->field(),
+        ];
+    }
+
+    /**
+     * @param  list<array<string,mixed>> $fields
+     * @return array<string,mixed>
+     */
+    private static function group(ScoringSettingsGroup $group, array $fields): array
+    {
+        return [
+            'group'  => $group->value,
+            'label'  => $group->label(),
+            'fields' => $fields,
         ];
     }
 
