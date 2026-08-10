@@ -71,7 +71,7 @@ final class KeizerPairing implements PerRoundPairing
         $categories = $this->categoryOrder($season->categories);
 
         $pairs = $this->pairs($order, $colours, $meetings, $rank, $categories);
-        $pairs = $this->repairCategories($pairs, $categories);
+        $pairs = $this->repairCategories($pairs, $categories, $meetings);
 
         // Board 1 is the pair containing the highest ranked player, which is
         // what an organiser expects reading down the sheet — the order boards
@@ -339,21 +339,29 @@ final class KeizerPairing implements PerRoundPairing
      * categories — an odd number of players in one, and nobody adjacent to
      * trade with — keeps the pairing it had rather than losing a board.
      *
-     * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}> $pairs
-     * @param  array<string,int>                          $categories
+     * Only the two boards involved change, but their rematch standing changes
+     * with them, and findOpponent had already ranked that second. So every
+     * candidate swap is scored on both axes: the largest category gain wins,
+     * ties go to the one that costs least in rematches. Acceptance still turns
+     * on a strict category decrease alone, which is what keeps the bound.
+     *
+     * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}>       $pairs
+     * @param  array<string,int>                                $categories
+     * @param  array<string,array{count:int,last:int}>          $meetings
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
      */
-    private function repairCategories(array $pairs, array $categories): array
+    private function repairCategories(array $pairs, array $categories, array $meetings): array
     {
         if ($this->settings->categoryPairing() === CategoryPairingMode::Free) {
             return $pairs;
         }
 
-        $breach = fn (array $pair): int => $this->categoryPenalty($pair[0], $pair[1], $categories);
+        $breach  = fn (array $pair): int => $this->categoryPenalty($pair[0], $pair[1], $categories);
+        $rematch = fn (array $pair): int => $this->rematchPenalty($pair[0], $pair[1], $meetings);
 
         // Bounded by the number of boards: each pass either fixes one or stops.
         for ($pass = 0, $limit = count($pairs) * count($pairs); $pass < $limit; $pass++) {
-            $improved = false;
+            $best = null;
 
             foreach ($pairs as $i => $pair) {
                 if ($breach($pair) === 0) {
@@ -365,28 +373,33 @@ final class KeizerPairing implements PerRoundPairing
                         continue;
                     }
 
-                    $before = $breach($pair) + $breach($other);
+                    $before        = $breach($pair) + $breach($other);
+                    $beforeRematch = $rematch($pair) + $rematch($other);
 
                     foreach ([[$pair[0], $other[0], $pair[1], $other[1]], [$pair[0], $other[1], $pair[1], $other[0]]] as [$keep, $taken, $given, $left]) {
                         $swapA = [$keep, $taken];
                         $swapB = [$given, $left];
 
-                        if ($breach($swapA) + $breach($swapB) >= $before) {
+                        $gain = $before - ($breach($swapA) + $breach($swapB));
+                        if ($gain <= 0) {
                             continue;
                         }
 
-                        $pairs[$i] = $swapA;
-                        $pairs[$j] = $swapB;
-                        $improved  = true;
+                        $cost = ($rematch($swapA) + $rematch($swapB)) - $beforeRematch;
 
-                        break 3;
+                        if ($best === null || $gain > $best['gain'] || ($gain === $best['gain'] && $cost < $best['cost'])) {
+                            $best = ['gain' => $gain, 'cost' => $cost, 'i' => $i, 'j' => $j, 'a' => $swapA, 'b' => $swapB];
+                        }
                     }
                 }
             }
 
-            if (!$improved) {
+            if ($best === null) {
                 break;
             }
+
+            $pairs[$best['i']] = $best['a'];
+            $pairs[$best['j']] = $best['b'];
         }
 
         return $pairs;
@@ -710,27 +723,26 @@ final class KeizerPairing implements PerRoundPairing
     /**
      * The odd player out.
      *
-     * Nobody sits out twice until everyone has, which is the part that isn't
+     * Whoever has sat out fewest times, which is the part that isn't
      * configurable — it is what stops the same regular losing two evenings
-     * while others lose none.
+     * while others lose none. Counting fewest rather than none carries the rule
+     * past the point where everyone has had one: a field on 1 apiece is wholly
+     * eligible again, while somebody on 3 waits for the rest to catch up.
      *
-     * @param  list<SeasonPlayer>      $order
-     * @param  list<Game>              $history
-     * @param  list<StandingsSnapshot> $standings
+     * @param  non-empty-list<SeasonPlayer> $order only reached on an odd field, so never fewer than three
+     * @param  list<Game>                   $history
+     * @param  list<StandingsSnapshot>      $standings
      */
     private function chooseBye(array $order, array $history, array $standings, Season $season): SeasonPlayer
     {
-        $had = [];
+        $taken = [];
         foreach ($standings as $snapshot) {
-            if ($snapshot->byes > 0) {
-                $had[$snapshot->season_player_id] = true;
-            }
+            $taken[$snapshot->season_player_id] = $snapshot->byes;
         }
 
-        $eligible = array_values(array_filter($order, static fn (SeasonPlayer $p) => !isset($had[$p->id])));
-        if ($eligible === []) {
-            $eligible = $order;
-        }
+        $count    = static fn (SeasonPlayer $p): int => $taken[$p->id] ?? 0;
+        $fewest   = min(array_map($count, $order));
+        $eligible = array_values(array_filter($order, static fn (SeasonPlayer $p) => $count($p) === $fewest));
 
         if ($this->settings->byeChoice() === PairingByeChoice::LowestRanked) {
             return $eligible[count($eligible) - 1];

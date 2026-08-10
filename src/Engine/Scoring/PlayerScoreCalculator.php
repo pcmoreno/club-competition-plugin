@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Scoring;
 
 use SCS\Engine\Scoring\Metric\MetricCalculatorInterface;
+use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\StandingsMetric;
 
@@ -64,7 +65,13 @@ final class PlayerScoreCalculator
             $game['white'] ? $white++ : $black++;
         }
 
-        $byes = count($context->byesByPlayer[$id] ?? []);
+        // Pairing byes only. The other types are absences — the player wasn't
+        // there — and counting them made a self-reported absence read as a bye
+        // in the standings and, worse, spend the player's turn at sitting out.
+        $byes = count(array_filter(
+            $context->byesByPlayer[$id] ?? [],
+            static fn (string $type): bool => $type === ByeType::PairingBye->value,
+        ));
 
         return [
             'games'         => $wins + $draws + $losses,
