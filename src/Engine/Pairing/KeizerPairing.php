@@ -338,7 +338,13 @@ final class KeizerPairing implements PerRoundPairing
                 if ($candidate['rematch'] > $best || $candidate['category'] > $candidates[0]['category']) {
                     break;
                 }
-                if ($this->wantsWhite($candidate['player'], $colours) === !$wants) {
+                // Not "wants the opposite" but "doesn't want the same". A player
+                // with no claim at all resolves the clash just as well —
+                // assignColours serves a one-sided claim unopposed — and they
+                // are nearer in rank than the next player who actively wants the
+                // other colour. wantsWhite() is ?bool, and null failed the
+                // strict test that was here.
+                if ($this->wantsWhite($candidate['player'], $colours) !== $wants) {
                     return $candidate['player'];
                 }
             }
