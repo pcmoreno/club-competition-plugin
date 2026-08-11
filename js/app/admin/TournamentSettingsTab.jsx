@@ -411,7 +411,14 @@ function NullableNumberField( { id, field, value, onChange, disabled } ) {
 // Pairing settings are a flat list of fields rather than the grouped shape
 // scoring uses, so they render straight from the schema.
 function PairingField( { id, field, values, setValues, disabled } ) {
-	const value = values?.[ field.key ] ?? field.default ?? null;
+	// Keyed on the key being present, not on the value being nullish: a stored
+	// null is a real choice for a nullable field — "don't round", "unlimited" —
+	// and ?? would fall through to the default and misreport it as a number the
+	// admin never picked.
+	const value =
+		values && field.key in values
+			? values[ field.key ]
+			: field.default ?? null;
 	const set = ( v ) => setValues( { ...values, [ field.key ]: v } );
 
 	if ( field.type === 'number' && field.nullable ) {
