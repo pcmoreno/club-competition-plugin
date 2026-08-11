@@ -8,15 +8,15 @@ use SCS\Engine\Settings\Setting\ByeTypes;
 use SCS\Engine\Settings\Setting\GameOutcomes;
 use SCS\Engine\Settings\Setting\TiebreakConfig;
 use SCS\Engine\Settings\Setting\Tiebreakers;
-use SCS\Entity\Enum\BuchholzMethod;
 use SCS\Entity\Enum\FieldType;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\ScoringSettingsGroup;
 use SCS\Entity\Enum\StandingsMetric;
-use SCS\Entity\Enum\TprMethod;
 
 final class StandardScoringSettings implements TournamentScoringSettings
 {
+    use SharedScoringSettings;
+
     // pairing_bye is reserved: the engine assigns it to the odd player, so it can't be deleted.
     // A full point here, where a ladder system prices it at two thirds.
     public const DEFAULT_BYE_TYPES = [
@@ -42,54 +42,9 @@ final class StandardScoringSettings implements TournamentScoringSettings
     ) {
     }
 
-    /** @return list<string> */
-    public function reservedByeKeys(): array
-    {
-        return (new ByeTypes(self::DEFAULT_BYE_TYPES))->reservedKeys();
-    }
-
-    public function pointsFor(ScoringOutcome $outcome): float
-    {
-        return (float)($this->gameOutcomes[$outcome->value] ?? 0.0);
-    }
-
-    public function byePoints(string $key): float
-    {
-        foreach ($this->byeTypes as $bye) {
-            if (($bye['key'] ?? null) === $key) {
-                return (float)($bye['points'] ?? 0.0);
-            }
-        }
-
-        return 0.0;
-    }
-
     public function rankBy(): StandingsMetric
     {
         return $this->rankByMetric;
-    }
-
-    /** @return list<StandingsMetric> */
-    public function tiebreakers(): array
-    {
-        return $this->tiebreakers;
-    }
-
-    public function directEncounterMaxGroup(): int
-    {
-        return (int)($this->tiebreakConfig['direct_encounter']['maxGroup'] ?? 2);
-    }
-
-    public function buchholzMethod(): BuchholzMethod
-    {
-        // Classic, not Baku2023: the fallback must name an implemented variant,
-        // or an unparseable stored value silently disables the metric.
-        return BuchholzMethod::tryFrom((string)($this->tiebreakConfig['buchholz']['method'] ?? '')) ?? BuchholzMethod::Classic;
-    }
-
-    public function tprMethod(): TprMethod
-    {
-        return TprMethod::tryFrom((string)($this->tiebreakConfig['performance_rating']['method'] ?? '')) ?? TprMethod::FideDp;
     }
 
     /** @return array<string,mixed> */

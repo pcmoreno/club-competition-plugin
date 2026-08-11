@@ -23,13 +23,10 @@ use SCS\Engine\Settings\Setting\ValueMultiplier;
 use SCS\Engine\Settings\Setting\ValueStep;
 use SCS\Engine\Settings\Setting\ValueStepEvery;
 use SCS\Entity\Enum\AssignValuesOn;
-use SCS\Entity\Enum\BuchholzMethod;
 use SCS\Entity\Enum\InitialValueOrder;
 use SCS\Entity\Enum\RevaluationMode;
-use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\ScoringSettingsGroup;
 use SCS\Entity\Enum\StandingsMetric;
-use SCS\Entity\Enum\TprMethod;
 use SCS\Entity\Enum\ValuationMethod;
 
 /**
@@ -49,6 +46,8 @@ use SCS\Entity\Enum\ValuationMethod;
  */
 final class KeizerScoringSettings implements TournamentScoringSettings
 {
+    use SharedScoringSettings;
+
     /**
      * Two thirds for the pairing bye, which is Sevilla's documented default for
      * ladder systems and what the club's own history computes back to.
@@ -167,53 +166,10 @@ final class KeizerScoringSettings implements TournamentScoringSettings
         return max(0, $this->aalsmeerRounds - ($roundNumber - $this->aalsmeerOffset));
     }
 
-    public function pointsFor(ScoringOutcome $outcome): float
-    {
-        return (float)($this->gameOutcomes[$outcome->value] ?? 0.0);
-    }
-
-    public function byePoints(string $key): float
-    {
-        foreach ($this->byeTypes as $bye) {
-            if (($bye['key'] ?? null) === $key) {
-                return (float)($bye['points'] ?? 0.0);
-            }
-        }
-
-        return 0.0;
-    }
-
-    /** @return list<string> */
-    public function reservedByeKeys(): array
-    {
-        return (new ByeTypes(self::DEFAULT_BYE_TYPES))->reservedKeys();
-    }
-
     // The Keizer score is the ranking metric by definition; it isn't chosen.
     public function rankBy(): StandingsMetric
     {
         return StandingsMetric::KeizerScore;
-    }
-
-    /** @return list<StandingsMetric> */
-    public function tiebreakers(): array
-    {
-        return $this->tiebreakers;
-    }
-
-    public function directEncounterMaxGroup(): int
-    {
-        return (int)($this->tiebreakConfig['direct_encounter']['maxGroup'] ?? 2);
-    }
-
-    public function buchholzMethod(): BuchholzMethod
-    {
-        return BuchholzMethod::tryFrom((string)($this->tiebreakConfig['buchholz']['method'] ?? '')) ?? BuchholzMethod::Classic;
-    }
-
-    public function tprMethod(): TprMethod
-    {
-        return TprMethod::tryFrom((string)($this->tiebreakConfig['performance_rating']['method'] ?? '')) ?? TprMethod::FideDp;
     }
 
     /** @return array<string,mixed> */
