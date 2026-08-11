@@ -264,9 +264,14 @@ final class KeizerScoringSettings implements TournamentScoringSettings
                 (new ValueStepEvery())->field(),
                 (new ValueMultiplier())->field(),
             ]),
+            // ScoreDecimals is deliberately not offered: standings_snapshots
+            // stores keizer_score as an integer, so the score is rounded whole
+            // after this setting has been honoured and choosing decimals would
+            // change nothing an organiser can see. Value decimals do apply —
+            // ValueLadder rounds the ladder itself. Give the column a decimal
+            // type and this belongs back in the group.
             self::group(ScoringSettingsGroup::Rounding, [
                 (new ValueDecimals())->field(),
-                (new ScoreDecimals())->field(),
             ]),
             self::group(ScoringSettingsGroup::Aalsmeer, [
                 (new AalsmeerRounds())->field(),

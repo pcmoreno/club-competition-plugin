@@ -54,9 +54,25 @@ final class ByeTypes implements SettingInterface
         );
     }
 
+    // Points are clamped for the same reason as the game outcomes: under Keizer
+    // they multiply the player's own value, so a negative one puts the score
+    // below what the snapshot column can store.
     /** @return list<array<string,mixed>> */
     public function normalise(mixed $raw): array
     {
-        return is_array($raw) ? array_values($raw) : $this->defaults;
+        if (!is_array($raw)) {
+            return $this->defaults;
+        }
+
+        return array_values(array_map(
+            static function (mixed $bye): mixed {
+                if (is_array($bye) && isset($bye['points']) && is_numeric($bye['points'])) {
+                    $bye['points'] = max(0, $bye['points'] + 0);
+                }
+
+                return $bye;
+            },
+            $raw
+        ));
     }
 }

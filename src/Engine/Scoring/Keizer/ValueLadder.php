@@ -80,6 +80,11 @@ final class ValueLadder
             return $bottom + $step * $fromBottom;
         }
 
-        return $top - $step * $rung;
+        // Floored, because from the top a large enough step walks past zero —
+        // with the default 200, any step over 200/(N-1) does it, which is 5 on a
+        // forty-player field. Snapshots store the score unsigned, so a negative
+        // aborts the round-completion transaction under strict mode and is
+        // silently clamped without it.
+        return max(0.0, $top - $step * $rung);
     }
 }

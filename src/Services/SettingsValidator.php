@@ -34,9 +34,14 @@ final class SettingsValidator
         $settings = $this->settingsResolver->scoringFor($system, $input);
         $errors   = [];
 
+        // Negatives are refused rather than clamped so the admin hears about it:
+        // both sets are coefficients on a player value, and a negative one can
+        // drive a Keizer score below zero, which the snapshot column can't hold.
         foreach ($input['gameOutcomes'] ?? [] as $key => $value) {
             if (!is_numeric($value)) {
                 $errors["gameOutcomes.$key"] = 'Must be a number.';
+            } elseif ($value < 0) {
+                $errors["gameOutcomes.$key"] = 'Cannot be negative.';
             }
         }
 
@@ -53,6 +58,8 @@ final class SettingsValidator
             }
             if (isset($bye['points']) && !is_numeric($bye['points'])) {
                 $errors["byeTypes.$i.points"] = 'Must be a number.';
+            } elseif (isset($bye['points']) && $bye['points'] < 0) {
+                $errors["byeTypes.$i.points"] = 'Cannot be negative.';
             }
         }
 

@@ -43,6 +43,7 @@ final class GameOutcomes implements SettingInterface
                     'key'     => $outcome->value,
                     'label'   => $outcome->label(),
                     'default' => $this->defaults[$outcome->value] ?? 0.0,
+                    'min'     => 0,
                     'step'    => 0.5,
                 ],
                 ScoringOutcome::cases()
@@ -57,8 +58,17 @@ final class GameOutcomes implements SettingInterface
      *
      * @return array<string,mixed>
      */
+    // Coefficients here multiply an opponent's value, so a negative one drives
+    // the score below zero, which the snapshot column cannot hold. Clamped
+    // rather than rejected: normalise() is also the validation path and never
+    // throws. SettingsValidator reports the same thing properly.
     public function normalise(mixed $raw): array
     {
-        return (is_array($raw) ? $raw : []) + $this->defaults;
+        $values = (is_array($raw) ? $raw : []) + $this->defaults;
+
+        return array_map(
+            static fn (mixed $v): mixed => is_numeric($v) ? max(0, $v + 0) : $v,
+            $values
+        );
     }
 }
