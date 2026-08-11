@@ -338,12 +338,9 @@ final class KeizerPairing implements PerRoundPairing
                 if ($candidate['rematch'] > $best || $candidate['category'] > $candidates[0]['category']) {
                     break;
                 }
-                // Not "wants the opposite" but "doesn't want the same". A player
-                // with no claim at all resolves the clash just as well —
-                // assignColours serves a one-sided claim unopposed — and they
-                // are nearer in rank than the next player who actively wants the
-                // other colour. wantsWhite() is ?bool, and null failed the
-                // strict test that was here.
+                // "Doesn't want the same", not "wants the opposite": wantsWhite
+                // is ?bool, and a player with no claim resolves the clash too,
+                // since assignColours serves a one-sided claim unopposed.
                 if ($this->wantsWhite($candidate['player'], $colours) !== $wants) {
                     return $candidate['player'];
                 }
@@ -753,11 +750,11 @@ final class KeizerPairing implements PerRoundPairing
     /**
      * The odd player out.
      *
-     * Whoever has sat out fewest times, which is the part that isn't
-     * configurable — it is what stops the same regular losing two evenings
-     * while others lose none. Counting fewest rather than none carries the rule
-     * past the point where everyone has had one: a field on 1 apiece is wholly
-     * eligible again, while somebody on 3 waits for the rest to catch up.
+     * Restricted to whoever has sat out fewest times, which isn't configurable
+     * — it is what stops the same regular losing two evenings while others lose
+     * none. Fewest rather than none, so the rule survives the wrap-around: a
+     * field on one apiece is wholly eligible, while somebody on three waits for
+     * the rest to catch up. The byeChoice setting only picks among those left.
      *
      * @param  non-empty-list<SeasonPlayer> $order only reached on an odd field, so never fewer than three
      * @param  list<Game>                   $history

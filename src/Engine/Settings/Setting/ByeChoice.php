@@ -24,7 +24,7 @@ final class ByeChoice implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Who takes the bye',
             'type'    => FieldType::Select->value,
-            'hint'    => 'Nobody takes a second bye until everyone has had one, whichever rule is chosen.',
+            'hint'    => 'The bye goes to whoever has had fewest so far, counted from the last completed round and among the players present. This rule chooses between them.',
             'default' => PairingByeChoice::Random->value,
             'options' => array_map(
                 static fn (PairingByeChoice $c) => [

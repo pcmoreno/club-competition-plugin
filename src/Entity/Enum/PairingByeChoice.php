@@ -7,9 +7,12 @@ namespace SCS\Entity\Enum;
 /**
  * Who sits out when an odd number of players turn up.
  *
- * Whichever rule applies, nobody takes a second pairing bye until everyone has
- * had one — that part isn't configurable, and it's what stops the same regular
- * losing an evening twice while others never do.
+ * The rule chosen here only breaks a tie: the bye is restricted first to
+ * whoever has taken fewest pairing byes, which isn't configurable and is what
+ * stops the same regular losing an evening twice while others never do. Fewest
+ * is counted among the players present, from the last completed round's
+ * standings — so a round paired before its predecessor is completed cannot see
+ * that predecessor's bye.
  *
  * Random is Sevilla's default for ladder systems, and the club's. The draw is
  * taken from the round rather than the clock, so it stays arbitrary between

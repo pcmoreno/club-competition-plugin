@@ -187,12 +187,11 @@ final class RoundService
         );
 
         return $this->transactions->transactional(function () use ($round, $season, $result): array {
-            // The bye is a row, not a board, so removing the pairings to
-            // regenerate leaves it behind — and save() upserts one player
-            // rather than replacing the round's set. Once the field changes
-            // shape the bye can land elsewhere, or nowhere, while last time's
-            // holder keeps a row saying they sat out. Scoring counts games and
-            // byes from separate tables, so they would be priced for both.
+            // The bye is an attendance row, not a board, so deleting the
+            // pairings to regenerate leaves it behind, and save() upserts one
+            // player rather than replacing the round's set. Scoring reads games
+            // and byes from separate tables, so a holder who ends up on a board
+            // this time is priced for both.
             $this->attendance->deleteByRoundAndByeType($round->id, ByeType::PairingBye);
 
             $games = [];
@@ -365,11 +364,11 @@ final class RoundService
         $computed = [];
 
         $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
-            // Inside the transaction with the scoring, not before it. Scoring
-            // can refuse — Keizer prices a round against the one before it and
-            // throws when that has no standings — and a status committed
-            // separately would survive the refusal, leaving the round locked
-            // and complete with nothing published behind it.
+            // In the same transaction as the scoring, because scoring can
+            // refuse: Keizer prices a round against the one before it and
+            // throws when that has no standings. A status committed outside
+            // would survive the refusal and leave the round locked and complete
+            // with nothing published behind it.
             $this->rounds->updateStatus($round->id, RoundStatus::Complete);
 
             foreach ($targets as $target) {

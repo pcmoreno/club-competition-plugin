@@ -34,7 +34,7 @@ final class SkipLimit implements SettingInterface
             'key'     => self::KEY,
             'label'   => 'Look-ahead limit',
             'type'    => FieldType::Number->value,
-            'hint'    => 'How far down the ranking the pairing may reach for a better colour. Always used to keep a player inside the colour limits; the colour-aware algorithm also uses it to improve colours generally.',
+            'hint'    => 'How far down the ranking the colour-aware algorithm may reach for a better colour. The standard algorithm never reaches, and a player already at a colour limit is paired around whatever this says.',
             'default' => self::DEFAULT,
             'min'     => 0,
             'max'     => self::MAX,

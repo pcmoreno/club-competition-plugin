@@ -65,9 +65,10 @@ final class PlayerScoreCalculator
             $game['white'] ? $white++ : $black++;
         }
 
-        // Pairing byes only. The other types are absences — the player wasn't
-        // there — and counting them made a self-reported absence read as a bye
-        // in the standings and, worse, spend the player's turn at sitting out.
+        // Pairing byes only: the other types mean the player wasn't there. This
+        // count is the published byes column and what chooseBye rations the bye
+        // by, neither of which an absence belongs in. Keizer still prices every
+        // type — it reads byesByPlayer directly, not this.
         $byes = count(array_filter(
             $context->byesByPlayer[$id] ?? [],
             static fn (string $type): bool => $type === ByeType::PairingBye->value,

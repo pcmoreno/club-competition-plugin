@@ -7,11 +7,12 @@ namespace SCS\Entity\Enum;
 /**
  * How a Keizer tournament turns a ranking into player values.
  *
- * Only Position range is implemented, and it is the one the club runs: the top
- * of the ranking takes the top value, the bottom takes the bottom value, and
- * everyone between is spread linearly. The rest are Sevilla's other valuation
- * methods, carried so the settings form shows the axis rather than pretending
- * there is only one way to do this.
+ * Three are implemented. Position range spreads the field linearly between the
+ * top and bottom values and is the one the club runs; the two stepped methods
+ * walk a fixed step per rung from one end, reading the value at that end and
+ * ignoring the other. The rest are Sevilla's remaining methods, carried so the
+ * settings form shows the axis rather than pretending there is only one way to
+ * do this — isImplemented() is what says which can be chosen.
  */
 enum ValuationMethod: string
 {
