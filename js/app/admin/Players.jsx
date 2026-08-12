@@ -2,7 +2,7 @@ import { useState } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
-import { EditPlayerDialog } from './EditPlayerDialog';
+import { PlayerDialog } from './PlayerDialog';
 import { PlayerDetailDialog } from './PlayerDetailDialog';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { MergePlayersDialog } from './MergePlayersDialog';
@@ -34,10 +34,14 @@ function errorMessage( err ) {
 // Clicking the name cell opens PlayerDetailDialog — a read-first overview with
 // three sections (Player details + activate/deactivate, Tournaments, Member
 // account + invite/revoke). Editing is deliberate from there: the four plain
-// Player fields (name, KNSB id, birth year, gender) go through EditPlayerDialog
-// via PATCH /players/{id}. Email lives on the separate Member account, not the
+// Player fields (name, KNSB id, birth year, gender) go through PlayerDialog via
+// PATCH /players/{id}. Email lives on the separate Member account, not the
 // Player, so it is NOT editable here. Elo is owned by the KNSB sync flow
 // (SyncDialog), so it is not editable here either.
+//
+// Adding a player uses the same dialog with no player to edit, and POSTs to
+// /players — which creates them active, and without an Elo until a KNSB sync
+// gives them one.
 
 const primaryBtn =
 	'rounded bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-2';
@@ -87,6 +91,7 @@ export function Players() {
 	const [ detailTarget, setDetailTarget ] = useState( null );
 	const [ editTarget, setEditTarget ] = useState( null );
 	const [ inviteTarget, setInviteTarget ] = useState( null );
+	const [ addOpen, setAddOpen ] = useState( false );
 	const [ mergeOpen, setMergeOpen ] = useState( false );
 	const [ fetchKnsbOpen, setFetchKnsbOpen ] = useState( false );
 	const [ syncKnsbOpen, setSyncKnsbOpen ] = useState( false );
@@ -145,6 +150,10 @@ export function Players() {
 						<ActionsMenu
 							items={ [
 								{
+									label: 'Add player',
+									onClick: () => setAddOpen( true ),
+								},
+								{
 									label: 'Merge players',
 									onClick: () => setMergeOpen( true ),
 									disabled: ! canMerge,
@@ -182,8 +191,9 @@ export function Players() {
 					onInvite={ setInviteTarget }
 				/>
 			) }
+			{ addOpen && <PlayerDialog onClose={ () => setAddOpen( false ) } /> }
 			{ editTarget && (
-				<EditPlayerDialog
+				<PlayerDialog
 					player={ editTarget }
 					onClose={ () => setEditTarget( null ) }
 				/>

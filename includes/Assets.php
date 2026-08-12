@@ -60,6 +60,9 @@ class Assets
         wp_localize_script('scs-viewer', 'scsBootstrap', [
             'apiRoot'  => esc_url_raw(rest_url('scs/v1/')),
             'buildUrl' => plugins_url('build/', dirname(__FILE__)),
+            // Safe to inject despite the caching note above: the same for every
+            // visitor, which is the whole test this payload has to pass.
+            'version'  => SCS_VERSION,
         ]);
     }
 }

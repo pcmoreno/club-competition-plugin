@@ -15,4 +15,9 @@ export const bootstrap = {
 	apiRoot: raw?.apiRoot ?? '/wp-json/scs/v1/',
 	// URL of the plugin's build/ dir, for any runtime asset references.
 	buildUrl: raw?.buildUrl ?? '',
+	// The plugin's version, from its header via SCS_VERSION. Shown in the app
+	// footer so what's running can be read off the page. Empty outside
+	// WordPress, where there is no plugin to have a version — the footer then
+	// renders nothing rather than a made-up number.
+	version: raw?.version ?? '',
 };

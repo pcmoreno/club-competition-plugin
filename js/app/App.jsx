@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { useRoute, navigate, matchPath } from './router/router';
 import { TopBar } from './layout/TopBar';
 import { SubNav } from './layout/SubNav';
+import { Footer } from './layout/Footer';
 import { Placeholder } from './layout/Page';
 
 import { Home } from './routes/Home';
@@ -175,6 +176,7 @@ function Shell() {
 			/>
 			{ ! AuthView && ! isAdminMode && <SubNav activePath={ path } /> }
 			{ body }
+			<Footer />
 		</div>
 	);
 }
