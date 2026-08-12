@@ -71,7 +71,7 @@ final class KeizerPairing implements PerRoundPairing
         $categories = $this->categoryOrder($season->categories);
 
         $pairs = $this->pairs($order, $colours, $meetings, $rank, $categories);
-        $pairs = $this->repairCategories($pairs, $categories, $meetings);
+        $pairs = $this->repairCategories($pairs, $categories, $meetings, $colours);
 
         // Board 1 is the pair containing the highest ranked player, which is
         // what an organiser expects reading down the sheet — the order boards
@@ -307,12 +307,7 @@ final class KeizerPairing implements PerRoundPairing
         // obvious board would put a capped player past their limit, look for
         // someone else whatever the algorithm. Opportunistic colour improvement
         // stays with the aware variants; enforcement doesn't.
-        $capClash = $wants !== null
-            && $this->wantsWhite($candidates[0]['player'], $colours) === $wants
-            && max(
-                $this->colourUrgency($player, $colours),
-                $this->colourUrgency($candidates[0]['player'], $colours),
-            ) === 3;
+        $capClash = $this->colourCapClash($player, $candidates[0]['player'], $colours);
 
         if ($this->settings->algorithm() !== PairingAlgorithm::ColorAware && !$capClash) {
             return $candidates[0]['player'];
@@ -366,18 +361,22 @@ final class KeizerPairing implements PerRoundPairing
      * categories — an odd number of players in one, and nobody adjacent to
      * trade with — keeps the pairing it had rather than losing a board.
      *
-     * Only the two boards involved change, but their rematch standing changes
-     * with them, and findOpponent had already ranked that second. So every
-     * candidate swap is scored on both axes: the largest category gain wins,
-     * ties go to the one that costs least in rematches. Acceptance still turns
-     * on a strict category decrease alone, which is what keeps the bound.
+     * Only the two boards involved change, but everything findOpponent weighed
+     * changes with them, so a swap is scored on all three axes it used: the
+     * largest category gain wins, then the fewest colour caps left clashing,
+     * then the least cost in rematches. Colour outranks rematch because a cap is
+     * a bound and a rematch a preference — a swap chosen blind to colour can
+     * rebuild the very board findOpponent scanned past every candidate to avoid.
+     * Acceptance still turns on a strict category decrease alone, which is what
+     * keeps the bound.
      *
      * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}>       $pairs
      * @param  array<string,int>                                $categories
      * @param  array<string,array{count:int,last:int}>          $meetings
+     * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
      */
-    private function repairCategories(array $pairs, array $categories, array $meetings): array
+    private function repairCategories(array $pairs, array $categories, array $meetings, array $colours): array
     {
         if ($this->settings->categoryPairing() === CategoryPairingMode::Free) {
             return $pairs;
@@ -385,6 +384,7 @@ final class KeizerPairing implements PerRoundPairing
 
         $breach  = fn (array $pair): int => $this->categoryPenalty($pair[0], $pair[1], $categories);
         $rematch = fn (array $pair): int => $this->rematchPenalty($pair[0], $pair[1], $meetings);
+        $clash   = fn (array $pair): int => $this->colourCapClash($pair[0], $pair[1], $colours) ? 1 : 0;
 
         // Bounded by the number of boards: each pass either fixes one or stops.
         for ($pass = 0, $limit = count($pairs) * count($pairs); $pass < $limit; $pass++) {
@@ -402,6 +402,7 @@ final class KeizerPairing implements PerRoundPairing
 
                     $before        = $breach($pair) + $breach($other);
                     $beforeRematch = $rematch($pair) + $rematch($other);
+                    $beforeClash   = $clash($pair) + $clash($other);
 
                     foreach ([[$pair[0], $other[0], $pair[1], $other[1]], [$pair[0], $other[1], $pair[1], $other[0]]] as [$keep, $taken, $given, $left]) {
                         $swapA = [$keep, $taken];
@@ -412,10 +413,17 @@ final class KeizerPairing implements PerRoundPairing
                             continue;
                         }
 
-                        $cost = ($rematch($swapA) + $rematch($swapB)) - $beforeRematch;
+                        // Ordered worst-first, so the smallest ranking wins:
+                        // category gain negated to sort descending, then colours,
+                        // then rematches.
+                        $rank = [
+                            -$gain,
+                            ($clash($swapA) + $clash($swapB)) - $beforeClash,
+                            ($rematch($swapA) + $rematch($swapB)) - $beforeRematch,
+                        ];
 
-                        if ($best === null || $gain > $best['gain'] || ($gain === $best['gain'] && $cost < $best['cost'])) {
-                            $best = ['gain' => $gain, 'cost' => $cost, 'i' => $i, 'j' => $j, 'a' => $swapA, 'b' => $swapB];
+                        if ($best === null || $rank < $best['rank']) {
+                            $best = ['rank' => $rank, 'i' => $i, 'j' => $j, 'a' => $swapA, 'b' => $swapB];
                         }
                     }
                 }
@@ -713,6 +721,29 @@ final class KeizerPairing implements PerRoundPairing
      *
      * @param array<int,array{last:?bool,balance:int,run:int}> $colours
      */
+    /**
+     * Whether putting these two on a board would leave a cap breached.
+     *
+     * Both want the same colour and at least one is already at a limit, so
+     * whichever assignColours overrules goes past it. Read by findOpponent
+     * before a board exists and by repairCategories once one does, which is the
+     * point of it being one predicate: the two disagreeing is how a repair pass
+     * undid the opponent search.
+     *
+     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     */
+    private function colourCapClash(SeasonPlayer $a, SeasonPlayer $b, array $colours): bool
+    {
+        $wants = $this->wantsWhite($a, $colours);
+
+        return $wants !== null
+            && $this->wantsWhite($b, $colours) === $wants
+            && max(
+                $this->colourUrgency($a, $colours),
+                $this->colourUrgency($b, $colours),
+            ) === 3;
+    }
+
     private function colourUrgency(SeasonPlayer $player, array $colours): int
     {
         $entry = $colours[$player->id] ?? null;

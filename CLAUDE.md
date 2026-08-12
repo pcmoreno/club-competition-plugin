@@ -513,7 +513,12 @@ hardcode `wp_scs_`.
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type
-- `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
+- `…scs_standings_snapshots` — immutable per-round standings, written on round-complete.
+  Its `byes` column counts **pairing byes only**, deliberately: counting every
+  bye type would make it `total rounds − games played` and carry no information
+  the row doesn't already hold. It is also what `chooseBye` rations the next
+  pairing bye by, where an absence has no place. Scoring is unaffected either
+  way — Keizer reads `byesByPlayer` directly and prices every type
 - `…scs_season_contacts` — which admins a tournament's notifications go to
 - `…scs_members` — non-WordPress member accounts
 - `…scs_admins` — plugin admins (invitable; `password_hash` is nullable)

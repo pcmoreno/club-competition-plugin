@@ -213,7 +213,8 @@ class Container
         $container->register('scoring_strategy_resolver', Engine\ScoringStrategyResolver::class)
             ->addArgument(new Reference('player_score_calculator'))
             ->addArgument(new Reference('standings_calculator'))
-            ->addArgument(new Reference('value_ladder'));
+            ->addArgument(new Reference('value_ladder'))
+            ->addArgument(new Reference('settings_resolver'));
 
         $container->register('pairing_engine_resolver', Engine\PairingEngineResolver::class)
             ->addArgument(new Reference('settings_resolver'));

@@ -46,6 +46,17 @@ final class TiebreakConfig implements SettingInterface
     {
         $config = array_replace_recursive(self::DEFAULT, is_array($raw) ? $raw : []);
 
+        // array_replace_recursive recurses into arrays but lets a scalar replace
+        // one outright, so {"buchholz":"x"} leaves a string where the checks
+        // below index an array — and this must not throw, being the validation
+        // path. A parameter set that isn't a set of parameters says nothing
+        // worth keeping, so it falls back whole.
+        foreach (self::DEFAULT as $metric => $default) {
+            if (!is_array($config[$metric])) {
+                $config[$metric] = $default;
+            }
+        }
+
         $buchholz = BuchholzMethod::tryFrom((string)($config['buchholz']['method'] ?? ''));
         if ($buchholz === null || !$buchholz->isImplemented()) {
             $config['buchholz']['method'] = BuchholzMethod::Classic->value;

@@ -159,6 +159,9 @@ final class RoundService
      * admin has adjusted by hand would silently discard that work, and clearing
      * the round first is an explicit act.
      *
+     * Also refused unless every earlier round is complete — see
+     * requireStandingsAreCurrent.
+     *
      * @return list<Game>
      */
     public function pairRound(Round $round): array
@@ -178,6 +181,8 @@ final class RoundService
         if ($this->games->findByRound($round->id) !== []) {
             throw new ConflictException('This round already has pairings. Remove them before generating new ones.');
         }
+
+        $this->requireStandingsAreCurrent($round);
 
         $result = $engine->pairNextRound(
             $season,
@@ -219,6 +224,39 @@ final class RoundService
 
             return $games;
         });
+    }
+
+    /**
+     * A round may only be generated once every round before it is complete.
+     *
+     * Everything a per-round engine reads is written by completeRound: the
+     * standings it pairs from, and the bye counts it rations the pairing bye by.
+     * Pair ahead of completion and both are frozen at some earlier round — the
+     * ranking is visibly stale, but the bye counts are not, so the same player
+     * can sit out twice running while the rule that forbids it reads as
+     * satisfied.
+     *
+     * Only generation is gated. Building a future board by hand stays open,
+     * which is the way to lay out a round early, and the way past a round that
+     * can't be completed.
+     */
+    private function requireStandingsAreCurrent(Round $round): void
+    {
+        $blocking = null;
+        foreach ($this->rounds->findBySeason($round->season_id) as $earlier) {
+            if ($earlier->round_number >= $round->round_number || $earlier->status === RoundStatus::Complete) {
+                continue;
+            }
+            $blocking = min($blocking ?? PHP_INT_MAX, $earlier->round_number);
+        }
+
+        if ($blocking !== null) {
+            throw new ConflictException(sprintf(
+                'Round %d has to be completed before round %d can be generated — the pairing reads the standings it writes.',
+                $blocking,
+                $round->round_number
+            ));
+        }
     }
 
     /**
