@@ -30,8 +30,9 @@ final class ScoringStrategyResolver
      * system → settings-class mapping lives only in SettingsResolver. Parsing the
      * blob here as well would let scoring read a season through one class while
      * SettingsValidator wrote it through another — a wrong standing, not an
-     * error. No default arm: a settings class with no strategy should fail
-     * loudly rather than score as standard.
+     * error. The default arm throws rather than falling back to standard: a
+     * settings class with no strategy is a coding error, and scoring a Keizer
+     * season as standard would look like a result.
      */
     public function resolve(Season $season): ScoringStrategyInterface
     {
@@ -49,6 +50,10 @@ final class ScoringStrategyResolver
                 $this->playerScores,
                 $this->standings,
             ),
+            default => throw new \LogicException(sprintf(
+                'No scoring strategy for settings of type %s.',
+                $settings::class
+            )),
         };
     }
 }

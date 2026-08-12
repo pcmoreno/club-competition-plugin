@@ -709,19 +709,6 @@ final class KeizerPairing implements PerRoundPairing
     }
 
     /**
-     * How strongly a player's colour claim has to be honoured.
-     *
-     * Three when a cap has been reached — their balance is as far out as it is
-     * allowed to go, or they have had one colour as many times running as the
-     * settings permit — and at that point the pairing works around them rather
-     * than the other way about. Two when they are merely out of balance. One
-     * for a bare alternation claim by someone whose colours are already even,
-     * which is the "mild" preference the settings can discount. Zero for no
-     * claim at all.
-     *
-     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
-     */
-    /**
      * Whether putting these two on a board would leave a cap breached.
      *
      * Both want the same colour and at least one is already at a limit, so
@@ -744,6 +731,19 @@ final class KeizerPairing implements PerRoundPairing
             ) === 3;
     }
 
+    /**
+     * How strongly a player's colour claim has to be honoured.
+     *
+     * Three when a cap has been reached — their balance is as far out as it is
+     * allowed to go, or they have had one colour as many times running as the
+     * settings permit — and at that point the pairing works around them rather
+     * than the other way about. Two when they are merely out of balance. One
+     * for a bare alternation claim by someone whose colours are already even,
+     * which is the "mild" preference the settings can discount. Zero for no
+     * claim at all.
+     *
+     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     */
     private function colourUrgency(SeasonPlayer $player, array $colours): int
     {
         $entry = $colours[$player->id] ?? null;
