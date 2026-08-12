@@ -69,16 +69,19 @@ class SerializerService
     private function season(Season $s, string $group): array
     {
         $data = [
-            'id'             => $s->id,
-            'name'           => $s->name,
-            'location'       => $s->location,
-            'start_date'     => $s->start_date?->format('Y-m-d'),
-            'end_date'       => $s->end_date?->format('Y-m-d'),
-            'pairing_system' => $s->pairing_system->value,
-            'time_control'   => $s->time_control->value,
-            'cadence'        => $s->pairing_system->cadence(),
-            'status'         => $s->status->value,
-            'categories'     => $s->categories,
+            'id'                 => $s->id,
+            'name'               => $s->name,
+            'location'           => $s->location,
+            'start_date'         => $s->start_date?->format('Y-m-d'),
+            'end_date'           => $s->end_date?->format('Y-m-d'),
+            'pairing_system'     => $s->pairing_system->value,
+            'time_control'       => $s->time_control->value,
+            'cadence'            => $s->pairing_system->cadence(),
+            // Cadence says how a schedule is laid out, not whether anything can
+            // lay it out — the admin's generate button needs the second one.
+            'generates_pairings' => $s->pairing_system->generatesPairings(),
+            'status'             => $s->status->value,
+            'categories'         => $s->categories,
         ];
 
         if ($group === self::GROUP_ADMIN) {

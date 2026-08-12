@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Scoring;
 
 use SCS\Engine\Scoring\Metric\MetricCalculatorInterface;
+use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\StandingsMetric;
 
@@ -64,7 +65,14 @@ final class PlayerScoreCalculator
             $game['white'] ? $white++ : $black++;
         }
 
-        $byes = count($context->byesByPlayer[$id] ?? []);
+        // Pairing byes only: the other types mean the player wasn't there. This
+        // count is the published byes column and what chooseBye rations the bye
+        // by, neither of which an absence belongs in. Keizer still prices every
+        // type — it reads byesByPlayer directly, not this.
+        $byes = count(array_filter(
+            $context->byesByPlayer[$id] ?? [],
+            static fn (string $type): bool => $type === ByeType::PairingBye->value,
+        ));
 
         return [
             'games'         => $wins + $draws + $losses,

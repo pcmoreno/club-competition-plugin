@@ -21,10 +21,11 @@ enum PairingSystem: string
         };
     }
 
-    // Selectable for a season. Automatic pairing generation is unavailable for
-    // every system (the admin builds boards by hand), so what actually gates a
-    // season is whether its scoring can be computed — without that, completing
-    // a round throws and the season is stuck. Keizer is the one that can't.
+    // Selectable for a season. The gate is whether the system's scoring can be
+    // computed — without that, completing a round throws and the season is
+    // stuck — which every system currently satisfies, so this is where a system
+    // added before its scoring strategy gets refused. Whether a system can
+    // *pair* itself is a separate question: see generatesPairings() below.
     public function isImplemented(): bool
     {
         return $this->scoringSystem()->isImplemented();
@@ -48,6 +49,18 @@ enum PairingSystem: string
             self::Manual                                 => 'manual',
             self::RoundRobinFull, self::RoundRobinGroups => 'full',
             default                                      => 'per-round',
+        };
+    }
+
+    // Whether an engine will actually produce a board, which is a different
+    // question from cadence: Swiss is per-round like Keizer and has no engine.
+    // Keep in step with PairingEngineResolver::resolve() — its default arm
+    // refuses exactly the systems that answer false here.
+    public function generatesPairings(): bool
+    {
+        return match ($this) {
+            self::Keizer, self::RoundRobinFull, self::RoundRobinGroups => true,
+            default                                                    => false,
         };
     }
 }

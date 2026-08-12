@@ -20,7 +20,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Admin invitations | Built — first admin only, see below |
 | Member self-report absence | Built — see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
-| Keizer pairing and scoring | **Not implemented** — no Keizer engine |
+| Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
@@ -95,43 +95,125 @@ fixtures/            Shipped season fixtures (JSON), imported via the admin Impo
 dev/                 Local Docker env, design/spec notes (page-inventory.md, engine-architecture.md)
 ```
 
-`tests/Unit` and `tests/Integration` exist locally but are empty, so git doesn't
-carry them — a fresh clone has no `tests/` at all. phpunit is installed
-(`composer test`) but **no tests are written yet**; changes are verified by hand
-in the UI.
+`tests/Unit/Engine/` is tracked and covers Keizer scoring and pairing, run with
+`composer test`. There is no `tests/Integration` in git, and `phpunit.xml` no
+longer declares one: PHPUnit treats a missing testsuite directory as a fatal
+error, so a clean clone could not run the suite at all. Everything outside the
+engine is still verified by hand in the UI.
 
 ## Key Concepts
 
-### Keizer Pairing System — NOT IMPLEMENTED YET
+### Keizer
 
-The Keizer system is the headline goal, but **no Keizer engine exists**. What
-gates a season is whether its *scoring* can be computed, and **Keizer is the only
-system that can't**: `ScoringStrategyResolver` throws a `ConflictException` for
-it alone, and `PairingSystem::implementedValues()` excludes it, so neither
-`CreateSeasonRequest` nor `UpdateSeasonRequest` accepts it. `swiss`,
-`round-robin-full` and `round-robin-groups` *are* selectable and score fine as
-`StandardScoring` (classical points + configurable tiebreaks) under
-`src/Engine/Scoring/`.
+Every pairing system is now selectable — `ScoringStrategyResolver` builds a
+strategy for both scoring systems, so nothing gates a season any more. `swiss`
+still has no pairing engine and is hand-built; Keizer and both round-robins
+generate their own boards.
 
-**Round-robin is the one system that pairs itself** —
-`RoundRobinPairing` (a `FullSchedulePairing`) builds the entire fixture as a
-FIDE Berger table, and `PairingEngineResolver` still throws for Swiss and
-Keizer, so those are hand-built. Pairing system and scoring system are separate
-axes here; don't read "Swiss is selectable" as "Swiss pairs itself".
+**Scoring** (`src/Engine/Scoring/KeizerScoring.php`):
 
-The seam is in place — implement `ScoringStrategyInterface` and register it in
-the resolver. The intended behaviour, for whoever builds it:
+```
+score = OwnV + Aalsmeer(round) × OwnV
+      + Σ games     Par(result) × OppV
+      + Σ absences  Par(reason) × OwnV
+```
 
-- Players paired by **Keizer score proximity** (not Elo)
-- **Category preference**: same-category pairings before cross-category
-- **Color balance**: player with fewer white games gets white
-- **No repeat pairings** within season (when possible)
-- **Odd count**: lowest-ranked player gets bye
-- **Retroactive recalculation**: scores recalculate after every round as opponent rankings shift (this is Keizer's defining feature)
+`Par` is the shared `gameOutcomes` / `byeTypes` knobs — the same numbers
+standard scoring adds to a total, here used as coefficients. Values come from a
+**Position range** ladder (`ValueLadder`): top of the ranking takes `topValue`,
+bottom takes `bottomValue`, everyone linear between, rounded. Defaults are
+200/100, fitted to the club's own history.
 
-Note this conflicts with immutable standings snapshots (see below): a completed
-round's snapshot is published history and is only rewritten by re-completing
-that round.
+Two things to know:
+
+- **The whole season is re-priced every round**, not incremented — a win against
+  someone who has since climbed is worth more today. This costs nothing, because
+  `computeStandings` already receives every game played so far.
+- **Two populations.** The ladder spans everyone *enrolled*; the standings list
+  only those who have played or taken a bye. Values depend on how many rungs
+  exist, so counting only participants would move everyone's value whenever a
+  new member debuted.
+
+Values come from the previous round's ranking (Sevilla's `Revaluation: Classic`
+— one pass, not an iteration to a fixed point), so **Keizer is sequential**:
+completing round N when N−1 has no snapshot throws a `ConflictException`.
+
+**Pairing** (`src/Engine/Pairing/KeizerPairing.php`, a `PerRoundPairing`) sorts
+by Keizer score or by Sevilla's damped percentage
+`(wins + ½ draws + SC) / (games + GC)`, then pairs neighbours. It works in from
+**both ends** by default rather than straight down the list, which keeps the
+awkward remainder in the middle of the field instead of dumping it on the
+weakest players. Standard and colour-aware algorithms are built; the weighted
+variants are exposed but coerce back to standard.
+
+**Rematches are discouraged, not forbidden.** `Pairing ▸ Values` sets a minimum
+gap (`roundsBetweenSamePairing`, 10) and a season maximum (`maxSamePairings`,
+4), and the engine treats both as penalties rather than filters — a thin field
+still gets a board. The oracle confirms both: its worst-repeated pair meets
+exactly four times, and 97 of 110 rematches respect the ten-round gap while 13
+break it, which is what a preference looks like in the data. The first rematch
+of the season falls in round 12, directly explained by the window.
+
+Colour has two caps on the same tab: `maxColorDifference` (2) bounds how far a
+player's colours drift from even, and `maxConsecutiveSameColor` (2) their
+longest run. A player at either cap has a **binding** claim that outranks the
+`colorPriority` rule; below it, `pickColorOnStrongerPreference` decides whether
+being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
+discounts the claim of someone whose colours are already even.
+
+Both caps are bounds rather than preferences, which is how Sevilla states them —
+"may not exceed", and setting either below 2 can leave it unable to pair at all.
+So they also constrain **who is paired**, not only who is overruled once a board
+exists: when the obvious opponent would push a capped player past their limit,
+`findOpponent` looks for someone else whatever the algorithm, and ignores
+`limit` while doing it — that budget is for improving colours nobody minds. The
+search still stops at the end of the candidates that are equally good on
+category and rematch, so it never buys colour with a worse board. A thin field
+can still leave a player over cap: we are more permissive than Sevilla, which
+would rather refuse to pair. Reaching for colour when nobody is at a cap remains
+the colour-aware algorithm's job alone.
+
+**Categories constrain pairing**, as the firmest of the three preferences rather
+than as a filter. Category distance is the first sort key in `findOpponent`,
+ahead of rematch and rank proximity, and it bounds the colour-aware look-ahead —
+which never reaches past a candidate sitting in a further category. Choosing
+opponents one at a time is greedy and can strand the last few players, so
+`repairCategories` then trades players between boards for as long as that
+strictly reduces the total breach. `categoryPairing` defaults to `adjacent` at
+`categoryDistance` 1 — own category or the next one either way — and `free`
+switches it off. A player with no category is never constrained, categories
+being optional per season.
+
+Because it ranks rather than filters, a field that genuinely can't be paired
+inside its categories keeps a breaching board instead of losing a game: the
+repair pass accepts only strictly-improving swaps, and then gives up.
+
+The oracle is unambiguous. Across 444 games: `C-C 148`, `B-B 102`, `A-B 78`,
+`A-A 63`, `B-C 53`, and **`A-C` exactly zero**. That is not a side effect of
+pairing by strength, which was this file's previous claim:
+
+- An A player sat **directly next to** a C player in the standings **378 times**
+  over the season — more often than A sat next to A — and within three ranks
+  1116 times. Proximity pairing would have produced A-C games constantly.
+- Nor is it a width limit. The widest game played was **525 rating points**
+  (C vs C), while the *closest possible* A-vs-C pairing is **202**. Thirty games
+  were played at a rating-order distance of 14 or more, topping out at 24; the
+  closest possible A-C is 15.
+
+So wide gaps are acceptable inside a category or between neighbours, and
+impossible across two — which only a category rule produces.
+
+One loose end: paired players are markedly closer in **rating order**
+(median gap 5, max 24) than in **Keizer-score order** (median 9, max 43). The
+pairing order may not be the score at all. Deliberately not acted on yet.
+
+Categories also drive grouped round-robin (`GroupingMode::Categories`) and the
+standings filter.
+
+Absence recording is load-bearing under Keizer in a way it never was under
+standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
+missing player as club duty or personal is worth a third of their own value —
+a bigger swing than most single games.
 
 ### Engine Settings
 
@@ -144,9 +226,9 @@ class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
-**`SettingsResolver::pairing()` returns null for Swiss and Keizer**, which have
-no pairing settings class yet — the endpoint sends `fields: null` and the tab
-renders nothing for them. Manual and both round-robins resolve. The mapping
+**`SettingsResolver::pairing()` returns null for Swiss**, which has no pairing
+settings class — the endpoint sends `fields: null` and the tab renders nothing.
+Manual, Keizer and both round-robins resolve. The mapping
 itself lives in `pairingFor(PairingSystem, array)`, keyed by system rather than
 season so `SettingsValidator` can normalise a submitted blob against the same
 match arm before any season holds it.
@@ -346,7 +428,12 @@ offered to accounts with a linked player.
 paired** — not by round status:
 
 - not on a board — the absence is recorded outright (`Absent` +
-  `ByeType::Personal`, **not** a scored bye) and can be withdrawn.
+  `ByeType::Personal`) and can be withdrawn. Under standard scoring that is
+  worth nothing; **under Keizer it is not** — `personal` defaults to 0.3333 of
+  the player's own value, so a member's own self-report becomes scored
+  competition data. Keizer plus classical is the club's configuration and the
+  absence flow is classical-only, so this is the normal case rather than a
+  corner of it.
 - already paired — **nothing is written**; the admins are emailed with the board
   and opponent and re-pair themselves. A member action must never mutate a
   pairing: the opponent's board would change under them.
@@ -362,6 +449,19 @@ admin set (that's scored competition data); a bare status row stays overwritable
 `declinableRounds()` returns a per-round `state` — `open` / `declared` /
 `notified` / `locked` — and the frontend renders from that rather than inferring
 one, so the withdraw affordance can't promise what the write path will refuse.
+
+**Putting a player on a board deletes their attendance row** — `addPairing` and
+`updatePairing` drop any row that carries a `bye_type` or says `Absent`, for
+whoever ends up playing. The board is the later and more explicit act: it says
+they turned up after all.
+
+Both columns have to go, because nothing reads them together. Scoring reads
+`bye_type` and no game check, so a bye alongside a game is scored on top of it —
+whatever the season prices that bye type at, and every type does it, an admin's
+club duty as much as a member's own. Pairing reads `status` and no bye, so a
+stale `Absent` left behind would drop the player from a board regenerated later.
+Generated pairings never create either state (`presentPlayers` excludes
+`Absent`), so this rule exists for the hand-built board.
 
 Both writes are throttled through `RateLimiterService` (they mail every active
 admin), and the paired-member path carries a one-notice-per-round marker so a
@@ -413,7 +513,12 @@ hardcode `wp_scs_`.
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type
-- `…scs_standings_snapshots` — immutable per-round standings, written on round-complete
+- `…scs_standings_snapshots` — immutable per-round standings, written on round-complete.
+  Its `byes` column counts **pairing byes only**, deliberately: counting every
+  bye type would make it `total rounds − games played` and carry no information
+  the row doesn't already hold. It is also what `chooseBye` rations the next
+  pairing bye by, where an absence has no place. Scoring is unaffected either
+  way — Keizer reads `byesByPlayer` directly and prices every type
 - `…scs_season_contacts` — which admins a tournament's notifications go to
 - `…scs_members` — non-WordPress member accounts
 - `…scs_admins` — plugin admins (invitable; `password_hash` is nullable)
@@ -666,11 +771,24 @@ SiteGround provides automated backups. Always verify deployments don't break exi
 
 ## Testing
 
-**There is no test suite yet.** phpunit is installed (`composer test`) and
-`tests/Unit` / `tests/Integration` exist locally, but they are empty — and since
-git can't track empty directories, a fresh clone has no `tests/` at all.
+**There is a test suite, but only for the engine.** `phpunit.xml` and
+`tests/Unit/Engine/` cover Keizer scoring and pairing; everything else is still
+verified by hand. `composer test` runs it.
 
-Until that changes, verification is: `npm run lint`, `vendor/bin/phpstan`,
+The Keizer tests are fixture-driven: `tests/Unit/Engine/Scoring/Fixture/`
+loads `fixtures/competition_2025_2026.json` — the club's real season, with the
+scores that were actually published — and replays round 1 against it. That
+matters because a wrong Keizer score is still a plausible-looking one, so
+nothing else can catch a numeric drift.
+
+Round 1 is asserted within a tolerance of ±2 points, deliberately: the ladder is
+a straight ramp, so a player one rung out shifts by ~1.7, and Sevilla's opening
+order can't be rebuilt now the competition file is gone. Later rounds are *not*
+asserted — the fixture records games and byes but not absences, and an absence
+is worth a third to two thirds of a player's own value every round they miss, so
+drift accumulates with the season rather than staying put.
+
+Otherwise verification is: `npm run lint`, `vendor/bin/phpstan`,
 `vendor/bin/php-cs-fixer`, and hands-on testing in the UI. Don't write throwaway
 CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 

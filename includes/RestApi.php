@@ -448,6 +448,14 @@ class RestApi
                 'permission_callback' => $isAdmin,
             ]);
 
+            // The per-round counterpart of the schedule generator above: this one
+            // pairs a single round from the standings.
+            register_rest_route('scs/v1', '/rounds/(?P<id>\d+)/pairings/generate', [
+                'methods'             => 'POST',
+                'callback'            => [$rounds, 'generatePairings'],
+                'permission_callback' => $isAdmin,
+            ]);
+
             register_rest_route('scs/v1', '/rounds/(?P<id>\d+)', [
                 [
                     'methods'             => 'GET',

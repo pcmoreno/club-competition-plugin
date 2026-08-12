@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Engine\Scoring;
 
-use SCS\Engine\Settings\StandardScoringSettings;
+use SCS\Engine\Settings\TournamentScoringSettings;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\ScoringOutcome;
 
@@ -22,7 +22,7 @@ final class ScoringContext
     public function __construct(
         public readonly array $playerIds,
         public readonly array $ratings,
-        public readonly StandardScoringSettings $settings,
+        public readonly TournamentScoringSettings $settings,
         public readonly array $gamesByPlayer,
         public readonly array $byesByPlayer,
         public readonly array $points = [],
@@ -35,7 +35,7 @@ final class ScoringContext
      * @param list<\SCS\Entity\Attendance> $attendance
      * @param array<int,int>               $ratings
      */
-    public static function build(array $playerIds, array $games, array $attendance, array $ratings, StandardScoringSettings $settings): self
+    public static function build(array $playerIds, array $games, array $attendance, array $ratings, TournamentScoringSettings $settings): self
     {
         $gamesByPlayer = [];
         foreach ($games as $game) {

@@ -31,7 +31,12 @@ use SCS\Repository\SeasonRepository;
  * must never hold an absent player who still occupies a board:
  *
  *  - SELF (not on a board) — we record the absence ourselves:
- *    AttendanceStatus::Absent + ByeType::Personal, which is *not* a scored bye.
+ *    AttendanceStatus::Absent + ByeType::Personal. Under standard scoring that
+ *    is worth nothing; under Keizer it is worth Par(personal) of the player's
+ *    own value, 0.3333 by default, so the member's own declaration is scored
+ *    competition data. That is Sevilla's behaviour and the coefficient is a
+ *    season setting — a club that doesn't want it sets personal to zero before
+ *    the first round completes, after which scoring locks.
  *    Withdrawable while they stay unpaired.
  *  - REQUEST (already paired) — we record nothing and only email the admins,
  *    including the board they're on. The admin marks the absence and re-pairs.
@@ -177,10 +182,10 @@ class RoundAbsenceService
 
         $this->requireNoticeAllowance($playerId);
 
-        // A bye the admin classified is competition data that scores: overwriting
-        // it here would let a member rewrite the standings. A bare status row
-        // (no bye_type) carries no such decision and stays overwritable, so the
-        // normal path is untouched.
+        // Any bye row is competition data under Keizer — the member's own
+        // included — so overwriting one here would let a member rewrite the
+        // standings. A bare status row (no bye_type) carries no such decision
+        // and stays overwritable, so the normal path is untouched.
         $existing = $this->attendance->findByRoundAndSeasonPlayer($round->id, $enrolment->id);
         if ($existing !== null && $existing->bye_type !== null) {
             throw new ConflictException($this->isOwnDeclaration($existing)
@@ -211,9 +216,9 @@ class RoundAbsenceService
     /**
      * Withdraw a declared absence ("I can play after all"). Only the row this
      * service wrote is removed — an admin re-classification (a club-duty bye,
-     * say) is their decision to reverse, not the member's. Once they're on a
-     * board it stops being theirs to undo either: the admin paired them knowing
-     * the absence, and unpicking that is the admin's call.
+     * say) is their decision to reverse, not the member's. There is nothing to
+     * withdraw once they're on a board: pairing a player drops whatever bye they
+     * held, so the refusal below reports a state, not a rule.
      */
     public function withdraw(int $playerId, int $roundId): void
     {

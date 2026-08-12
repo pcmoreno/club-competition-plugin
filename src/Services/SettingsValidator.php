@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCS\Services;
 
-use SCS\Engine\Settings\StandardScoringSettings;
 use SCS\Engine\Settings\StandingsDisplaySettings;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\BuchholzMethod;
@@ -23,16 +22,25 @@ final class SettingsValidator
     }
 
     /**
+     * Scoring settings are per-system for the same reason pairing settings are:
+     * the system decides which class parses the blob. Normalising a Keizer
+     * payload through the standard class would silently drop every Keizer knob.
+     *
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function validateScoring(array $input): array
+    public function validateScoring(PairingSystem $system, array $input): array
     {
-        $errors = [];
+        $settings = $this->settingsResolver->scoringFor($system, $input);
+        $errors   = [];
 
+        // Refused rather than clamped so the admin hears about it. The rule is
+        // policy and applies to every scoring system: no result or bye deducts.
         foreach ($input['gameOutcomes'] ?? [] as $key => $value) {
             if (!is_numeric($value)) {
                 $errors["gameOutcomes.$key"] = 'Must be a number.';
+            } elseif ($value < 0) {
+                $errors["gameOutcomes.$key"] = 'Cannot be negative.';
             }
         }
 
@@ -41,21 +49,23 @@ final class SettingsValidator
             if ($key === '') {
                 $errors["byeTypes.$i.key"] = 'Key is required.';
             } elseif (ByeType::tryFrom((string)$key) === null) {
-                // Attendance stores bye_type as a fixed enum; a key outside it
-                // would render a box every drop silently fails against, so reject
-                // it here rather than at drop time. (Free-form types are a
-                // possible future direction — see the I5 review note.)
+                // Attendance stores bye_type as a fixed enum, so a key outside it
+                // would render a box every drop silently fails against. Rejected
+                // here rather than at drop time. Admin-defined bye types would
+                // mean making that column free-form, not relaxing this check.
                 $errors["byeTypes.$i.key"] = 'Unknown bye type.';
             }
             if (isset($bye['points']) && !is_numeric($bye['points'])) {
                 $errors["byeTypes.$i.points"] = 'Must be a number.';
+            } elseif (isset($bye['points']) && $bye['points'] < 0) {
+                $errors["byeTypes.$i.points"] = 'Cannot be negative.';
             }
         }
 
         // The engine assigns the reserved bye types itself, so they must survive any client payload.
         if (isset($input['byeTypes']) && is_array($input['byeTypes'])) {
             $keys    = array_column(array_filter($input['byeTypes'], 'is_array'), 'key');
-            $missing = array_diff(StandardScoringSettings::reservedByeKeys(), $keys);
+            $missing = array_diff($settings->reservedByeKeys(), $keys);
             if ($missing !== []) {
                 $errors['byeTypes'] = sprintf('Reserved bye type(s) cannot be removed: %s.', implode(', ', $missing));
             }
@@ -108,7 +118,7 @@ final class SettingsValidator
             throw new ValidationException($errors);
         }
 
-        return StandardScoringSettings::fromArray($input)->getSettings();
+        return $settings->getSettings();
     }
 
     /**

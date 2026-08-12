@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Scoring\Metric;
 
 use SCS\Engine\Scoring\ScoringContext;
-use SCS\Engine\Settings\StandardScoringSettings;
+use SCS\Engine\Settings\TournamentScoringSettings;
 use SCS\Entity\Enum\ScoringOutcome;
 use SCS\Entity\Enum\StandingsMetric;
 
@@ -17,7 +17,7 @@ final class SonnebornBergerCalculator implements MetricCalculatorInterface
         return StandingsMetric::SonnebornBerger;
     }
 
-    public function isImplemented(StandardScoringSettings $settings): bool
+    public function isImplemented(TournamentScoringSettings $settings): bool
     {
         return true;
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Notice, ConfirmModal } from '../components/ui';
+import { categoryLabel } from '../components/game';
 import {
 	ROUND_STATUS_LABELS,
 	ROUND_EDITABLE,
@@ -120,6 +121,23 @@ export function TournamentPairingsTab( { season, players } ) {
 	// finalised locks the board and opens result entry; complete freezes the
 	// standings and shows results read-only.
 	const editable = round !== null && ROUND_EDITABLE.includes( round.status );
+	// Generating reads the standings, and those are written when a round is
+	// completed — so an earlier round still open means pairing from a ranking
+	// that predates it. The service refuses this too; naming the round here is
+	// what turns that refusal into something the admin can act on.
+	const blockingRound = useMemo( () => {
+		if ( round === null ) {
+			return null;
+		}
+
+		return (
+			ordered.find(
+				( r ) =>
+					r.round_number < round.round_number &&
+					r.status !== 'complete'
+			)?.round_number ?? null
+		);
+	}, [ ordered, round ] );
 	const resultsVisible =
 		round !== null &&
 		( round.status === 'finalised' || round.status === 'complete' );
@@ -163,6 +181,15 @@ export function TournamentPairingsTab( { season, players } ) {
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
 			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
 		},
+	} );
+
+	// Per-round systems pair the selected round from the standings. The backend
+	// refuses a round that already has games, so this can't quietly discard a
+	// board an admin has adjusted by hand.
+	const generatePairings = useMutation( {
+		mutationFn: () =>
+			api.post( `rounds/${ currentRoundId }/pairings/generate`, {} ),
+		onSuccess: invalidateRound,
 	} );
 
 	// Round dates are the only thing here that isn't competition data, so this
@@ -485,11 +512,28 @@ export function TournamentPairingsTab( { season, players } ) {
 					{ genLabel && season.cadence !== 'full' && (
 						<button
 							type="button"
-							disabled
-							title="Automatic pairing isn’t available yet — build the board by hand below."
-							className="rounded border border-rule px-3 py-1.5 text-sm text-muted opacity-60"
+							onClick={ () => generatePairings.mutate() }
+							disabled={
+								generatePairings.isPending ||
+								! editable ||
+								games.length > 0 ||
+								! season.generates_pairings ||
+								blockingRound !== null
+							}
+							title={
+								! season.generates_pairings
+									? 'Automatic pairing isn’t available for this system yet — build the board by hand below.'
+									: games.length > 0
+										? 'This round already has pairings. Remove them to generate again.'
+										: blockingRound !== null
+											? `Complete round ${ blockingRound } first — the board is built from the standings, and those are written when a round is completed. You can still pair this round by hand below.`
+											: undefined
+							}
+							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
-							{ genLabel }
+							{ generatePairings.isPending
+								? 'Pairing…'
+								: genLabel }
 						</button>
 					) }
 					<span className="text-xs uppercase tracking-wide text-muted">
@@ -570,11 +614,14 @@ export function TournamentPairingsTab( { season, players } ) {
 				</div>
 			) }
 
-			{ season.cadence === 'per-round' && (
+			{ generatePairings.isError && (
+				<Notice>{ errorMessage( generatePairings.error ) }</Notice>
+			) }
+
+			{ ! season.generates_pairings && season.cadence !== 'manual' && (
 				<Notice>
-					This tournament pairs one round at a time from the standings.
-					That engine isn’t built yet — pairings can be entered by hand
-					below in the meantime.
+					That engine isn’t built yet — pairings can be entered by
+					hand
 				</Notice>
 			) }
 
@@ -975,6 +1022,12 @@ function Board( {
 				<span className="text-xs text-muted">vs</span>
 				{ seat( game.black, 'black' ) }
 			</div>
+			{ /* Same reading as the viewer's CAT column, so a board that reaches
+			     across categories is as visible while it's being built as it is
+			     once published. Empty for a season without categories. */ }
+			<span className="w-16 shrink-0 text-right text-xs text-ink-3">
+				{ categoryLabel( game.white, game.black ) }
+			</span>
 			{ resultsVisible && (
 				<ResultControl
 					result={ game.result }

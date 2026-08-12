@@ -7,13 +7,10 @@ import { ApiError } from '../api/client';
 // PairingSystem enum (src/Entity/Enum/PairingSystem.php). Scoring is derived
 // from the pairing system on the backend, so it isn't chosen separately.
 //
-// Keizer is not selectable: it's the one system whose scoring has no strategy
-// yet, so a Keizer season can't complete a round. The backend rejects it too
-// (PairingSystem::implementedValues); the label stays here so existing seasons
-// still render a name. Automatic pairing is unavailable for every system —
-// boards are built by hand — which is why the others remain selectable.
+// Swiss is selectable but has no pairing engine, so its boards are built by
+// hand; Keizer and both round-robins generate their own.
 export const PAIRING_OPTIONS = [
-	{ value: 'keizer', label: 'Keizer', implemented: false },
+	{ value: 'keizer', label: 'Keizer' },
 	{ value: 'swiss', label: 'Swiss' },
 	{ value: 'manual', label: 'Manual' },
 	{ value: 'round-robin-full', label: 'Round-robin' },
@@ -75,7 +72,9 @@ export function generateLabel( cadence ) {
 		return 'Generate tournament pairings';
 	}
 	if ( cadence === 'per-round' ) {
-		return 'Generate next round pairings';
+		// The selected round, not "the next one" — rounds are created
+		// explicitly, and this pairs whichever one is open.
+		return 'Generate pairings';
 	}
 	return null;
 }

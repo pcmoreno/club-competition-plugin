@@ -157,6 +157,30 @@ class RoundController extends RestController
     }
 
     /**
+     * Build this round's boards from the standings. Only for a per-round system
+     * (Keizer); the service refuses a full-schedule one, and refuses a round
+     * that already has pairings.
+     */
+    public function generatePairings(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $round = $this->roundRepository->findById((int)$request->get_param('id'));
+            if ($round === null) {
+                throw new NotFoundException('Round not found.');
+            }
+
+            $games = $this->roundService->pairRound($round);
+
+            return $this->created([
+                'games' => array_map(
+                    fn ($game) => $this->serializer->serialize($game, SerializerService::GROUP_ADMIN),
+                    $games
+                ),
+            ]);
+        });
+    }
+
+    /**
      * Set or clear the round's date. Not guarded on round status: the date is
      * when the evening was played, not competition data, so correcting it after
      * the fact is a legitimate admin fix.
@@ -203,12 +227,14 @@ class RoundController extends RestController
                 return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));
             }
 
-            $this->roundRepository->updateStatus($round->id, $newStatus);
-
             // Completing a round freezes its standings snapshot, and refreshes
             // every later completed round's — they accumulate this one's games.
+            // The service owns that status write so it shares a transaction
+            // with the scoring that can refuse it.
             if ($newStatus === RoundStatus::Complete) {
                 $this->roundService->completeRound($round);
+            } else {
+                $this->roundRepository->updateStatus($round->id, $newStatus);
             }
 
             return $this->ok($this->serializer->serialize($this->requireRound($round->id), SerializerService::GROUP_ADMIN));

@@ -6,7 +6,6 @@ namespace SCS\Controller;
 
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\PairingSystem;
-use SCS\Entity\Enum\ScoringSystem;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
@@ -128,7 +127,7 @@ class SeasonController extends RestController
             // The metric the season ranks by (StandingsMetric value, e.g. 'points'
             // or 'sonneborn_berger'); each row exposes its value as rank_score so
             // callers don't need to know which column to read.
-            $rankByKey = $this->settingsResolver->scoring($season)?->getSettings()['rankBy'] ?? null;
+            $rankByKey = $this->settingsResolver->scoring($season)->getSettings()['rankBy'] ?? null;
 
             $standings = array_map(function ($s) use ($display, $previousRank, $rankByKey) {
                 $d = $display[$s->season_player_id] ?? null;
@@ -347,8 +346,8 @@ class SeasonController extends RestController
                     'fields' => $pairing?->getSettingsFields(),
                 ],
                 'scoring' => [
-                    'values' => $scoring?->getSettings(),
-                    'fields' => $scoring?->getSettingsFields(),
+                    'values' => $scoring->getSettings(),
+                    'fields' => $scoring->getSettingsFields(),
                 ],
                 'display' => [
                     'values' => $display->getSettings(),
@@ -398,10 +397,9 @@ class SeasonController extends RestController
             if ($scoringLocked) {
                 throw new ValidationException(['scoring_settings' => 'Scoring settings are locked after the first completed round.']);
             }
-            if ($newSystem->scoringSystem() !== ScoringSystem::Standard) {
-                throw new ValidationException(['scoring_settings' => 'Scoring settings for this system are not supported yet.']);
-            }
-            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($input->scoring_settings));
+            // Whether this system has scoring settings at all is the validator's
+            // call now — it resolves the class that will parse the blob.
+            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($newSystem, $input->scoring_settings));
         }
 
         if ($input->display_settings !== null) {

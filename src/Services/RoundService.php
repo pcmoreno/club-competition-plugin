@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCS\Services;
 
 use SCS\Engine\Pairing\FullSchedulePairing;
+use SCS\Engine\Pairing\PerRoundPairing;
 use SCS\Engine\PairingEngineResolver;
 use SCS\Engine\ScoringStrategyResolver;
 use SCS\Engine\SettingsResolver;
@@ -146,6 +147,164 @@ final class RoundService
         });
     }
 
+    /**
+     * Build one round's boards from the standings.
+     *
+     * The counterpart to generateSchedule for systems that pair a round at a
+     * time. Only players who are actually present are paired: an absence
+     * recorded before the board is built takes that player out of it, which is
+     * the whole reason the attendance window comes first.
+     *
+     * Refused if the round already has games. Regenerating over a board an
+     * admin has adjusted by hand would silently discard that work, and clearing
+     * the round first is an explicit act.
+     *
+     * Also refused unless every earlier round is complete — see
+     * requireStandingsAreCurrent.
+     *
+     * @return list<Game>
+     */
+    public function pairRound(Round $round): array
+    {
+        $this->requireEditableRound($round);
+
+        $season = $this->seasons->findById($round->season_id);
+        if ($season === null) {
+            throw new NotFoundException('Season not found for round.');
+        }
+
+        $engine = $this->pairingEngines->resolve($season);
+        if (!$engine instanceof PerRoundPairing) {
+            throw new ConflictException('This tournament lays out its whole schedule at once, not a round at a time.');
+        }
+
+        if ($this->games->findByRound($round->id) !== []) {
+            throw new ConflictException('This round already has pairings. Remove them before generating new ones.');
+        }
+
+        $this->requireStandingsAreCurrent($round);
+
+        $result = $engine->pairNextRound(
+            $season,
+            $this->presentPlayers($round),
+            $this->gamesBefore($season->id, $round),
+            array_values($this->snapshots->findLatestForSeason($season->id)),
+        );
+
+        return $this->transactions->transactional(function () use ($round, $season, $result): array {
+            // The bye is an attendance row, not a board, so deleting the
+            // pairings to regenerate leaves it behind, and save() upserts one
+            // player rather than replacing the round's set. Scoring reads games
+            // and byes from separate tables, so a holder who ends up on a board
+            // this time is priced for both.
+            $this->attendance->deleteByRoundAndByeType($round->id, ByeType::PairingBye);
+
+            $games = [];
+            foreach ($result->pairings as $pairing) {
+                $games[] = $this->games->create(
+                    $round->id,
+                    $pairing['white'],
+                    $pairing['black'],
+                    $pairing['board'],
+                    null,
+                    $season->time_control,
+                );
+            }
+
+            // Saved one at a time rather than through saveMany, which opens a
+            // transaction of its own and would nest inside this one.
+            foreach ($result->byes as $bye) {
+                $this->attendance->save(
+                    $round->id,
+                    $bye['season_player_id'],
+                    AttendanceStatus::Present,
+                    ByeType::from($bye['bye_type']),
+                );
+            }
+
+            return $games;
+        });
+    }
+
+    /**
+     * A round may only be generated once every round before it is complete.
+     *
+     * Everything a per-round engine reads is written by completeRound: the
+     * standings it pairs from, and the bye counts it rations the pairing bye by.
+     * Pair ahead of completion and both are frozen at some earlier round — the
+     * ranking is visibly stale, but the bye counts are not, so the same player
+     * can sit out twice running while the rule that forbids it reads as
+     * satisfied.
+     *
+     * Only generation is gated. Building a future board by hand stays open,
+     * which is the way to lay out a round early, and the way past a round that
+     * can't be completed.
+     */
+    private function requireStandingsAreCurrent(Round $round): void
+    {
+        $blocking = null;
+        foreach ($this->rounds->findBySeason($round->season_id) as $earlier) {
+            if ($earlier->round_number >= $round->round_number || $earlier->status === RoundStatus::Complete) {
+                continue;
+            }
+            $blocking = min($blocking ?? PHP_INT_MAX, $earlier->round_number);
+        }
+
+        if ($blocking !== null) {
+            throw new ConflictException(sprintf(
+                'Round %d has to be completed before round %d can be generated — the pairing reads the standings it writes.',
+                $blocking,
+                $round->round_number
+            ));
+        }
+    }
+
+    /**
+     * The roster minus anyone recorded absent for this round.
+     *
+     * Absence is opt-out: a player with no attendance row at all is assumed to
+     * be coming, because the club pairs on the expectation that people turn up
+     * and only hears about the ones who can't.
+     *
+     * @return list<\SCS\Entity\SeasonPlayer>
+     */
+    private function presentPlayers(Round $round): array
+    {
+        $absent = [];
+        foreach ($this->attendance->findByRound($round->id) as $row) {
+            if ($row->status === AttendanceStatus::Absent) {
+                $absent[$row->season_player_id] = true;
+            }
+        }
+
+        $present = [];
+        foreach ($this->seasonPlayers->findBySeason($round->season_id) as $player) {
+            if (!isset($absent[$player->id])) {
+                $present[] = $player;
+            }
+        }
+
+        return $present;
+    }
+
+    /**
+     * Every game played in earlier rounds, for colour history and rematches.
+     *
+     * @return list<Game>
+     */
+    private function gamesBefore(int $seasonId, Round $round): array
+    {
+        $games = [];
+        foreach ($this->rounds->findBySeason($seasonId) as $earlier) {
+            if ($earlier->round_number >= $round->round_number) {
+                continue;
+            }
+            $games = array_merge($games, $this->games->findByRound($earlier->id));
+        }
+
+        return $games;
+    }
+
     public function addPairing(int $roundId, int $white, int $black, ?int $board): Game
     {
         $round = $this->requireEditableRound($this->rounds->findById($roundId));
@@ -159,14 +318,18 @@ final class RoundService
             throw new NotFoundException('Season not found for round.');
         }
 
-        return $this->games->create(
-            $round->id,
-            $white,
-            $black,
-            $board ?? $this->nextBoard($round->id),
-            null,
-            $season->time_control,
-        );
+        return $this->transactions->transactional(function () use ($round, $season, $white, $black, $board): Game {
+            $this->releaseFromBye($round->id, $white, $black);
+
+            return $this->games->create(
+                $round->id,
+                $white,
+                $black,
+                $board ?? $this->nextBoard($round->id),
+                null,
+                $season->time_control,
+            );
+        });
     }
 
     public function updatePairing(int $gameId, ?int $white, ?int $black, ?int $board): Game
@@ -185,9 +348,13 @@ final class RoundService
         if ($board !== null) {
             $data['board'] = $board;
         }
-        $this->games->update($game->id, $data);
 
-        return $this->requireGame($game->id);
+        return $this->transactions->transactional(function () use ($game, $round, $data, $white, $black): Game {
+            $this->releaseFromBye($round->id, $white, $black);
+            $this->games->update($game->id, $data);
+
+            return $this->requireGame($game->id);
+        });
     }
 
     public function removePairing(int $gameId): void
@@ -199,8 +366,8 @@ final class RoundService
     }
 
     /**
-     * Freeze the standings for a round, and for every later round already
-     * completed.
+     * Mark a round complete and freeze its standings, along with every later
+     * round already completed.
      *
      * Standings are cumulative, so a correction in round 3 also moves rounds 4
      * and 5. Recomputing only the round being completed is what made a
@@ -235,7 +402,21 @@ final class RoundService
         // leave a partial standings table (some players, ranks with holes), and
         // findLatestForSeason picks the highest round_number with *any*
         // snapshot, so that fragment would become the published standings.
-        $this->transactions->transactional(function () use ($season, $roster, $seasonRounds, $targets, $strategy): void {
+        // Keizer prices every round against the one before it, so the cascade
+        // has to hand each target the ranking it steps forward from. Rounds are
+        // rewritten oldest first, so a target's predecessor is either one we
+        // just computed here or the stored snapshot of a round we aren't
+        // touching.
+        $computed = [];
+
+        $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
+            // In the same transaction as the scoring, because scoring can
+            // refuse: Keizer prices a round against the one before it and
+            // throws when that has no standings. A status committed outside
+            // would survive the refusal and leave the round locked and complete
+            // with nothing published behind it.
+            $this->rounds->updateStatus($round->id, RoundStatus::Complete);
+
             foreach ($targets as $target) {
                 // Standard scoring is cumulative over all games/attendance up to this round.
                 /** @var list<\SCS\Entity\Game> $games */
@@ -250,7 +431,13 @@ final class RoundService
                     $attendance = array_merge($attendance, $this->attendance->findByRound($r->id));
                 }
 
-                $snapshots = $strategy->computeStandings($season, $target, $roster, $games, $attendance);
+                $previousRound = $this->roundBefore($seasonRounds, $target);
+                $previous      = $previousRound === null
+                    ? []
+                    : array_values($computed[$previousRound->id] ?? $this->snapshots->findByRound($previousRound->id));
+
+                $snapshots            = $strategy->computeStandings($season, $target, $roster, $games, $attendance, $previous);
+                $computed[$target->id] = $snapshots;
 
                 $this->snapshots->deleteByRound($target->id);
                 foreach ($snapshots as $snapshot) {
@@ -329,6 +516,27 @@ final class RoundService
         $this->rounds->updateStatus($round->id, RoundStatus::Finalised);
     }
 
+    /**
+     * The round immediately before this one by number, which is not simply the
+     * previous array element — a season can have gaps once rounds are deleted.
+     *
+     * @param list<Round> $rounds
+     */
+    private function roundBefore(array $rounds, Round $target): ?Round
+    {
+        $previous = null;
+        foreach ($rounds as $round) {
+            if ($round->round_number >= $target->round_number) {
+                continue;
+            }
+            if ($previous === null || $round->round_number > $previous->round_number) {
+                $previous = $round;
+            }
+        }
+
+        return $previous;
+    }
+
     private function requireGame(int $gameId): Game
     {
         $game = $this->games->findById($gameId);
@@ -390,6 +598,22 @@ final class RoundService
             $paired = [$existing->white_season_player_id, $existing->black_season_player_id];
             if (in_array($white, $paired, true) || in_array($black, $paired, true)) {
                 throw new ConflictException('A player is already paired in this round.');
+            }
+        }
+    }
+
+    // A board says the player turned up after all, which settles both columns of
+    // an attendance row that says otherwise. Pairing reads status and scoring
+    // reads bye_type, so leaving either behind misreports: a bye alongside a game
+    // scores twice, and a stale absence drops the player from a regenerated
+    // board. The whole row goes — no row is how this model says present. Every
+    // bye type, not only the member's own: club duty double-counts identically.
+    private function releaseFromBye(int $roundId, int ...$seasonPlayerIds): void
+    {
+        foreach ($seasonPlayerIds as $seasonPlayerId) {
+            $row = $this->attendance->findByRoundAndSeasonPlayer($roundId, $seasonPlayerId);
+            if ($row !== null && ($row->bye_type !== null || $row->status === AttendanceStatus::Absent)) {
+                $this->attendance->delete($roundId, $seasonPlayerId);
             }
         }
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCS\Engine;
 
+use SCS\Engine\Settings\KeizerPairingSettings;
+use SCS\Engine\Settings\KeizerScoringSettings;
 use SCS\Engine\Settings\ManualPairingSettings;
 use SCS\Engine\Settings\RoundRobinGroupsPairingSettings;
 use SCS\Engine\Settings\RoundRobinPairingSettings;
@@ -36,18 +38,30 @@ final class SettingsResolver
     {
         return match ($system) {
             PairingSystem::Manual           => ManualPairingSettings::fromArray($values),
+            PairingSystem::Keizer           => KeizerPairingSettings::fromArray($values),
             PairingSystem::RoundRobinFull   => RoundRobinPairingSettings::fromArray($values),
             PairingSystem::RoundRobinGroups => RoundRobinGroupsPairingSettings::fromArray($values),
             default                         => null,
         };
     }
 
-    // Null for systems whose scoring isn't implemented yet (Keizer).
-    public function scoring(Season $season): ?TournamentScoringSettings
+    // Every scoring system has settings — both of them are implemented.
+    public function scoring(Season $season): TournamentScoringSettings
     {
-        return match ($season->pairing_system->scoringSystem()) {
-            ScoringSystem::Standard => StandardScoringSettings::fromArray($season->scoring_settings ?? []),
-            ScoringSystem::Keizer   => null,
+        return $this->scoringFor($season->pairing_system, $season->scoring_settings ?? []);
+    }
+
+    /**
+     * The same mapping keyed by system, so a submitted blob can be normalised
+     * against the class that will actually read it — see SettingsValidator.
+     *
+     * @param array<string,mixed> $values
+     */
+    public function scoringFor(PairingSystem $system, array $values): TournamentScoringSettings
+    {
+        return match ($system->scoringSystem()) {
+            ScoringSystem::Standard => StandardScoringSettings::fromArray($values),
+            ScoringSystem::Keizer   => KeizerScoringSettings::fromArray($values),
         };
     }
 

@@ -19,8 +19,16 @@ final class StandardScoring implements ScoringStrategyInterface
     ) {
     }
 
-    public function computeStandings(Season $season, Round $round, array $roster, array $games, array $attendance): array
-    {
+    // $previousStandings is ignored: standard scoring is cumulative over the
+    // games themselves, so it never needs to know where anyone stood before.
+    public function computeStandings(
+        Season $season,
+        Round $round,
+        array $roster,
+        array $games,
+        array $attendance,
+        array $previousStandings = [],
+    ): array {
         $playerIds = [];
         $ratings   = [];
         foreach ($roster as $player) {

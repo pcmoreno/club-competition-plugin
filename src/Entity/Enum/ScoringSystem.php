@@ -9,10 +9,10 @@ enum ScoringSystem: string
     case Standard = 'standard';
     case Keizer   = 'keizer';
 
-    // Keizer has no strategy yet, so ScoringStrategyResolver can't build one and
-    // a round using it cannot be completed.
+    // Both systems compute, so nothing is gated. This is the seam that refuses
+    // a scoring system added before its strategy exists.
     public function isImplemented(): bool
     {
-        return $this === self::Standard;
+        return true;
     }
 }

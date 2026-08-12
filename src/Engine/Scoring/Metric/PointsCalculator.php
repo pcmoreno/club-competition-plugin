@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SCS\Engine\Scoring\Metric;
 
 use SCS\Engine\Scoring\ScoringContext;
-use SCS\Engine\Settings\StandardScoringSettings;
+use SCS\Engine\Settings\TournamentScoringSettings;
 use SCS\Entity\Enum\StandingsMetric;
 
 // Sum of game-outcome points (win/draw/loss) plus bye points, per the settings.
@@ -16,7 +16,7 @@ final class PointsCalculator implements MetricCalculatorInterface
         return StandingsMetric::Points;
     }
 
-    public function isImplemented(StandardScoringSettings $settings): bool
+    public function isImplemented(TournamentScoringSettings $settings): bool
     {
         return true;
     }

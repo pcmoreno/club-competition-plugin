@@ -231,6 +231,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 						/>
 						<input
 							type="number"
+							min={ field.min }
 							step="0.5"
 							className={ inputCls + ' num w-20' }
 							value={ row.points ?? 0 }
@@ -411,7 +412,13 @@ function NullableNumberField( { id, field, value, onChange, disabled } ) {
 // Pairing settings are a flat list of fields rather than the grouped shape
 // scoring uses, so they render straight from the schema.
 function PairingField( { id, field, values, setValues, disabled } ) {
-	const value = values?.[ field.key ] ?? field.default ?? null;
+	// Keyed on the key being present rather than the value being nullish: for a
+	// nullable field a stored null is a real choice — "don't round",
+	// "unlimited" — and must not read as the default.
+	const value =
+		values && field.key in values
+			? values[ field.key ]
+			: field.default ?? null;
 	const set = ( v ) => setValues( { ...values, [ field.key ]: v } );
 
 	if ( field.type === 'number' && field.nullable ) {
@@ -476,6 +483,40 @@ function PairingField( { id, field, values, setValues, disabled } ) {
 	);
 }
 
+// Fields that only qualify the one before them — how many categories apart, how
+// far the alternation starts from — say so in the schema and are laid out beside
+// it rather than under it, so the pair reads as the one question it is.
+function inlineRows( fields ) {
+	const rows = [];
+	fields.forEach( ( f ) => {
+		if ( f.inline && rows.length > 0 ) {
+			rows[ rows.length - 1 ].push( f );
+		} else {
+			rows.push( [ f ] );
+		}
+	} );
+	return rows;
+}
+
+// A knob can depend on another one's value: a count of categories means nothing
+// while there is no limit to count, so it greys out instead of inviting a number
+// that would be ignored.
+function isEnabled( field, values ) {
+	if ( ! field.enabledBy ) {
+		return true;
+	}
+	const current = values?.[ field.enabledBy.key ];
+	if ( current === undefined ) {
+		return true;
+	}
+	// A list where more than one value keeps the field alive — the ladder's top
+	// value is read by two of the three valuation methods, not one.
+	const wanted = field.enabledBy.value;
+	return Array.isArray( wanted )
+		? wanted.includes( current )
+		: current === wanted;
+}
+
 // One labelled pairing knob. A checkbox reads as its own label, so a toggle puts
 // the control first instead of stacking an empty box under a heading.
 function PairingRow( { field, values, setValues, disabled } ) {
@@ -534,6 +575,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 							<span>{ f.label }</span>
 							<input
 								type="number"
+								min={ f.min }
 								step={ f.step ?? 0.5 }
 								className={ inputCls + ' num w-20' }
 								value={ values.gameOutcomes?.[ f.key ] ?? f.default }
@@ -627,6 +669,37 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 						setValues( { ...values, tiebreakConfig } )
 					}
 				/>
+			</section>
+		);
+	}
+
+	// Anything else is a plain list of knobs — the same shape the pairing tab
+	// renders, so it goes through the same row. A settings class adding one
+	// needs nothing here.
+	if ( Array.isArray( group.fields ) && group.fields.some( ( f ) => f.key ) ) {
+		return (
+			<section>
+				<SectionTitle>{ group.label }</SectionTitle>
+				<div className="flex flex-col gap-3">
+					{ inlineRows( group.fields ).map( ( row ) => (
+						<div
+							key={ row[ 0 ].key }
+							className="flex flex-wrap items-start gap-4"
+						>
+							{ row.map( ( f ) => (
+								<PairingRow
+									key={ f.key }
+									field={ f }
+									values={ values }
+									setValues={ setValues }
+									disabled={
+										disabled || ! isEnabled( f, values )
+									}
+								/>
+							) ) }
+						</div>
+					) ) }
+				</div>
 			</section>
 		);
 	}
@@ -748,14 +821,24 @@ export function TournamentSettingsTab( { season } ) {
 						Pairing
 					</SectionTitle>
 					<div className="flex flex-col gap-3">
-						{ pairingFields.map( ( f ) => (
-							<PairingRow
-								key={ f.key }
-								field={ f }
-								values={ pairing }
-								setValues={ editPairing }
-								disabled={ save.isPending }
-							/>
+						{ inlineRows( pairingFields ).map( ( row ) => (
+							<div
+								key={ row[ 0 ].key }
+								className="flex flex-wrap items-start gap-4"
+							>
+								{ row.map( ( f ) => (
+									<PairingRow
+										key={ f.key }
+										field={ f }
+										values={ pairing }
+										setValues={ editPairing }
+										disabled={
+											save.isPending ||
+											! isEnabled( f, pairing )
+										}
+									/>
+								) ) }
+							</div>
 						) ) }
 					</div>
 				</section>
