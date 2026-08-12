@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SCS\Engine;
 
 use SCS\Engine\Pairing\KeizerPairing;
-use SCS\Engine\Pairing\ManualPairing;
 use SCS\Engine\Pairing\PairingEngineInterface;
 use SCS\Engine\Pairing\RoundRobinPairing;
 use SCS\Engine\Settings\KeizerPairingSettings;
@@ -24,9 +23,6 @@ final class PairingEngineResolver
     public function resolve(Season $season): PairingEngineInterface
     {
         switch ($season->pairing_system) {
-            case PairingSystem::Manual:
-                return new ManualPairing();
-
             case PairingSystem::Keizer:
                 $keizer = $this->settings->pairing($season);
                 if (!$keizer instanceof KeizerPairingSettings) {
@@ -45,11 +41,14 @@ final class PairingEngineResolver
                 return new RoundRobinPairing($settings);
 
             default:
-                // Manual resolves above but produces nothing, so the systems
-                // this arm refuses are exactly those the enum's
-                // generatesPairings() reports false for. Change one, change both.
+                // Refuses exactly the systems the enum's generatesPairings()
+                // reports false for. Change one, change both. Manual belongs
+                // here rather than resolving to a do-nothing engine: callers
+                // gate on the engine's interface, so a no-op that satisfies
+                // PerRoundPairing runs the whole pairing path — including the
+                // bye-row clear — and reports success having built nothing.
                 throw new ConflictException(sprintf(
-                    'Automatic pairing is not available for %s yet — build the board by hand.',
+                    'Automatic pairing is not available for %s — build the board by hand.',
                     $season->pairing_system->value
                 ));
         }

@@ -34,9 +34,8 @@ final class SettingsValidator
         $settings = $this->settingsResolver->scoringFor($system, $input);
         $errors   = [];
 
-        // Negatives are refused rather than clamped so the admin hears about it:
-        // both sets are coefficients on a player value, and a negative one can
-        // drive a Keizer score below zero, which the snapshot column can't hold.
+        // Refused rather than clamped so the admin hears about it. The rule is
+        // policy and applies to every scoring system: no result or bye deducts.
         foreach ($input['gameOutcomes'] ?? [] as $key => $value) {
             if (!is_numeric($value)) {
                 $errors["gameOutcomes.$key"] = 'Must be a number.';
@@ -50,10 +49,10 @@ final class SettingsValidator
             if ($key === '') {
                 $errors["byeTypes.$i.key"] = 'Key is required.';
             } elseif (ByeType::tryFrom((string)$key) === null) {
-                // Attendance stores bye_type as a fixed enum; a key outside it
-                // would render a box every drop silently fails against, so reject
-                // it here rather than at drop time. (Free-form types are a
-                // possible future direction — see the I5 review note.)
+                // Attendance stores bye_type as a fixed enum, so a key outside it
+                // would render a box every drop silently fails against. Rejected
+                // here rather than at drop time. Admin-defined bye types would
+                // mean making that column free-form, not relaxing this check.
                 $errors["byeTypes.$i.key"] = 'Unknown bye type.';
             }
             if (isset($bye['points']) && !is_numeric($bye['points'])) {

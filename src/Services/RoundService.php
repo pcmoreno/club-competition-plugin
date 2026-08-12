@@ -280,14 +280,18 @@ final class RoundService
             throw new NotFoundException('Season not found for round.');
         }
 
-        return $this->games->create(
-            $round->id,
-            $white,
-            $black,
-            $board ?? $this->nextBoard($round->id),
-            null,
-            $season->time_control,
-        );
+        return $this->transactions->transactional(function () use ($round, $season, $white, $black, $board): Game {
+            $this->releaseFromBye($round->id, $white, $black);
+
+            return $this->games->create(
+                $round->id,
+                $white,
+                $black,
+                $board ?? $this->nextBoard($round->id),
+                null,
+                $season->time_control,
+            );
+        });
     }
 
     public function updatePairing(int $gameId, ?int $white, ?int $black, ?int $board): Game
@@ -306,9 +310,13 @@ final class RoundService
         if ($board !== null) {
             $data['board'] = $board;
         }
-        $this->games->update($game->id, $data);
 
-        return $this->requireGame($game->id);
+        return $this->transactions->transactional(function () use ($game, $round, $data, $white, $black): Game {
+            $this->releaseFromBye($round->id, $white, $black);
+            $this->games->update($game->id, $data);
+
+            return $this->requireGame($game->id);
+        });
     }
 
     public function removePairing(int $gameId): void
@@ -552,6 +560,22 @@ final class RoundService
             $paired = [$existing->white_season_player_id, $existing->black_season_player_id];
             if (in_array($white, $paired, true) || in_array($black, $paired, true)) {
                 throw new ConflictException('A player is already paired in this round.');
+            }
+        }
+    }
+
+    // A board says the player turned up after all, which settles both columns of
+    // an attendance row that says otherwise. Pairing reads status and scoring
+    // reads bye_type, so leaving either behind misreports: a bye alongside a game
+    // scores twice, and a stale absence drops the player from a regenerated
+    // board. The whole row goes — no row is how this model says present. Every
+    // bye type, not only the member's own: club duty double-counts identically.
+    private function releaseFromBye(int $roundId, int ...$seasonPlayerIds): void
+    {
+        foreach ($seasonPlayerIds as $seasonPlayerId) {
+            $row = $this->attendance->findByRoundAndSeasonPlayer($roundId, $seasonPlayerId);
+            if ($row !== null && ($row->bye_type !== null || $row->status === AttendanceStatus::Absent)) {
+                $this->attendance->delete($roundId, $seasonPlayerId);
             }
         }
     }

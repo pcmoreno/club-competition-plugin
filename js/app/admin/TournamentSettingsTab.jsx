@@ -231,6 +231,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 						/>
 						<input
 							type="number"
+							min={ field.min }
 							step="0.5"
 							className={ inputCls + ' num w-20' }
 							value={ row.points ?? 0 }
@@ -574,6 +575,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 							<span>{ f.label }</span>
 							<input
 								type="number"
+								min={ f.min }
 								step={ f.step ?? 0.5 }
 								className={ inputCls + ' num w-20' }
 								value={ values.gameOutcomes?.[ f.key ] ?? f.default }

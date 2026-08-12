@@ -450,6 +450,19 @@ admin set (that's scored competition data); a bare status row stays overwritable
 `notified` / `locked` — and the frontend renders from that rather than inferring
 one, so the withdraw affordance can't promise what the write path will refuse.
 
+**Putting a player on a board deletes their attendance row** — `addPairing` and
+`updatePairing` drop any row that carries a `bye_type` or says `Absent`, for
+whoever ends up playing. The board is the later and more explicit act: it says
+they turned up after all.
+
+Both columns have to go, because nothing reads them together. Scoring reads
+`bye_type` and no game check, so a bye alongside a game is scored on top of it —
+whatever the season prices that bye type at, and every type does it, an admin's
+club duty as much as a member's own. Pairing reads `status` and no bye, so a
+stale `Absent` left behind would drop the player from a board regenerated later.
+Generated pairings never create either state (`presentPlayers` excludes
+`Absent`), so this rule exists for the hand-built board.
+
 Both writes are throttled through `RateLimiterService` (they mail every active
 admin), and the paired-member path carries a one-notice-per-round marker so a
 resubmit can't mail the admins again.

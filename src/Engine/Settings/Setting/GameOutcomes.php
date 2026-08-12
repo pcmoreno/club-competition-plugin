@@ -58,10 +58,9 @@ final class GameOutcomes implements SettingInterface
      *
      * @return array<string,mixed>
      */
-    // Coefficients here multiply an opponent's value, so a negative one drives
-    // the score below zero, which the snapshot column cannot hold. Clamped
-    // rather than rejected: normalise() is also the validation path and never
-    // throws. SettingsValidator reports the same thing properly.
+    // Nothing is ever worth less than nothing: no result deducts, under either
+    // scoring system. Clamped rather than rejected because normalise() is also
+    // the validation path and never throws — SettingsValidator says so properly.
     public function normalise(mixed $raw): array
     {
         $values = (is_array($raw) ? $raw : []) + $this->defaults;

@@ -38,6 +38,7 @@ final class ByeTypes implements SettingInterface
             'group'        => ScoringSettingsGroup::ByeTypes->value,
             'type'         => FieldType::KeyedNumberList->value,
             'reservedKeys' => $this->reservedKeys(),
+            'min'          => 0,
             'default'      => $this->defaults,
         ];
     }
@@ -54,9 +55,7 @@ final class ByeTypes implements SettingInterface
         );
     }
 
-    // Points are clamped for the same reason as the game outcomes: under Keizer
-    // they multiply the player's own value, so a negative one puts the score
-    // below what the snapshot column can store.
+    // Clamped for the same reason as the game outcomes: no bye deducts either.
     /** @return list<array<string,mixed>> */
     public function normalise(mixed $raw): array
     {

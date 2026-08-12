@@ -216,9 +216,9 @@ class RoundAbsenceService
     /**
      * Withdraw a declared absence ("I can play after all"). Only the row this
      * service wrote is removed — an admin re-classification (a club-duty bye,
-     * say) is their decision to reverse, not the member's. Once they're on a
-     * board it stops being theirs to undo either: the admin paired them knowing
-     * the absence, and unpicking that is the admin's call.
+     * say) is their decision to reverse, not the member's. There is nothing to
+     * withdraw once they're on a board: pairing a player drops whatever bye they
+     * held, so the refusal below reports a state, not a rule.
      */
     public function withdraw(int $playerId, int $roundId): void
     {
