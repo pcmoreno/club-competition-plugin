@@ -34,7 +34,7 @@ const SEASON_STATUS_LABEL = {
 // ADMIN. Read-first player overview opened by clicking a name on the roster.
 // Three sections — Player (details + activate/deactivate), Tournaments (the
 // seasons they're enrolled in), Member (login account: invite / revoke). Edits
-// are deliberate: the four plain fields go through the separate EditPlayerDialog
+// are deliberate: the four plain fields go through the separate PlayerDialog
 // (opened via onEdit), and invites through InviteMemberDialog (via onInvite).
 //
 // The player row is read live from the ['admin-players'] roster cache (already

@@ -11,6 +11,7 @@ declare(strict_types=1);
  */
 define('SCS_TABLE_PREFIX', 'wp_scs_');
 define('SCS_PLUGIN_PATH', __DIR__ . '/');
+define('SCS_VERSION', '0.0.0');
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'wordpress');
 define('DB_USER', 'wordpress');

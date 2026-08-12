@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Plugin Name: Club Competition Manager
  * Plugin URI: https://github.com/pcmoreno/club-competition-plugin
  * Description: Manage chess competition pairings, standings, and results for Schaakclub Santpoort
- * Version: 0.4.0
+ * Version: 0.5.0
  * Author: Paulo Moreno
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,7 +20,12 @@ if (! defined('ABSPATH')) {
 
 define('SCS_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('SCS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SCS_VERSION', '0.4.0');
+// Read back from the header above rather than repeated, so the version has one
+// place to be edited. WordPress parses that header out of the file text and it
+// can't be generated, so the literal has to live there; a second copy here would
+// be free to drift, and a version that lies is worse than none. Shown to
+// visitors in the app footer, so it is now load-bearing rather than decorative.
+define('SCS_VERSION', get_file_data(__FILE__, ['Version' => 'Version'], 'plugin')['Version'] ?: '0.0.0');
 define('SCS_DB_VERSION', '0.1.0');
 
 // The plugin's tables share the site's WordPress table prefix (which is not
