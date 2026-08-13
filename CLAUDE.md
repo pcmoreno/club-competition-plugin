@@ -394,6 +394,52 @@ pending invites. The tournament-contacts picker reads the same endpoint and
 filters to `active` in `ContactsField` — an admin who hasn't accepted yet
 shouldn't be pickable as a notification recipient.
 
+### Tournament Lifecycle
+
+`SeasonStatus` runs preparation → active → completed. Only two of those moves
+are wired up, and they are not symmetrical.
+
+**Starting** is the header's Start button — `PATCH /seasons/{id}` with
+`status: 'active'`. `preparation ↔ active` is otherwise unvalidated and
+deliberately left that way: an admin who started a tournament by mistake can put
+it back and delete it (`destroy` is preparation-only).
+
+**Completing is not a status write at all.** `PATCH /seasons/{id}` rejects
+`status: 'completed'` outright, so there is exactly one way in: ticking *"Also
+complete the tournament"* in the Complete-round modal, which sends
+`complete_season` on `PATCH /rounds/{id}/status` and lands in
+`RoundService::closeSeason` — inside the same transaction as the round's own
+completion, because closing the tournament is irreversible and must not survive
+scoring refusing the round. It refuses unless **every** round is complete, and
+refuses a season with **no** rounds: one that never played a round was cancelled,
+not finished. The frontend offers the tick only on the last round, which is the
+admin's cue rather than the real condition.
+
+**Completed is final and read-only.** There is no reopen, by decision — recovery
+would be a DB edit. The freeze is enforced in three places, none of which is the
+round status (a season can be completed with a draft round sitting in it, and
+round status wouldn't catch a *new* round, a reopen, or a date edit):
+
+- `RoundService::assertSeasonOpen` — from `createRound`, `generateSchedule`,
+  `pairRound`, `completeRound`, `reopenRound`, and both `require*Round` helpers.
+  Public, because `RoundController` writes the round date and the plain
+  draft/published/finalised transitions straight through the repository.
+- `SeasonController::requireOpenSeason` — the roster and category writes.
+- `SeasonController::requireDisplaySettingsOnly` — `PATCH /seasons/{id}` accepts
+  **only** `display_settings` on a completed tournament and rejects the whole
+  request if anything rides along, so the frontend must send that key alone.
+
+The standings columns are the single exception, and `display_settings` holds
+nothing else (`StandingsDisplaySettings`): they change how the finished record is
+read, not what it says.
+
+The frontend mirrors this from `isLocked(season)` in `tournamentShared.js`,
+passed down as `locked` to all five tabs. Editing apparatus is **removed** rather
+than disabled — the Categories add-form goes, the Players transfer list collapses
+to the roster it ended with — because there is nothing to add to a finished
+record. The member absence path needs no guard: `seasonAccepts` already requires
+`Active`.
+
 ### Time Control
 
 Both `seasons` and `games` carry a `time_control` (`TimeControl` enum: blitz /

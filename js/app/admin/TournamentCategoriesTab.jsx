@@ -12,7 +12,7 @@ import { keys } from '../api/keys';
 // each carries its own Remove (disabled while it still holds players). Rename
 // isn't offered: players store the category as a plain string, so it'd orphan
 // them.
-export function TournamentCategoriesTab( { season, players } ) {
+export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	const queryClient = useQueryClient();
 	const [ list, setList ] = useState( season.categories ?? [] );
 	const [ input, setInput ] = useState( '' );
@@ -199,10 +199,13 @@ export function TournamentCategoriesTab( { season, players } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				Categories split the tournament into pools. Leave the list empty
-				to run it as a single undivided group.
+				{ locked
+					? 'The categories this tournament was played in, and who was in each.'
+					: 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.' }
 			</p>
 
+			{ /* Removed rather than disabled: nothing can be added to a finished record. */ }
+			{ ! locked && (
 			<div className="max-w-xl">
 				<div className="flex items-end gap-3">
 					<label className="block flex-1">
@@ -257,20 +260,30 @@ export function TournamentCategoriesTab( { season, players } ) {
 					</p>
 				) }
 			</div>
+			) }
 
 			{ list.length > 0 && (
-				<div className="space-y-3 border-t border-rule pt-6">
+				<div
+					className={
+						'space-y-3' +
+						( locked ? '' : ' border-t border-rule pt-6' )
+					}
+				>
 					<div>
 						<h3 className="text-sm font-medium text-ink">
-							Assign players to categories
+							{ locked
+								? 'Players by category'
+								: 'Assign players to categories' }
 						</h3>
-						<p className="text-xs text-muted">
-							Drag a player into a category, or back to Unassigned
-							to clear it.
-						</p>
+						{ ! locked && (
+							<p className="text-xs text-muted">
+								Drag a player into a category, or back to
+								Unassigned to clear it.
+							</p>
+						) }
 					</div>
 
-					{ players.length === 0 && (
+					{ players.length === 0 && ! locked && (
 						<p className="text-sm text-muted">
 							No players enrolled yet — add them on the Players
 							tab. You can still add and remove categories here.
@@ -292,6 +305,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 									onDrop={ () => onDropTo( c ) }
 									onDragStart={ onDragStart }
 									onRemove={ () => removeAt( c ) }
+									locked={ locked }
 									empty="Drop players here"
 								/>
 							) ) }
@@ -304,6 +318,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 							onLeave={ () => setOver( null ) }
 							onDrop={ () => onDropTo( null ) }
 							onDragStart={ onDragStart }
+							locked={ locked }
 							empty="No unassigned players"
 						/>
 					</div>
@@ -335,7 +350,7 @@ export function TournamentCategoriesTab( { season, players } ) {
 
 // One droppable box holding the players in a category (or the unassigned pool).
 // Rows are draggable to any other box. Category boxes carry a Remove action,
-// disabled while the box still holds players.
+// disabled while the box still holds players. Locked leaves a plain list.
 function AssignBox( {
 	title,
 	rows,
@@ -345,16 +360,21 @@ function AssignBox( {
 	onDrop,
 	onDragStart,
 	onRemove,
+	locked = false,
 	empty,
 } ) {
 	return (
 		<section
-			onDragOver={ ( e ) => {
-				e.preventDefault();
-				onOver();
-			} }
-			onDragLeave={ onLeave }
-			onDrop={ onDrop }
+			onDragOver={
+				locked
+					? undefined
+					: ( e ) => {
+							e.preventDefault();
+							onOver();
+					  }
+			}
+			onDragLeave={ locked ? undefined : onLeave }
+			onDrop={ locked ? undefined : onDrop }
 			className={
 				'rounded border bg-surface ' +
 				( isOver ? 'border-accent ring-1 ring-accent' : 'border-rule' )
@@ -366,7 +386,7 @@ function AssignBox( {
 					<span className="num font-mono text-xs text-muted">
 						{ rows.length }
 					</span>
-					{ onRemove && (
+					{ onRemove && ! locked && (
 						<button
 							type="button"
 							className="text-xs text-loss hover:underline disabled:opacity-40"
@@ -392,9 +412,14 @@ function AssignBox( {
 					rows.map( ( p ) => (
 						<li
 							key={ p.player_id }
-							draggable
-							onDragStart={ () => onDragStart( p ) }
-							className="flex cursor-grab items-center justify-between rounded px-2 py-1.5 text-sm text-ink-3 hover:bg-paper"
+							draggable={ ! locked }
+							onDragStart={
+								locked ? undefined : () => onDragStart( p )
+							}
+							className={
+								'flex items-center justify-between rounded px-2 py-1.5 text-sm text-ink-3 ' +
+								( locked ? '' : 'cursor-grab hover:bg-paper' )
+							}
 						>
 							<span className="truncate">{ p.name }</span>
 							{ !! p.elo && (

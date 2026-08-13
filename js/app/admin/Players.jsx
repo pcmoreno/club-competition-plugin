@@ -86,6 +86,8 @@ export function Players() {
 		queryFn: () => api.get( 'players' ),
 	} );
 	const [ search, setSearch ] = useState( '' );
+	// Off by default, so the page keeps showing what its title says it does.
+	const [ activeOnly, setActiveOnly ] = useState( false );
 	const [ sort, setSort ] = useState( { key: 'knsb_elo', dir: 'desc' } );
 	const [ syncTarget, setSyncTarget ] = useState( null );
 	const [ detailTarget, setDetailTarget ] = useState( null );
@@ -107,7 +109,9 @@ export function Players() {
 	} else {
 		const q = search.trim().toLowerCase();
 		const filtered = data.filter(
-			( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q )
+			( p ) =>
+				( ! q || ( p.name ?? '' ).toLowerCase().includes( q ) ) &&
+				( ! activeOnly || p.active )
 		);
 		const sorted = [ ...filtered ].sort( ( a, b ) => {
 			if ( sort.key === 'name' ) {
@@ -124,7 +128,7 @@ export function Players() {
 				<Notice>
 					{ data.length === 0
 						? 'No players in the roster yet.'
-						: 'No players match your search.' }
+						: 'No players match your filters.' }
 				</Notice>
 			);
 		} else {
@@ -168,6 +172,16 @@ export function Players() {
 								},
 							] }
 						/>
+						<label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-3">
+							<input
+								type="checkbox"
+								checked={ activeOnly }
+								onChange={ ( e ) =>
+									setActiveOnly( e.target.checked )
+								}
+							/>
+							Active only
+						</label>
 						<SearchInput
 							value={ search }
 							onChange={ setSearch }

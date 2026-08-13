@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
-import { STATUS_LABELS, errorMessage } from './tournamentShared';
+import { STATUS_LABELS, errorMessage, isLocked } from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
@@ -69,6 +69,7 @@ export function TournamentDetail( { seasonId } ) {
 	const { season, players = [] } = data;
 	const tabs = tabsFor( season.status );
 	const activeTab = tab ?? ( season.status === 'active' ? 'pairings' : 'basic' );
+	const locked = isLocked( season );
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -101,6 +102,13 @@ export function TournamentDetail( { seasonId } ) {
 				</div>
 			</div>
 
+			{ locked && (
+				<p className="rounded border border-rule bg-surface px-3 py-2 text-sm text-ink-3">
+					This tournament is completed, so its record is read-only. The
+					standings columns on the Settings tab can still be changed.
+				</p>
+			) }
+
 			<div className="border-b border-rule">
 				<nav className="-mb-px flex gap-6">
 					{ tabs.map( ( t ) => (
@@ -124,29 +132,38 @@ export function TournamentDetail( { seasonId } ) {
 			<div>
 				{ activeTab === 'basic' && (
 					<div className="max-w-2xl">
-						<TournamentBasicTab season={ season } />
+						<TournamentBasicTab
+							season={ season }
+							locked={ locked }
+						/>
 					</div>
 				) }
 				{ activeTab === 'pairings' && (
 					<TournamentPairingsTab
 						season={ season }
 						players={ players }
+						locked={ locked }
 					/>
 				) }
 				{ activeTab === 'players' && (
 					<TournamentPlayersTab
 						season={ season }
 						players={ players }
+						locked={ locked }
 					/>
 				) }
 				{ activeTab === 'categories' && (
 					<TournamentCategoriesTab
 						season={ season }
 						players={ players }
+						locked={ locked }
 					/>
 				) }
 				{ activeTab === 'settings' && (
-					<TournamentSettingsTab season={ season } />
+					<TournamentSettingsTab
+						season={ season }
+						locked={ locked }
+					/>
 				) }
 			</div>
 

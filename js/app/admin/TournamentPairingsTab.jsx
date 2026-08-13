@@ -19,7 +19,7 @@ import { keys } from '../api/keys';
 // results, and advance the round status. Automatic generation is cadence-aware:
 // a full-schedule system (round-robin) builds every round in one call, while the
 // per-round engines don't exist yet and keep a disabled placeholder.
-export function TournamentPairingsTab( { season, players } ) {
+export function TournamentPairingsTab( { season, players, locked = false } ) {
 	const queryClient = useQueryClient();
 	const [ selectedRoundId, setSelectedRoundId ] = useState( null );
 	const [ builder, setBuilder ] = useState( { white: null, black: null } );
@@ -29,6 +29,8 @@ export function TournamentPairingsTab( { season, players } ) {
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
 	const [ confirmReopen, setConfirmReopen ] = useState( false );
 	const [ confirmGenerate, setConfirmGenerate ] = useState( false );
+	// Ticked in the Complete-round modal to close the tournament along with it.
+	const [ closeSeason, setCloseSeason ] = useState( false );
 	// Held locally so the input doesn't snap back to the stored value between the
 	// change and the refetch that confirms it.
 	const [ dateDraft, setDateDraft ] = useState( null );
@@ -120,7 +122,8 @@ export function TournamentPairingsTab( { season, players } ) {
 	// Phases: draft/published build the board (pairings editable, no results);
 	// finalised locks the board and opens result entry; complete freezes the
 	// standings and shows results read-only.
-	const editable = round !== null && ROUND_EDITABLE.includes( round.status );
+	const editable =
+		! locked && round !== null && ROUND_EDITABLE.includes( round.status );
 	// Generating reads the standings, and those are written when a round is
 	// completed — so an earlier round still open means pairing from a ranking
 	// that predates it. The service refuses this too; naming the round here is
@@ -148,6 +151,7 @@ export function TournamentPairingsTab( { season, players } ) {
 	useEffect( () => {
 		setBuilder( { white: null, black: null } );
 		setDateDraft( null );
+		setCloseSeason( false );
 	}, [ currentRoundId ] );
 
 	const roundKey = keys.round( currentRoundId );
@@ -233,8 +237,11 @@ export function TournamentPairingsTab( { season, players } ) {
 	} );
 
 	const setStatus = useMutation( {
-		mutationFn: ( status ) =>
-			api.patch( `rounds/${ currentRoundId }/status`, { status } ),
+		mutationFn: ( { status, completeSeason = false } ) =>
+			api.patch( `rounds/${ currentRoundId }/status`, {
+				status,
+				complete_season: completeSeason,
+			} ),
 		onSuccess: () => {
 			setConfirmAdvance( false );
 			setConfirmReopen( false );
@@ -399,6 +406,10 @@ export function TournamentPairingsTab( { season, players } ) {
 	// No rounds yet. A full-schedule tournament generates its whole fixture from
 	// the roster; anything else starts with one round and is paired by hand.
 	if ( ordered.length === 0 ) {
+		// Unreachable when locked (closeSeason refuses a season with no rounds).
+		if ( locked ) {
+			return <Notice>This tournament has no rounds.</Notice>;
+		}
 		const isFullSchedule = season.cadence === 'full';
 		return (
 			<div className="space-y-4">
@@ -447,10 +458,14 @@ export function TournamentPairingsTab( { season, players } ) {
 	}
 
 	const roundsFull = roundLimit !== null && ordered.length >= roundLimit;
-	const genLabel = generateLabel( season.cadence );
+	const genLabel = locked ? null : generateLabel( season.cadence );
 	// A generated fixture is the whole round set, so it can't be extended by hand.
-	const canAddRound = season.cadence !== 'full';
+	const canAddRound = ! locked && season.cadence !== 'full';
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
+	// The admin's cue for closing the season; the backend checks the real condition.
+	const isLastRound =
+		round !== null &&
+		round.round_number === ordered[ ordered.length - 1 ]?.round_number;
 	// Match the backend's board numbering (max existing board + 1) so the
 	// builder shows the number the new pairing will actually get.
 	const nextBoardNumber =
@@ -552,7 +567,7 @@ export function TournamentPairingsTab( { season, players } ) {
 					) }
 					{ /* The status flow is forward-only, so without this a wrong
 					     result in a completed round could never be corrected. */ }
-					{ round?.status === 'complete' && (
+					{ round?.status === 'complete' && ! locked && (
 						<button
 							type="button"
 							onClick={ () => setConfirmReopen( true ) }
@@ -578,6 +593,7 @@ export function TournamentPairingsTab( { season, players } ) {
 						     the value '' — which clears the stored date. */ }
 						<input
 							type="date"
+							disabled={ locked }
 							value={ dateDraft ?? round.date ?? '' }
 							onChange={ ( e ) => setDateDraft( e.target.value ) }
 							onBlur={ ( e ) => {
@@ -593,7 +609,7 @@ export function TournamentPairingsTab( { season, players } ) {
 							className="rounded border border-rule bg-paper px-2 py-1 text-sm text-ink disabled:opacity-60"
 						/>
 					</label>
-					{ ( dateDraft ?? round.date ) && (
+					{ ( dateDraft ?? round.date ) && ! locked && (
 						<button
 							type="button"
 							onClick={ () => {
@@ -890,8 +906,16 @@ export function TournamentPairingsTab( { season, players } ) {
 					}
 					danger={ nextStatus === 'complete' }
 					busy={ setStatus.isPending }
-					onCancel={ () => setConfirmAdvance( false ) }
-					onConfirm={ () => setStatus.mutate( nextStatus ) }
+					onCancel={ () => {
+						setConfirmAdvance( false );
+						setCloseSeason( false );
+					} }
+					onConfirm={ () =>
+						setStatus.mutate( {
+							status: nextStatus,
+							completeSeason: closeSeason && isLastRound,
+						} )
+					}
 				>
 					{ nextStatus === 'published' &&
 						'Publishing makes this round’s pairings visible. You can still adjust them afterwards.' }
@@ -899,6 +923,24 @@ export function TournamentPairingsTab( { season, players } ) {
 						'Finalising locks the pairings so they can’t be changed. Results can still be entered.' }
 					{ nextStatus === 'complete' &&
 						'Completing the round freezes its standings snapshot.' }
+					{ /* Opt-in, not implied: completing the tournament can't be undone. */ }
+					{ nextStatus === 'complete' && isLastRound && (
+						<label className="mt-3 flex items-start gap-2">
+							<input
+								type="checkbox"
+								checked={ closeSeason }
+								onChange={ ( e ) =>
+									setCloseSeason( e.target.checked )
+								}
+								className="mt-0.5"
+							/>
+							<span className="text-sm text-ink-3">
+								Also complete the tournament. This is the last
+								round, and a completed tournament is read-only
+								for good.
+							</span>
+						</label>
+					) }
 					{ setStatus.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( setStatus.error ) }
@@ -941,7 +983,7 @@ export function TournamentPairingsTab( { season, players } ) {
 					}
 					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmReopen( false ) }
-					onConfirm={ () => setStatus.mutate( 'finalised' ) }
+					onConfirm={ () => setStatus.mutate( { status: 'finalised' } ) }
 				>
 					Reopening lets you correct a result. The published standings
 					stay as they are until you complete the round again — which

@@ -35,6 +35,11 @@ export const STATUS_LABELS = {
 	completed: 'Completed',
 };
 
+// Completed tournaments are read-only bar the standings columns; the server refuses the rest.
+export function isLocked( season ) {
+	return season.status === 'completed';
+}
+
 // RoundStatus enum (src/Entity/Enum/RoundStatus.php). Pairings are editable
 // while draft/published; finalised and complete lock the board.
 export const ROUND_STATUS_LABELS = {

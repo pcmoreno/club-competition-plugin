@@ -229,6 +229,15 @@ class SeasonController extends RestController
 
             $data = $input->toUpdateData();
 
+            // Closed by completing its last round, so RoundService::closeSeason's rule can't be stepped around.
+            if (($data['status'] ?? null) === SeasonStatus::Completed->value) {
+                throw new ConflictException('A tournament is completed by completing its final round.');
+            }
+
+            if ($season->status === SeasonStatus::Completed) {
+                $this->requireDisplaySettingsOnly($input, $data !== []);
+            }
+
             // The tempo is fixed once the tournament leaves preparation. Games
             // take it when they are paired, so changing it mid-tournament would
             // split one tournament across two tempos — and a full-schedule
@@ -238,6 +247,14 @@ class SeasonController extends RestController
                 && $season->status !== SeasonStatus::Preparation
             ) {
                 throw new ValidationException(['time_control' => 'The time control can only be changed while the tournament is in preparation.']);
+            }
+
+            // Same rule for the start date: once it has begun, that's a fact rather than a plan.
+            if (isset($data['start_date'])
+                && $data['start_date'] !== $season->start_date?->format('Y-m-d')
+                && $season->status !== SeasonStatus::Preparation
+            ) {
+                throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
             }
 
             $this->applySettings($input, $season, $data);
@@ -257,6 +274,26 @@ class SeasonController extends RestController
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
+    }
+
+    // Standings columns only; the flag predates applySettings, so false means settings-only.
+    private function requireDisplaySettingsOnly(UpdateSeasonRequest $input, bool $touchesSeasonRow): void
+    {
+        if ($touchesSeasonRow
+            || $input->contact_admin_ids !== null
+            || $input->pairing_settings !== null
+            || $input->scoring_settings !== null
+        ) {
+            throw new ConflictException('This tournament is completed. Only the standings columns can still be changed.');
+        }
+    }
+
+    // The roster and its categories are frozen with the rest of the record.
+    private function requireOpenSeason(Season $season): void
+    {
+        if ($season->status === SeasonStatus::Completed) {
+            throw new ConflictException('This tournament is completed and can no longer be changed.');
+        }
     }
 
     // Delete a tournament and all its scoped data. Restricted to Preparation for
@@ -415,6 +452,8 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            $this->requireOpenSeason($season);
+
             $input = EnrollPlayerRequest::fromRequest($request);
             $this->validate($input);
 
@@ -459,6 +498,8 @@ class SeasonController extends RestController
             if ($season === null) {
                 throw new NotFoundException('Season not found.');
             }
+
+            $this->requireOpenSeason($season);
 
             $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
                 $season->id,
@@ -527,6 +568,8 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            $this->requireOpenSeason($season);
+
             $input = BulkPlayerIdsRequest::fromRequest($request);
             $this->validate($input);
 
@@ -593,6 +636,8 @@ class SeasonController extends RestController
             if ($season === null) {
                 throw new NotFoundException('Season not found.');
             }
+
+            $this->requireOpenSeason($season);
 
             $input = AssignCategoriesRequest::fromRequest($request);
             $this->validate($input);

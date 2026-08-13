@@ -19,7 +19,7 @@ import { keys } from '../api/keys';
 // such error surfaces inline. Blank dates are left untouched — like the player
 // edit form, a missing param reads as "unchanged", so this pass can't clear a
 // date back to empty.
-export function TournamentBasicTab( { season } ) {
+export function TournamentBasicTab( { season, locked = false } ) {
 	const queryClient = useQueryClient();
 	const [ name, setName ] = useState( season.name ?? '' );
 	const [ pairing, setPairing ] = useState( season.pairing_system );
@@ -48,11 +48,8 @@ export function TournamentBasicTab( { season } ) {
 	}, [ contactData ] );
 	const contactIds = contacts ?? savedContacts;
 
-	// The pairing system and the tempo can only change while the tournament is in
-	// preparation: once it's active the games are already keyed to the system and
-	// already carry the tempo they were paired under. (Pairing *settings* stay
-	// editable — those are tuned per round.)
-	const pairingLocked = season.status !== 'preparation';
+	// Fixed once the tournament leaves preparation; pairing *settings* stay editable.
+	const fixedOnStart = season.status !== 'preparation';
 
 	const save = useMutation( {
 		mutationFn: ( payload ) =>
@@ -110,6 +107,8 @@ export function TournamentBasicTab( { season } ) {
 
 	return (
 		<form className="space-y-4" onSubmit={ submit }>
+			{ /* One fieldset rather than a disabled per control, so a field added later can't be missed. */ }
+			<fieldset disabled={ locked } className="space-y-4">
 			<label className="block">
 				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 					Name
@@ -130,10 +129,10 @@ export function TournamentBasicTab( { season } ) {
 				<select
 					value={ pairing }
 					onChange={ ( e ) => setPairing( e.target.value ) }
-					disabled={ pairingLocked }
+					disabled={ fixedOnStart }
 					className={
 						fieldInput +
-						( pairingLocked
+						( fixedOnStart
 							? ' cursor-not-allowed opacity-60'
 							: '' )
 					}
@@ -156,7 +155,7 @@ export function TournamentBasicTab( { season } ) {
 						</option>
 					) ) }
 				</select>
-				{ pairingLocked && (
+				{ fixedOnStart && (
 					<span className="mt-1 block text-xs text-muted">
 						The pairing system is locked once the tournament has
 						started.
@@ -173,8 +172,20 @@ export function TournamentBasicTab( { season } ) {
 						type="date"
 						value={ startDate }
 						onChange={ ( e ) => setStartDate( e.target.value ) }
-						className={ fieldInput }
+						disabled={ fixedOnStart }
+						className={
+							fieldInput +
+							( fixedOnStart
+								? ' cursor-not-allowed opacity-60'
+								: '' )
+						}
 					/>
+					{ fixedOnStart && (
+						<span className="mt-1 block text-xs text-muted">
+							The start date is locked once the tournament has
+							started.
+						</span>
+					) }
 				</label>
 				<label className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
@@ -196,10 +207,10 @@ export function TournamentBasicTab( { season } ) {
 				<select
 					value={ timeControl }
 					onChange={ ( e ) => setTimeControl( e.target.value ) }
-					disabled={ pairingLocked }
+					disabled={ fixedOnStart }
 					className={
 						fieldInput +
-						( pairingLocked ? ' cursor-not-allowed opacity-60' : '' )
+						( fixedOnStart ? ' cursor-not-allowed opacity-60' : '' )
 					}
 				>
 					{ TIME_CONTROL_OPTIONS.map( ( o ) => (
@@ -209,7 +220,7 @@ export function TournamentBasicTab( { season } ) {
 					) ) }
 				</select>
 				<span className="mt-1 block text-xs text-muted">
-					{ pairingLocked
+					{ fixedOnStart
 						? 'The time control is locked once the tournament has started — its games already carry it.'
 						: 'Games take the tournament’s time control when they are paired.' }
 				</span>
@@ -229,6 +240,7 @@ export function TournamentBasicTab( { season } ) {
 			</label>
 
 			<ContactsField value={ contactIds } onChange={ setContacts } />
+			</fieldset>
 
 			{ save.isError && (
 				<p className="text-sm text-loss">
@@ -236,18 +248,20 @@ export function TournamentBasicTab( { season } ) {
 				</p>
 			) }
 
-			<div className="flex items-center gap-3 pt-2">
-				<button
-					type="submit"
-					className={ primaryBtn }
-					disabled={ ! canSave }
-				>
-					{ save.isPending ? 'Saving…' : 'Save changes' }
-				</button>
-				{ save.isSuccess && ! dirty && (
-					<span className="text-sm text-muted">Saved.</span>
-				) }
-			</div>
+			{ ! locked && (
+				<div className="flex items-center gap-3 pt-2">
+					<button
+						type="submit"
+						className={ primaryBtn }
+						disabled={ ! canSave }
+					>
+						{ save.isPending ? 'Saving…' : 'Save changes' }
+					</button>
+					{ save.isSuccess && ! dirty && (
+						<span className="text-sm text-muted">Saved.</span>
+					) }
+				</div>
+			) }
 		</form>
 	);
 }

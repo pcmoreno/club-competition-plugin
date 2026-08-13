@@ -10,7 +10,7 @@ import { keys } from '../api/keys';
 // dragging between panels or by multi-selecting and using the centre button
 // (Add ← / Remove →). Enrolment ignores categories (they're assigned elsewhere);
 // ratings auto-fill from the player's KNSB Elo.
-export function TournamentPlayersTab( { season, players } ) {
+export function TournamentPlayersTab( { season, players, locked = false } ) {
 	const queryClient = useQueryClient();
 
 	const [ selEnrolled, setSelEnrolled ] = useState( () => new Set() );
@@ -92,10 +92,10 @@ export function TournamentPlayersTab( { season, players } ) {
 	// Removing a player who has played orphans their games/attendance/snapshots,
 	// so removal is only allowed while the tournament is still in preparation
 	// (the server enforces the same rule).
-	const canRemove = season.status === 'preparation';
+	const canRemove = ! locked && season.status === 'preparation';
 
 	const doEnroll = ( ids ) => {
-		if ( ids.length > 0 ) {
+		if ( ! locked && ids.length > 0 ) {
 			enroll.mutate( { ids } );
 		}
 	};
@@ -163,7 +163,15 @@ export function TournamentPlayersTab( { season, players } ) {
 
 	return (
 		<div className="space-y-3">
-			<div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-3">
+			{ /* Nothing left to enrol, so this collapses to the roster it ended with. */ }
+			<div
+				className={
+					'items-stretch gap-3 ' +
+					( locked
+						? 'max-w-md'
+						: 'grid grid-cols-[1fr_auto_1fr]' )
+				}
+			>
 				<Panel
 					title={ `Enrolled (${ players.length })` }
 					side="enrolled"
@@ -183,6 +191,7 @@ export function TournamentPlayersTab( { season, players } ) {
 					onDragOver={ () => setDropTarget( 'enrolled' ) }
 					onDragLeave={ () => setDropTarget( null ) }
 					onDrop={ () => onDropTo( 'enrolled' ) }
+					locked={ locked }
 					empty="No players enrolled yet."
 					action={
 						players.length > 0 &&
@@ -199,6 +208,7 @@ export function TournamentPlayersTab( { season, players } ) {
 					}
 				/>
 
+				{ ! locked && (
 				<div className="flex justify-center">
 					<button
 						type="button"
@@ -222,7 +232,9 @@ export function TournamentPlayersTab( { season, players } ) {
 						{ removeMode ? 'Remove →' : '← Add' }
 					</button>
 				</div>
+				) }
 
+				{ ! locked && (
 				<Panel
 					title={ `Active players (${ available.length })` }
 					side="available"
@@ -253,6 +265,7 @@ export function TournamentPlayersTab( { season, players } ) {
 						)
 					}
 				/>
+				) }
 			</div>
 
 			{ err && (
@@ -299,6 +312,7 @@ function Panel( {
 	onDragOver,
 	onDragLeave,
 	onDrop,
+	locked = false,
 	empty,
 	action,
 } ) {
@@ -316,12 +330,16 @@ function Panel( {
 				{ action }
 			</div>
 			<ul
-				onDragOver={ ( e ) => {
-					e.preventDefault();
-					onDragOver();
-				} }
-				onDragLeave={ onDragLeave }
-				onDrop={ onDrop }
+				onDragOver={
+					locked
+						? undefined
+						: ( e ) => {
+								e.preventDefault();
+								onDragOver();
+						  }
+				}
+				onDragLeave={ locked ? undefined : onDragLeave }
+				onDrop={ locked ? undefined : onDrop }
 				className={
 					'min-h-64 flex-1 space-y-1 rounded border bg-surface p-1.5 ' +
 					( isOver
@@ -341,14 +359,25 @@ function Panel( {
 						return (
 							<li
 								key={ id }
-								draggable
-								onDragStart={ () => onDragStart( side, id ) }
-								onClick={ () => onToggle( side, id ) }
+								draggable={ ! locked }
+								onDragStart={
+									locked
+										? undefined
+										: () => onDragStart( side, id )
+								}
+								onClick={
+									locked
+										? undefined
+										: () => onToggle( side, id )
+								}
 								className={
-									'flex cursor-pointer items-center justify-between rounded px-2 py-1.5 text-sm ' +
-									( isSel
-										? 'bg-accent-soft text-ink'
-										: 'text-ink-3 hover:bg-paper' )
+									'flex items-center justify-between rounded px-2 py-1.5 text-sm ' +
+									( locked
+										? 'text-ink-3'
+										: 'cursor-pointer ' +
+										  ( isSel
+												? 'bg-accent-soft text-ink'
+												: 'text-ink-3 hover:bg-paper' ) )
 								}
 							>
 								<span className="truncate">{ rowLabel( p ) }</span>
