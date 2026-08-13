@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Plugin Name: Club Competition Manager
  * Plugin URI: https://github.com/pcmoreno/club-competition-plugin
  * Description: Manage chess competition pairings, standings, and results for Schaakclub Santpoort
- * Version: 0.5.0
+ * Version: 0.5.1
  * Author: Paulo Moreno
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
