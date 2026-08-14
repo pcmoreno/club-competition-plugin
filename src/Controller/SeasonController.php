@@ -272,6 +272,12 @@ class SeasonController extends RestController
                 throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
             }
 
+            // Renaming or removing a team after the start would orphan the
+            // players holding that name.
+            if (isset($data['categories'])) {
+                $this->requireTeamsEditable($season);
+            }
+
             $systemChanged = $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is
@@ -307,6 +313,16 @@ class SeasonController extends RestController
             || $input->scoring_settings !== null
         ) {
             throw new ConflictException('This tournament is completed. Only the standings columns can still be changed.');
+        }
+    }
+
+    // A team competition's line-ups are settled once it starts: the boards are
+    // published and being played, so a change would rewrite games already on the
+    // table. Individual categories stay editable, as they always were.
+    private function requireTeamsEditable(Season $season): void
+    {
+        if ($season->is_team && $season->status !== SeasonStatus::Preparation) {
+            throw new ConflictException('Teams and board order are fixed once the tournament has started.');
         }
     }
 
@@ -531,6 +547,8 @@ class SeasonController extends RestController
 
             $this->requireOpenSeason($season);
 
+            $this->requireTeamsEditable($season);
+
             $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
                 $season->id,
                 (int)$request->get_param('player_id')
@@ -678,6 +696,7 @@ class SeasonController extends RestController
             }
 
             $this->requireOpenSeason($season);
+            $this->requireTeamsEditable($season);
 
             $input = AssignCategoriesRequest::fromRequest($request);
             $this->validate($input);
@@ -745,6 +764,8 @@ class SeasonController extends RestController
             if (!$season->is_team) {
                 throw new ConflictException('This tournament is played individually, so it has no boards to order.');
             }
+
+            $this->requireTeamsEditable($season);
 
             $input = SetTeamBoardsRequest::fromRequest($request);
             $this->validate($input);

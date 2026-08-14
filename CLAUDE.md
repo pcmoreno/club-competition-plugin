@@ -230,6 +230,12 @@ It sits on the enrolment beside the team rather than in a map of its own, which
 would hold membership a second time and be free to disagree with
 `season_players.category`.
 
+**Teams are fixed once the tournament starts** — `requireTeamsEditable` refuses
+the team list, the assignments and the board order from `active` onwards, not
+just from `completed`, because by then boards are published and being played.
+Individual categories keep their old behaviour and stay editable while the
+tournament runs; only `is_team` seasons freeze early.
+
 `PATCH /seasons/{id}/boards` takes a team and its players **in playing order**,
 never the numbers themselves: 1..n is assigned server-side, so no request can
 leave a gap or put two players on one board. Auto Fill renumbers every team by

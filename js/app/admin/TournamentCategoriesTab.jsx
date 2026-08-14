@@ -343,7 +343,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				{ locked
+				{ locked && isTeam && season.status !== 'completed'
+					? 'Teams and board order are fixed now that the tournament has started.'
+					: locked
 					? `The ${ plural } this tournament was played in, and who was in each.`
 					: isTeam
 					? 'Teams split the tournament into sides. Every player should end up in one.'

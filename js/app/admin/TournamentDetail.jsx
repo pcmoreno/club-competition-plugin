@@ -173,7 +173,11 @@ export function TournamentDetail( { seasonId } ) {
 					<TournamentCategoriesTab
 						season={ season }
 						players={ players }
-						locked={ locked }
+						locked={
+							locked ||
+							( season.is_team &&
+								season.status !== 'preparation' )
+						}
 					/>
 				) }
 				{ activeTab === 'settings' && (
