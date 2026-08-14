@@ -7,6 +7,7 @@ import { STATUS_LABELS, errorMessage, isLocked } from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
+import { TournamentAbsencesTab } from './TournamentAbsencesTab';
 import { TournamentCategoriesTab } from './TournamentCategoriesTab';
 import { TournamentSettingsTab } from './TournamentSettingsTab';
 import { keys } from '../api/keys';
@@ -19,13 +20,20 @@ import { keys } from '../api/keys';
 
 // The Pairings tab only applies once the tournament has started (you enrol and
 // set categories in preparation, then Start). It's the default tab while active.
-function tabsFor( status ) {
+//
+// Absences is offered wherever rounds are created one at a time — a full
+// schedule pairs every round up front, so a standing absence has nothing to
+// apply to.
+function tabsFor( season ) {
 	return [
 		{ key: 'basic', label: 'Basic details' },
-		...( status !== 'preparation'
+		...( season.status !== 'preparation'
 			? [ { key: 'pairings', label: 'Pairings' } ]
 			: [] ),
 		{ key: 'players', label: 'Players' },
+		...( season.cadence !== 'full'
+			? [ { key: 'absences', label: 'Absences' } ]
+			: [] ),
 		{ key: 'categories', label: 'Categories' },
 		{ key: 'settings', label: 'Settings' },
 	];
@@ -67,7 +75,7 @@ export function TournamentDetail( { seasonId } ) {
 	}
 
 	const { season, players = [] } = data;
-	const tabs = tabsFor( season.status );
+	const tabs = tabsFor( season );
 	const activeTab = tab ?? ( season.status === 'active' ? 'pairings' : 'basic' );
 	const locked = isLocked( season );
 
@@ -149,6 +157,12 @@ export function TournamentDetail( { seasonId } ) {
 					<TournamentPlayersTab
 						season={ season }
 						players={ players }
+						locked={ locked }
+					/>
+				) }
+				{ activeTab === 'absences' && (
+					<TournamentAbsencesTab
+						season={ season }
 						locked={ locked }
 					/>
 				) }

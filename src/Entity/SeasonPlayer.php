@@ -13,6 +13,7 @@ class SeasonPlayer
         public readonly ?string $category,
         public readonly int $elo_rating,
         public readonly \DateTimeImmutable $enrolled_at,
+        public readonly bool $default_absent = false,
     ) {
     }
 }

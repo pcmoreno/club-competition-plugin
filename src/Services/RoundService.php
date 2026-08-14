@@ -60,11 +60,22 @@ final class RoundService
             throw new ConflictException('This tournament’s rounds come from its generated schedule.');
         }
 
-        return $this->rounds->createNextForSeason(
-            season_id: $season->id,
-            date:      $date,
-            maxRounds: $this->settings->roundLimit($season),
-        );
+        return $this->transactions->transactional(function () use ($season, $date): Round {
+            $round = $this->rounds->createNextForSeason(
+                season_id: $season->id,
+                date:      $date,
+                maxRounds: $this->settings->roundLimit($season),
+            );
+
+            // The only trigger: flagging an enrolment later doesn't backfill rounds that already exist.
+            foreach ($this->seasonPlayers->findBySeason($season->id) as $enrolment) {
+                if ($enrolment->default_absent) {
+                    $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal);
+                }
+            }
+
+            return $round;
+        });
     }
 
     /**

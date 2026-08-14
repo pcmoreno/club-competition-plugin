@@ -19,6 +19,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member invitations and auth (no WP account) | Built |
 | Admin invitations | Built — first admin only, see below |
 | Member self-report absence | Built — see below |
+| Standing absence per enrolment | Built — admin Absences tab, see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
@@ -471,7 +472,8 @@ offered to accounts with a linked player.
 
 **"I can't play this round"** (`POST`/`DELETE /me/rounds/{id}/absence`,
 `RoundAbsenceService`) has two modes, decided by **whether the member is already
-paired** — not by round status:
+paired** — not by round status. An enrolment marked default absent is outside
+this flow entirely (see Standing Absence below):
 
 - not on a board — the absence is recorded outright (`Absent` +
   `ByeType::Personal`) and can be withdrawn. Under standard scoring that is
@@ -526,6 +528,44 @@ which is deliberately not guarded on round status: it records the evening a
 round was played, not competition data, so correcting it afterwards is a
 legitimate admin fix.
 
+### Standing Absence
+
+An enrolment can be marked **default absent** (`season_players.default_absent`),
+for the member who plays five evenings a season rather than thirty-four.
+`RoundService::createRound` then writes an `Absent` + `ByeType::Personal` row for
+them as each round is created, so the round opens with them already in the
+Personal bye box and `presentPlayers()` leaves them out of a generated board.
+
+**Round creation is the only trigger.** Flagging an enrolment does not backfill
+rounds that already exist, and un-flagging does not clear the rows it wrote — the
+admin drags the player out of the bye box, which writes `Present` and makes them
+pairable again. That keeps the write out of every enrolment path and away from
+completed rounds, at the cost of a stale row after a mid-season change.
+
+It is **scored**, like any personal bye: `Par(personal) × OwnV` under Keizer, a
+third of the player's own value at the club's setting. Intended — see the
+absence-scoring note above.
+
+Offered wherever `cadence() !== 'full'`. A full schedule pairs every round up
+front and `generateSchedule` bypasses `createRound` entirely, so the trigger
+would never fire; `SeasonController::setDefaultAbsence` refuses those seasons and
+the tab isn't rendered for them. Manual and Swiss qualify despite having no
+pairing engine — the row is written at round creation, not at pairing.
+
+A flagged enrolment is **out of the member self-report flow** altogether:
+`declinableRounds` skips it, and `declare` / `withdraw` refuse via `resolve()`.
+Without the second guard `withdraw` would let a member clear their own standing
+absence a round at a time — `isOwnDeclaration` matches exactly the row the flag
+writes.
+
+The admin **Absences tab** (`TournamentAbsencesTab`, `GET`/`PATCH
+/seasons/{id}/absences`) sets it as a transfer list over the roster, and lists
+the absences recorded for the round about to be played — the highest-numbered
+round that isn't complete, rather than the lowest, so an unfinished previous
+round doesn't hide the one being paired. Standing absences never appear in that
+list; neither do declarations made after the pairings go out, which write nothing
+and only mail the tournament's contacts.
+
 ### Tournament Contacts
 
 The admins a tournament's notifications go to (`…scs_season_contacts`,
@@ -555,7 +595,8 @@ site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
 hardcode `wp_scs_`.
 
 - `…scs_seasons` — competition seasons (name, dates, pairing system, `time_control`)
-- `…scs_season_players` — player enrollment (season + category + player)
+- `…scs_season_players` — player enrollment (season + category + player, plus
+  `default_absent`)
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type

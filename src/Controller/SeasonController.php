@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Engine\SettingsResolver;
+use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
+use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
@@ -679,5 +682,118 @@ class SeasonController extends RestController
 
             return $this->ok(array_map($this->serializer->serialize(...), $players));
         });
+    }
+
+    // The Absences tab: the roster split by standing absence, plus the absences
+    // already recorded for the round about to be played.
+    public function absences(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $display = $this->playerDisplay->mapForSeason($season->id);
+
+            $enrolments = [];
+            $flagged    = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolments[] = ($display[$sp->id] ?? []) + [ 'default_absent' => $sp->default_absent ];
+                if ($sp->default_absent) {
+                    $flagged[$sp->id] = true;
+                }
+            }
+
+            $round = $this->latestOpenRound($season->id);
+
+            // Standing absences are the upper boxes' subject, so listing them here would drown the news.
+            $declared = [];
+            if ($round !== null) {
+                foreach ($this->attendanceRepository->findByRound($round->id) as $row) {
+                    if ($row->status !== AttendanceStatus::Absent || isset($flagged[$row->season_player_id])) {
+                        continue;
+                    }
+
+                    $declared[] = [
+                        'season_player_id' => $row->season_player_id,
+                        'name'             => $display[$row->season_player_id]['name'] ?? null,
+                        'bye_type'         => $row->bye_type?->value,
+                    ];
+                }
+            }
+
+            usort($declared, static fn (array $a, array $b): int => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
+
+            return $this->ok([
+                'enrolments' => $enrolments,
+                'round'      => $round === null ? null : [
+                    'id'     => $round->id,
+                    'number' => $round->round_number,
+                    'date'   => $round->date?->format('Y-m-d'),
+                    'status' => $round->status->value,
+                ],
+                'declared'   => $declared,
+            ]);
+        });
+    }
+
+    // Move enrolments between default-present and default-absent (the Absences tab transfer list).
+    public function setDefaultAbsence(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $this->requireOpenSeason($season);
+
+            // A full schedule pairs every round up front, so it never runs the round-creation trigger.
+            if ($season->pairing_system->cadence() === 'full') {
+                throw new ConflictException('This tournament lays out its whole schedule at once, so a standing absence has nothing to apply to.');
+            }
+
+            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = $sp;
+            }
+
+            $ids = [];
+            foreach (array_unique($input->player_ids ?? []) as $playerId) {
+                if (isset($enrolled[$playerId])) {
+                    $ids[] = $enrolled[$playerId]->id;
+                }
+            }
+
+            $this->seasonPlayerRepository->updateDefaultAbsent(
+                $season->id,
+                $ids,
+                filter_var($request->get_param('default_absent'), FILTER_VALIDATE_BOOLEAN)
+            );
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
+    }
+
+    // The round about to be played: the highest-numbered one that isn't complete.
+    private function latestOpenRound(int $seasonId): ?Round
+    {
+        $latest = null;
+        foreach ($this->roundRepository->findBySeason($seasonId) as $round) {
+            if ($round->status === RoundStatus::Complete) {
+                continue;
+            }
+            if ($latest === null || $round->round_number > $latest->round_number) {
+                $latest = $round;
+            }
+        }
+
+        return $latest;
     }
 }

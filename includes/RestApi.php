@@ -410,6 +410,21 @@ class RestApi
                 ],
             ]);
 
+            // The Absences tab: GET reads the roster split plus the round's
+            // recorded absences, PATCH moves enrolments between the two boxes.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/absences', [
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [$seasons, 'absences'],
+                    'permission_callback' => $isAdminRead,
+                ],
+                [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$seasons, 'setDefaultAbsence'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)', [
                 [
                     'methods'             => 'GET',

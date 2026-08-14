@@ -25,6 +25,7 @@ export const keys = {
 	season: ( seasonId ) => [ 'season', id( seasonId ) ],
 	seasonSettings: ( seasonId ) => [ 'season-settings', id( seasonId ) ],
 	seasonContacts: ( seasonId ) => [ 'season-contacts', id( seasonId ) ],
+	seasonAbsences: ( seasonId ) => [ 'season-absences', id( seasonId ) ],
 
 	// Rounds
 	rounds: ( seasonId ) => [ 'rounds', id( seasonId ) ],

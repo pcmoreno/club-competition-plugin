@@ -161,6 +161,25 @@ class SeasonPlayerRepository
         });
     }
 
+    // Scoped to the season so a stray enrolment id can't flag another season's row.
+    /** @param list<int> $ids */
+    public function updateDefaultAbsent(int $season_id, array $ids, bool $default_absent): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        $this->connection->createQueryBuilder()
+            ->update(SCS_TABLE_PREFIX . 'season_players')
+            ->set('default_absent', ':default_absent')
+            ->where('season_id = :season_id')
+            ->andWhere('id IN (:ids)')
+            ->setParameter('default_absent', $default_absent ? 1 : 0)
+            ->setParameter('season_id', $season_id)
+            ->setParameter('ids', $ids, ArrayParameterType::INTEGER)
+            ->executeStatement();
+    }
+
     public function delete(int $id): void
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'id' => $id ]);
@@ -195,6 +214,7 @@ class SeasonPlayerRepository
             category:    $row['category'] !== null ? (string)$row['category'] : null,
             elo_rating:  (int)$row['elo_rating'],
             enrolled_at: new \DateTimeImmutable($row['enrolled_at']),
+            default_absent: (bool)($row['default_absent'] ?? false),
         );
     }
 }

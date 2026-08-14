@@ -126,7 +126,7 @@ class RoundAbsenceService
         $entries = [];
         foreach ($this->seasonPlayers->findByPlayer($playerId) as $enrolment) {
             $season = $seasonsById[$enrolment->season_id] ?? null;
-            if ($season === null || !$this->seasonAccepts($season)) {
+            if ($season === null || !$this->seasonAccepts($season) || $enrolment->default_absent) {
                 continue;
             }
 
@@ -268,6 +268,11 @@ class RoundAbsenceService
         $enrolment = $this->seasonPlayers->findBySeasonAndPlayer($season->id, $playerId);
         if ($enrolment === null) {
             throw new NotFoundException('You\'re not enrolled in this tournament.');
+        }
+
+        // Backstop: declinableRounds already withholds these rounds, so the frontend offers nothing to call.
+        if ($enrolment->default_absent) {
+            throw new ConflictException('You\'re already absent from every round of this tournament.');
         }
 
         return [$round, $season, $enrolment];
