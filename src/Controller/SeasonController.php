@@ -28,6 +28,7 @@ use SCS\Request\AssignCategoriesRequest;
 use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
+use SCS\Request\SetDefaultAbsenceRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
@@ -260,7 +261,7 @@ class SeasonController extends RestController
                 throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
             }
 
-            $this->applySettings($input, $season, $data);
+            $systemChanged = $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is
             // a normal edit, not an empty request.
@@ -273,6 +274,13 @@ class SeasonController extends RestController
             }
             if (!empty($data)) {
                 $this->seasonRepository->update($season->id, $data);
+            }
+
+            // Standing absences are system-specific in the same way pairing settings
+            // are: a full-schedule system can't act on them and won't let them be
+            // cleared, so a switch would strand them on the enrolment.
+            if ($systemChanged) {
+                $this->seasonPlayerRepository->clearDefaultAbsent($season->id);
             }
 
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
@@ -404,9 +412,11 @@ class SeasonController extends RestController
      * system scores differently; scoring settings lock after the first completed
      * round; display settings are always editable.
      *
+     * Returns whether the pairing system changed.
+     *
      * @param array<string,mixed> $data
      */
-    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): void
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): bool
     {
         $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
         $systemChanged = $newSystem !== $season->pairing_system;
@@ -445,6 +455,8 @@ class SeasonController extends RestController
         if ($input->display_settings !== null) {
             $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
         }
+
+        return $systemChanged;
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response
@@ -754,7 +766,7 @@ class SeasonController extends RestController
                 throw new ConflictException('This tournament lays out its whole schedule at once, so a standing absence has nothing to apply to.');
             }
 
-            $input = BulkPlayerIdsRequest::fromRequest($request);
+            $input = SetDefaultAbsenceRequest::fromRequest($request);
             $this->validate($input);
 
             $enrolled = [];
@@ -769,11 +781,7 @@ class SeasonController extends RestController
                 }
             }
 
-            $this->seasonPlayerRepository->updateDefaultAbsent(
-                $season->id,
-                $ids,
-                filter_var($request->get_param('default_absent'), FILTER_VALIDATE_BOOLEAN)
-            );
+            $this->seasonPlayerRepository->updateDefaultAbsent($season->id, $ids, (bool)$input->default_absent);
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 

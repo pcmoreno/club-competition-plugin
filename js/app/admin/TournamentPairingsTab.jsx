@@ -462,10 +462,18 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// A generated fixture is the whole round set, so it can't be extended by hand.
 	const canAddRound = ! locked && season.cadence !== 'full';
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
-	// The admin's cue for closing the season; the backend checks the real condition.
+	// The admin's cue for closing the season, and the only guard on it — the
+	// backend accepts any round once every round that exists is complete, which
+	// round 1 of a tournament that creates them one at a time satisfies. A
+	// configured round count is the real last round; without one (unlimited
+	// Keizer, or a generated fixture) the highest round that exists is the best
+	// available answer.
 	const isLastRound =
 		round !== null &&
-		round.round_number === ordered[ ordered.length - 1 ]?.round_number;
+		( roundLimit !== null
+			? round.round_number === roundLimit
+			: round.round_number ===
+			  ordered[ ordered.length - 1 ]?.round_number );
 	// Match the backend's board numbering (max existing board + 1) so the
 	// builder shows the number the new pairing will actually get.
 	const nextBoardNumber =

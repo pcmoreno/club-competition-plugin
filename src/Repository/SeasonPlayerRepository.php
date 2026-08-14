@@ -180,6 +180,15 @@ class SeasonPlayerRepository
             ->executeStatement();
     }
 
+    public function clearDefaultAbsent(int $season_id): void
+    {
+        $this->connection->update(
+            SCS_TABLE_PREFIX . 'season_players',
+            [ 'default_absent' => 0 ],
+            [ 'season_id' => $season_id ]
+        );
+    }
+
     public function delete(int $id): void
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'id' => $id ]);
