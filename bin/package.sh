@@ -24,8 +24,10 @@ OUT_DIR=dist
 
 # The plugin header is the one place the version lives; SCS_VERSION derives from
 # it at runtime and the app footer shows it, so the file name matches what a
-# person reads off the page.
-VERSION=$(sed -n 's/^ \* Version: *//p' "$NAME.php" | head -1 | tr -d '[:space:]')
+# person reads off the page. Read from the ref rather than the working tree, or
+# packaging an older ref names the zip after the version you happen to have
+# checked out.
+VERSION=$(git show "$REF:$NAME.php" | sed -n 's/^ \* Version: *//p' | head -1 | tr -d '[:space:]')
 if [ -z "$VERSION" ]; then
     echo "package: no Version header in $NAME.php" >&2
     exit 1
@@ -42,6 +44,15 @@ fi
 # The one deploy mistake this repo can actually make: editing the frontend and
 # shipping the previous bundle, which fails silently because build/ is committed
 # and therefore always present.
+#
+# Checked first because `find -newer` errors when its reference file is missing,
+# and that error is discarded below — so no bundle at all would pass the guard
+# that exists to catch a stale one.
+if [ ! -f build/viewer.js ]; then
+    echo "package: build/viewer.js is missing — run 'npm run build'." >&2
+    exit 1
+fi
+
 if [ -n "$(find js css -type f -newer build/viewer.js -print -quit 2>/dev/null)" ]; then
     echo "package: build/viewer.js is older than the frontend sources — run 'npm run build'." >&2
     exit 1
