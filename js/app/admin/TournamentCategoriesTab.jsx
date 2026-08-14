@@ -185,29 +185,48 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 			queryClient.invalidateQueries( { queryKey: seasonKey } ),
 	} );
 
-	// Even split by rating: strongest players fill the first group; when the
-	// count doesn't divide evenly the remainder lands in the lowest groups, so
-	// those end up one larger.
+	// The two modes want opposite things from the same ratings.
+	//
+	// Categories are strength tiers, so they take a straight split: the strongest
+	// players fill the first group, and an uneven count leaves the lowest groups
+	// one larger.
+	//
+	// Teams are meant to be evenly matched, so they take a snake draft — the pick
+	// order reverses every pass (A B C D, D C B A, A B C D…), which is what stops
+	// the first team from collecting every top board.
 	const runAutoFill = () => {
 		setConfirming( null );
 		const sorted = [ ...players ].sort(
 			( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 )
 		);
 		const k = list.length;
-		const base = Math.floor( sorted.length / k );
-		const rem = sorted.length % k;
 		const assignments = [];
-		let idx = 0;
-		for ( let i = 0; i < k; i++ ) {
-			const size = base + ( i >= k - rem ? 1 : 0 );
-			for ( let j = 0; j < size; j++ ) {
+
+		if ( isTeam ) {
+			sorted.forEach( ( p, i ) => {
+				const pass = Math.floor( i / k );
+				const seat = i % k;
 				assignments.push( {
-					playerId: sorted[ idx ].player_id,
-					category: list[ i ],
+					playerId: p.player_id,
+					category: list[ pass % 2 === 0 ? seat : k - 1 - seat ],
 				} );
-				idx++;
+			} );
+		} else {
+			const base = Math.floor( sorted.length / k );
+			const rem = sorted.length % k;
+			let idx = 0;
+			for ( let i = 0; i < k; i++ ) {
+				const size = base + ( i >= k - rem ? 1 : 0 );
+				for ( let j = 0; j < size; j++ ) {
+					assignments.push( {
+						playerId: sorted[ idx ].player_id,
+						category: list[ i ],
+					} );
+					idx++;
+				}
 			}
 		}
+
 		assignMany.mutate( assignments );
 	};
 
@@ -356,6 +375,8 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 								? `Add a ${ term } first`
 								: players.length === 0
 								? 'Enrol players first'
+								: isTeam
+								? 'Balance the teams by rating'
 								: `Distribute players evenly across ${ plural }`
 						}
 					>
@@ -484,10 +505,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					onCancel={ () => setConfirming( null ) }
 					onConfirm={ runAutoFill }
 				>
-					This assigns an even number of players to each { term } by
-					rating and overrides what you have set so far. When the count
-					doesn’t divide evenly, the lowest { plural } take the extra
-					players.
+					{ isTeam
+						? 'This shares the players out by rating so the teams are as evenly matched as possible, and overrides what you have set so far. Board order is reset to strongest first.'
+						: 'This assigns an even number of players to each category by rating and overrides what you have set so far. When the count doesn’t divide evenly, the lowest categories take the extra players.' }
 				</ConfirmModal>
 			) }
 		</div>
