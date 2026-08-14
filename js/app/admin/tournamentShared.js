@@ -9,20 +9,13 @@ import { ApiError } from '../api/client';
 //
 // Swiss is selectable but has no pairing engine, so its boards are built by
 // hand; Keizer and both round-robins generate their own.
-// `implemented: false` keeps the option visible but unselectable — Swiss has no
-// pairing engine, and the grouped round-robin sections an individual tournament
-// by category rather than playing group against group. Mirrors
-// PairingSystem::isImplemented(), which refuses them server-side.
+// `implemented: false` keeps the option visible but unselectable. Mirrors
+// PairingSystem::isImplemented(), which refuses it server-side.
 export const PAIRING_OPTIONS = [
 	{ value: 'keizer', label: 'Keizer' },
 	{ value: 'swiss', label: 'Swiss', implemented: false },
 	{ value: 'manual', label: 'Manual' },
 	{ value: 'round-robin-full', label: 'Round-robin' },
-	{
-		value: 'round-robin-groups',
-		label: 'Round-robin (groups)',
-		implemented: false,
-	},
 ];
 
 // The system a fresh tournament starts on.

@@ -24,7 +24,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Swiss pairing | **Not implemented** — no engine, so it is Manual under another name. Not selectable |
-| Round-robin (groups) | **Not implemented** as intended. What exists sections an individual tournament by category; it is meant to be a **team** competition — group A vs group B, board by board — which needs a team entity, a fixture spanning several boards, and team standings. None of those exist. Not selectable |
+| Team play (group vs group) | **Not implemented, and not a pairing system.** A team competition — group A vs group B, board by board — is orthogonal to how a round is paired, so it needs a team entity, a fixture spanning several boards and team standings, none of which exist. The old `round-robin-groups` system was removed rather than left standing in for it: it only sectioned an *individual* tournament by category |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -110,11 +110,11 @@ engine is still verified by hand in the UI.
 
 `ScoringStrategyResolver` builds a strategy for both scoring systems, so scoring
 gates nothing. **Selectability is now gated on pairing** instead
-(`PairingSystem::isImplemented()`): three of the five systems can be chosen for a
-new tournament — Keizer, Manual and Round-robin. Swiss and Round-robin (groups)
-are refused; see the goals table for why. Both dialogs render them disabled and
-labelled "(not implemented)", and `UpdateSeasonRequest` still *accepts* them so a
-season already on one stays editable.
+(`PairingSystem::isImplemented()`): three of the four systems can be chosen for a
+new tournament — Keizer, Manual and Round-robin. Swiss is refused: it has no
+pairing engine, so it would be Manual under another label. Both dialogs render it
+disabled and labelled "(not implemented)", and `UpdateSeasonRequest` still
+*accepts* every system so a season already on one stays editable.
 
 **Scoring** (`src/Engine/Scoring/KeizerScoring.php`):
 
@@ -213,9 +213,7 @@ One loose end: paired players are markedly closer in **rating order**
 (median gap 5, max 24) than in **Keizer-score order** (median 9, max 43). The
 pairing order may not be the score at all. Deliberately not acted on yet.
 
-Categories also drive grouped round-robin (`GroupingMode::Categories`, no longer
-selectable — see the goals table) and the
-standings filter.
+Categories also drive the standings filter.
 
 Absence recording is load-bearing under Keizer in a way it never was under
 standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
@@ -255,17 +253,13 @@ reads it by key, and `RoundRepository::createNextForSeason` refuses a round past
 it — inside the same `forUpdate()` lock as the number it's checked against, so
 two concurrent appends can't overshoot.
 
-Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`; the grouped
-variant adds `Grouping`. **There is deliberately no round count** — it is
+Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`. **There is
+deliberately no round count** — it is
 legs × (N-1) for an even field and legs × N for an odd one — and no bye value,
 because the odd player out takes the `pairing_bye` that scoring already prices.
 `Legs` caps at a flat 100 because a Setting can't see the roster: what is
 actually bounded is legs × field size (100 legs is fine for a two-player match
 and impossible for four players), so the real ceiling belongs to the generator.
-`Grouping` only implements "the season's categories"; the rating splits need a
-conditional group-count field the settings form can't render yet. All of it is
-moot while the grouped variant is unselectable — and finishing those splits would
-not make it the team competition it is meant to be either.
 
 `roundLimit()` returns null for round-robin, and deliberately: the schedule is
 the round set, so `RoundService::createRound` refuses a hand-made round outright
@@ -299,9 +293,8 @@ Three things follow from the fixture being derived from pairing numbers:
   exists (see the round-limit note above).
 
 Guards live in the engine because only it sees both the legs and the roster:
-fewer than two players, a category with one player (grouped variant), and a
-schedule longer than 255 rounds — legs × (N-1) for an even field and legs × N
-for an odd one, taken from the largest group — all throw a `ConflictException`
+fewer than two players, and a schedule longer than 255 rounds — legs × (N-1) for
+an even field and legs × N for an odd one — both throw a `ConflictException`
 naming the real numbers. They run before the transaction, so a rejected
 generation deletes nothing.
 

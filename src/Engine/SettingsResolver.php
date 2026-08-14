@@ -7,7 +7,6 @@ namespace SCS\Engine;
 use SCS\Engine\Settings\KeizerPairingSettings;
 use SCS\Engine\Settings\KeizerScoringSettings;
 use SCS\Engine\Settings\ManualPairingSettings;
-use SCS\Engine\Settings\RoundRobinGroupsPairingSettings;
 use SCS\Engine\Settings\RoundRobinPairingSettings;
 use SCS\Engine\Settings\Setting\NumberOfRounds;
 use SCS\Engine\Settings\StandardScoringSettings;
@@ -40,7 +39,6 @@ final class SettingsResolver
             PairingSystem::Manual           => ManualPairingSettings::fromArray($values),
             PairingSystem::Keizer           => KeizerPairingSettings::fromArray($values),
             PairingSystem::RoundRobinFull   => RoundRobinPairingSettings::fromArray($values),
-            PairingSystem::RoundRobinGroups => RoundRobinGroupsPairingSettings::fromArray($values),
             default                         => null,
         };
     }

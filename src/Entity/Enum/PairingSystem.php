@@ -6,11 +6,10 @@ namespace SCS\Entity\Enum;
 
 enum PairingSystem: string
 {
-    case Manual            = 'manual';
-    case Keizer            = 'keizer';
-    case Swiss             = 'swiss';
-    case RoundRobinFull   = 'round-robin-full';
-    case RoundRobinGroups = 'round-robin-groups';
+    case Manual         = 'manual';
+    case Keizer         = 'keizer';
+    case Swiss          = 'swiss';
+    case RoundRobinFull = 'round-robin-full';
 
     // Scoring is derived from the pairing system (code-only map; only Keizer scores its own way).
     public function scoringSystem(): ScoringSystem
@@ -26,20 +25,14 @@ enum PairingSystem: string
      * produce the tournament its name promises.
      *
      * Swiss has no pairing engine, so choosing it gives you Manual under another
-     * label. The grouped round-robin runs an independent round-robin inside each
-     * category — it is a sectioned individual tournament, not the team
-     * competition (group A versus group B, board by board) the name describes,
-     * and none of that exists: no team entity, no fixture spanning several
-     * boards, no team standings.
-     *
-     * Manual pairs nothing either, but that is what it is for — see
+     * label. Manual pairs nothing either, but that is what it is for — see
      * generatesPairings(), which answers a different question.
      */
     public function isImplemented(): bool
     {
         return match ($this) {
-            self::Swiss, self::RoundRobinGroups => false,
-            default                             => $this->scoringSystem()->isImplemented(),
+            self::Swiss => false,
+            default     => $this->scoringSystem()->isImplemented(),
         };
     }
 
@@ -58,9 +51,9 @@ enum PairingSystem: string
     public function cadence(): string
     {
         return match ($this) {
-            self::Manual                                 => 'manual',
-            self::RoundRobinFull, self::RoundRobinGroups => 'full',
-            default                                      => 'per-round',
+            self::Manual         => 'manual',
+            self::RoundRobinFull => 'full',
+            default              => 'per-round',
         };
     }
 
@@ -71,8 +64,8 @@ enum PairingSystem: string
     public function generatesPairings(): bool
     {
         return match ($this) {
-            self::Keizer, self::RoundRobinFull, self::RoundRobinGroups => true,
-            default                                                    => false,
+            self::Keizer, self::RoundRobinFull => true,
+            default                            => false,
         };
     }
 }
