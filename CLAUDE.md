@@ -24,7 +24,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Swiss pairing | **Not implemented** — no engine, so it is Manual under another name. Not selectable |
-| Team play (group vs group) | **Not implemented, and not a pairing system.** A team competition — group A vs group B, board by board — is orthogonal to how a round is paired, so it needs a team entity, a fixture spanning several boards and team standings, none of which exist. The old `round-robin-groups` system was removed rather than left standing in for it: it only sectioned an *individual* tournament by category |
+| Team play (group vs group) | **Partly built.** `seasons.is_team` marks a tournament as team play and the Categories tab becomes the Teams tab — so teams can be named and players assigned. Nothing yet pairs group against group, groups boards into a match result, or produces team standings. Not a pairing system: it is orthogonal to how a round is paired |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -214,6 +214,20 @@ One loose end: paired players are markedly closer in **rating order**
 pairing order may not be the score at all. Deliberately not acted on yet.
 
 Categories also drive the standings filter.
+
+**Teams reuse all of it.** `seasons.is_team` doesn't add storage: a team
+tournament's teams *are* its `categories`, and a player's team is their
+`season_players.category`. The flag decides what the groups are called, and the
+Categories tab renders as the Teams tab — one component, `TournamentCategoriesTab`.
+A tournament is one or the other, never both, which is why nothing was added
+alongside. Like the pairing system and the tempo, it is fixed once the tournament
+leaves preparation.
+
+The consequence to know: everything that reads `category` still reads it. Under
+Keizer that includes `categoryPairing`, which defaults to `adjacent` — so on a
+team season it constrains pairing to a player's own team or the next one along,
+which is backwards for a competition where teams are meant to play each other.
+Latent while no team pairing exists, and the workaround is `categoryPairing: free`.
 
 Absence recording is load-bearing under Keizer in a way it never was under
 standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
@@ -595,7 +609,8 @@ they follow the host's WordPress prefix. **Production is not `wp_`** — the liv
 site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
 hardcode `wp_scs_`.
 
-- `…scs_seasons` — competition seasons (name, dates, pairing system, `time_control`)
+- `…scs_seasons` — competition seasons (name, dates, pairing system,
+  `time_control`, `is_team`)
 - `…scs_season_players` — player enrollment (season + category + player, plus
   `default_absent`)
 - `…scs_rounds` — competition rounds
@@ -619,8 +634,13 @@ no "single active season" invariant: don't add a unique constraint, and note
 property (`categories` column), optional — a season may run as one undivided
 pool, so `season_players.category` is nullable.
 
-Migrations live in `includes/migrations/` and are tracked per file in the
-`scs_applied_migrations` WordPress option — not a version number. They run on
+Migrations live in `includes/migrations/` and are tracked in the
+`scs_applied_migrations` WordPress option by their **numeric prefix**, not their
+filename and not a global version number. So a number is spent the moment a
+database applies it, whatever the file behind it was called: withdrawing a
+migration and reusing its number means any database that ran the old one
+silently skips the new one. Either take the next number, or — if the withdrawn
+one never left a dev machine — drop it from that option and reuse the number. They run on
 `plugins_loaded`, because the deploy flow (git pull / upload-replace) never
 fires the activation hook. The `SCS_DB_VERSION` constant is currently unused.
 

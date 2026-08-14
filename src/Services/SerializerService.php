@@ -82,6 +82,7 @@ class SerializerService
             'generates_pairings' => $s->pairing_system->generatesPairings(),
             'status'             => $s->status->value,
             'categories'         => $s->categories,
+            'is_team'            => $s->is_team,
         ];
 
         if ($group === self::GROUP_ADMIN) {

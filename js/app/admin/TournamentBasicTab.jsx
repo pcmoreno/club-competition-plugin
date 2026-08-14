@@ -29,6 +29,7 @@ export function TournamentBasicTab( { season, locked = false } ) {
 	const [ timeControl, setTimeControl ] = useState(
 		season.time_control ?? DEFAULT_TIME_CONTROL
 	);
+	const [ isTeam, setIsTeam ] = useState( season.is_team === true );
 
 	// Contacts live in their own table, so they arrive from their own endpoint
 	// rather than on the season payload the parent already holds.
@@ -79,6 +80,7 @@ export function TournamentBasicTab( { season, locked = false } ) {
 		endDate !== ( season.end_date ?? '' ) ||
 		trimmedLocation !== ( season.location ?? '' ) ||
 		timeControl !== ( season.time_control ?? DEFAULT_TIME_CONTROL ) ||
+		isTeam !== ( season.is_team === true ) ||
 		contactsDirty;
 	const canSave = trimmedName !== '' && dirty && ! save.isPending;
 
@@ -91,6 +93,7 @@ export function TournamentBasicTab( { season, locked = false } ) {
 			name: trimmedName,
 			pairing_system: pairing,
 			time_control: timeControl,
+			is_team: isTeam,
 			location: trimmedLocation,
 			contact_admin_ids: contactIds,
 		};
@@ -223,6 +226,29 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					{ fixedOnStart
 						? 'The time control is locked once the tournament has started — its games already carry it.'
 						: 'Games take the tournament’s time control when they are paired.' }
+				</span>
+			</label>
+
+			<label className="block">
+				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+					Competition type
+				</span>
+				<select
+					value={ isTeam ? 'team' : 'individual' }
+					onChange={ ( e ) => setIsTeam( e.target.value === 'team' ) }
+					disabled={ fixedOnStart }
+					className={
+						fieldInput +
+						( fixedOnStart ? ' cursor-not-allowed opacity-60' : '' )
+					}
+				>
+					<option value="individual">Individual</option>
+					<option value="team">Team</option>
+				</select>
+				<span className="mt-1 block text-xs text-muted">
+					{ fixedOnStart
+						? 'The competition type is locked once the tournament has started.'
+						: 'A team tournament groups its players into teams instead of categories.' }
 				</span>
 			</label>
 

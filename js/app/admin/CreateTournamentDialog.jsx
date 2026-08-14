@@ -26,6 +26,7 @@ export function CreateTournamentDialog( { onClose } ) {
 	const [ endDate, setEndDate ] = useState( '' );
 	const [ pairing, setPairing ] = useState( DEFAULT_PAIRING_SYSTEM );
 	const [ timeControl, setTimeControl ] = useState( DEFAULT_TIME_CONTROL );
+	const [ isTeam, setIsTeam ] = useState( false );
 
 	// Contacts default to whoever is creating the tournament. Pre-selected here
 	// rather than added server-side after the fact, so the list on screen is the
@@ -62,6 +63,7 @@ export function CreateTournamentDialog( { onClose } ) {
 			name: trimmedName,
 			pairing_system: pairing,
 			time_control: timeControl,
+			is_team: isTeam,
 			contact_admin_ids: contactIds,
 		};
 		if ( location.trim() !== '' ) {

@@ -5,14 +5,20 @@ import { ConfirmModal } from '../components/ui';
 import { fieldInput, primaryBtn, errorMessage } from './tournamentShared';
 import { keys } from '../api/keys';
 
-// ADMIN. Categories tab. Add categories (persisted to the season's `categories`
-// column via PATCH /seasons/{id}) then assign enrolled players by dragging them
-// between a box per category and the "Unassigned" box (PATCH
-// /seasons/{id}/players/{pid}). The category boxes double as the category list —
-// each carries its own Remove (disabled while it still holds players). Rename
-// isn't offered: players store the category as a plain string, so it'd orphan
-// them.
+// ADMIN. Categories tab, and the Teams tab — one component, because a team
+// tournament groups its players out of the same `categories` column and the
+// same `season_players.category`. `season.is_team` only changes what the groups
+// are called; nothing about the storage or the interaction differs.
+//
+// Add groups (persisted via PATCH /seasons/{id}) then assign enrolled players by
+// dragging them between a box per group and the "Unassigned" box (PATCH
+// /seasons/{id}/players/{pid}). The boxes double as the group list — each
+// carries its own Remove (disabled while it still holds players). Rename isn't
+// offered: players store the group as a plain string, so it'd orphan them.
 export function TournamentCategoriesTab( { season, players, locked = false } ) {
+	const isTeam = season.is_team === true;
+	const term = isTeam ? 'team' : 'category';
+	const plural = isTeam ? 'teams' : 'categories';
 	const queryClient = useQueryClient();
 	const [ list, setList ] = useState( season.categories ?? [] );
 	const [ input, setInput ] = useState( '' );
@@ -200,7 +206,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
 				{ locked
-					? 'The categories this tournament was played in, and who was in each.'
+					? `The ${ plural } this tournament was played in, and who was in each.`
+					: isTeam
+					? 'Teams split the tournament into sides. Every player should end up in one.'
 					: 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.' }
 			</p>
 
@@ -210,7 +218,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 				<div className="flex items-end gap-3">
 					<label className="block flex-1">
 						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							Add category
+							Add { term }
 						</span>
 						<input
 							type="text"
@@ -222,7 +230,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 									add();
 								}
 							} }
-							placeholder="e.g. Group A"
+							placeholder={ isTeam ? 'e.g. Team A' : 'e.g. Group A' }
 							className={ fieldInput }
 						/>
 					</label>
@@ -245,10 +253,10 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 						}
 						title={
 							list.length === 0
-								? 'Add a category first'
+								? `Add a ${ term } first`
 								: players.length === 0
 								? 'Enrol players first'
-								: 'Distribute players evenly across categories'
+								: `Distribute players evenly across ${ plural }`
 						}
 					>
 						{ autoFill.isPending ? 'Filling…' : 'Auto Fill' }
@@ -272,12 +280,12 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					<div>
 						<h3 className="text-sm font-medium text-ink">
 							{ locked
-								? 'Players by category'
-								: 'Assign players to categories' }
+								? `Players by ${ term }`
+								: `Assign players to ${ plural }` }
 						</h3>
 						{ ! locked && (
 							<p className="text-xs text-muted">
-								Drag a player into a category, or back to
+								Drag a player into a { term }, or back to
 								Unassigned to clear it.
 							</p>
 						) }
@@ -286,7 +294,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					{ players.length === 0 && ! locked && (
 						<p className="text-sm text-muted">
 							No players enrolled yet — add them on the Players
-							tab. You can still add and remove categories here.
+							tab. You can still add and remove { plural } here.
 						</p>
 					) }
 
@@ -338,9 +346,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					onCancel={ () => setConfirming( false ) }
 					onConfirm={ runAutoFill }
 				>
-					This assigns an even number of players to each category by
+					This assigns an even number of players to each { term } by
 					rating and overrides what you have set so far. When the count
-					doesn’t divide evenly, the lowest categories take the extra
+					doesn’t divide evenly, the lowest { plural } take the extra
 					players.
 				</ConfirmModal>
 			) }
@@ -395,7 +403,7 @@ function AssignBox( {
 							title={
 								rows.length > 0
 									? 'Move its players out first'
-									: 'Remove category'
+									: 'Remove'
 							}
 						>
 							Remove

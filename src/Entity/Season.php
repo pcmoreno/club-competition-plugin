@@ -30,6 +30,8 @@ class Season
         public readonly ?array $display_settings = null,
         // The tempo this tournament is played at; its games inherit it.
         public readonly TimeControl $time_control = TimeControl::Classical,
+        // Team play: `categories` holds team names rather than category names.
+        public readonly bool $is_team = false,
     ) {
     }
 }

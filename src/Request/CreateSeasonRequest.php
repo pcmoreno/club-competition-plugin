@@ -33,6 +33,9 @@ class CreateSeasonRequest
     /** @var list<string> */
     public array $categories = [];
 
+    // Team play: `categories` then holds team names.
+    public bool $is_team = false;
+
     // The admins to notify about this tournament, honoured as given. Null means
     // the field was never sent, and the controller falls back to the creating
     // admin — a caller that omits contacts entirely still gets a sane one.
@@ -70,6 +73,9 @@ class CreateSeasonRequest
         }
         if ($request->get_param('time_control') !== null) {
             $dto->time_control = (string)$request->get_param('time_control');
+        }
+        if ($request->get_param('is_team') !== null) {
+            $dto->is_team = filter_var($request->get_param('is_team'), FILTER_VALIDATE_BOOLEAN);
         }
         if ($request->get_param('categories') !== null) {
             $dto->categories = array_values((array)$request->get_param('categories'));

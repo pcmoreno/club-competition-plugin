@@ -204,6 +204,7 @@ class SeasonController extends RestController
                 pairing_system: PairingSystem::from($input->pairing_system),
                 categories:     $input->categories,
                 time_control:   TimeControl::from($input->time_control),
+                is_team:        $input->is_team,
             );
 
             // The creating admin is the tournament's first contact — but only as
@@ -251,6 +252,15 @@ class SeasonController extends RestController
                 && $season->status !== SeasonStatus::Preparation
             ) {
                 throw new ValidationException(['time_control' => 'The time control can only be changed while the tournament is in preparation.']);
+            }
+
+            // Same rule again: what kind of competition this is stops being a
+            // choice once it has begun, and it decides what `categories` means.
+            if (isset($data['is_team'])
+                && (bool)$data['is_team'] !== $season->is_team
+                && $season->status !== SeasonStatus::Preparation
+            ) {
+                throw new ValidationException(['is_team' => 'Team play can only be changed while the tournament is in preparation.']);
             }
 
             // Same rule for the start date: once it has begun, that's a fact rather than a plan.

@@ -70,7 +70,7 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control): Season
+    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control, bool $is_team = false): Season
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'seasons', [
             'name'           => $name,
@@ -81,6 +81,7 @@ class SeasonRepository
             'pairing_system' => $pairing_system->value,
             'status'         => SeasonStatus::Preparation->value,
             'categories'     => json_encode($categories),
+            'is_team'        => $is_team ? 1 : 0,
         ]);
 
         return $this->findById((int)$this->connection->lastInsertId());
@@ -118,6 +119,7 @@ class SeasonRepository
             scoring_settings: $this->decodeSettings($row['scoring_settings'] ?? null),
             display_settings: $this->decodeSettings($row['display_settings'] ?? null),
             time_control:     TimeControl::from($row['time_control']),
+            is_team:          (bool)($row['is_team'] ?? false),
         );
     }
 
