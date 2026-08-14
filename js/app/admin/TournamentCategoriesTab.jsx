@@ -23,10 +23,12 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	const [ list, setList ] = useState( season.categories ?? [] );
 	const [ input, setInput ] = useState( '' );
 	const [ over, setOver ] = useState( null );
-	const [ confirming, setConfirming ] = useState( false );
+	const [ confirming, setConfirming ] = useState( null );
 	const drag = useRef( null );
 
 	const seasonKey = keys.season( season.id );
+
+	const assigned = players.filter( ( p ) => p.category ).length;
 
 	// Enrolled players split into a box per category plus the leftover pool,
 	// each ordered by rating (highest first).
@@ -99,9 +101,10 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		},
 	} );
 
-	// Bulk-apply many category assignments in one atomic request (Auto Fill),
-	// optimistic like the single assign so the whole board rearranges immediately.
-	const autoFill = useMutation( {
+	// Bulk-apply many assignments in one atomic request — Auto Fill and Clear are
+	// the same write with different lists. Optimistic like the single assign, so
+	// the whole board rearranges immediately.
+	const assignMany = useMutation( {
 		mutationFn: ( assignments ) =>
 			api.patch( `seasons/${ season.id }/players/bulk`, {
 				assignments: assignments.map( ( a ) => ( {
@@ -186,7 +189,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	// count doesn't divide evenly the remainder lands in the lowest groups, so
 	// those end up one larger.
 	const runAutoFill = () => {
-		setConfirming( false );
+		setConfirming( null );
 		const sorted = [ ...players ].sort(
 			( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 )
 		);
@@ -205,7 +208,19 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 				idx++;
 			}
 		}
-		autoFill.mutate( assignments );
+		assignMany.mutate( assignments );
+	};
+
+	// Empty every group, leaving the groups themselves in place — each box
+	// keeps its own Remove for that.
+	const runClear = () => {
+		setConfirming( null );
+		assignMany.mutate(
+			players.map( ( p ) => ( {
+				playerId: p.player_id,
+				category: null,
+			} ) )
+		);
 	};
 
 	const persist = ( next ) => {
@@ -330,11 +345,11 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					<button
 						type="button"
 						className="rounded border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-40"
-						onClick={ () => setConfirming( true ) }
+						onClick={ () => setConfirming( 'autofill' ) }
 						disabled={
 							list.length === 0 ||
 							players.length === 0 ||
-							autoFill.isPending
+							assignMany.isPending
 						}
 						title={
 							list.length === 0
@@ -344,7 +359,20 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 								: `Distribute players evenly across ${ plural }`
 						}
 					>
-						{ autoFill.isPending ? 'Filling…' : 'Auto Fill' }
+						{ assignMany.isPending ? 'Filling…' : 'Auto Fill' }
+					</button>
+					<button
+						type="button"
+						className="rounded border border-rule px-4 py-2 text-sm font-medium text-loss hover:bg-surface disabled:opacity-40"
+						onClick={ () => setConfirming( 'clear' ) }
+						disabled={ assigned === 0 || assignMany.isPending }
+						title={
+							assigned === 0
+								? 'Nobody is assigned'
+								: `Take every player back out of their ${ term }`
+						}
+					>
+						Clear
 					</button>
 				</div>
 				{ save.isError && (
@@ -426,19 +454,34 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 						/>
 					</div>
 
-					{ ( assign.isError || autoFill.isError ) && (
+					{ ( assign.isError || assignMany.isError || boards.isError ) && (
 						<p className="text-sm text-loss">
-							{ errorMessage( assign.error || autoFill.error ) }
+							{ errorMessage(
+								assign.error || assignMany.error || boards.error
+							) }
 						</p>
 					) }
 				</div>
 			) }
 
-			{ confirming && (
+			{ confirming === 'clear' && (
+				<ConfirmModal
+					title={ `Clear ${ plural }` }
+					confirmLabel="Clear"
+					danger
+					onCancel={ () => setConfirming( null ) }
+					onConfirm={ runClear }
+				>
+					This takes { assigned } { assigned === 1 ? 'player' : 'players' }{ ' ' }
+					back out of their { plural }. The { plural } themselves stay.
+				</ConfirmModal>
+			) }
+
+			{ confirming === 'autofill' && (
 				<ConfirmModal
 					title="Auto Fill"
 					confirmLabel="Auto Fill"
-					onCancel={ () => setConfirming( false ) }
+					onCancel={ () => setConfirming( null ) }
 					onConfirm={ runAutoFill }
 				>
 					This assigns an even number of players to each { term } by
