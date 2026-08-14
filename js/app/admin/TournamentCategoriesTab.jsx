@@ -32,6 +32,10 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	// each ordered by rating (highest first).
 	const grouped = useMemo( () => {
 		const byRating = ( a, b ) => ( b.elo || 0 ) - ( a.elo || 0 );
+		// A team plays in board order; an unnumbered player sorts to the bottom.
+		const byBoard = ( a, b ) =>
+			( a.board_number ?? Infinity ) - ( b.board_number ?? Infinity ) ||
+			byRating( a, b );
 		const groups = Object.fromEntries( list.map( ( c ) => [ c, [] ] ) );
 		const unassigned = [];
 		for ( const p of players ) {
@@ -42,7 +46,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 			}
 		}
 		for ( const c of list ) {
-			groups[ c ].sort( byRating );
+			groups[ c ].sort( isTeam ? byBoard : byRating );
 		}
 		unassigned.sort( byRating );
 		return { groups, unassigned };
@@ -136,6 +140,48 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		},
 	} );
 
+	// A team's board order, sent as the players in playing order — the server
+	// numbers them, so the request can't produce a gap or a shared board.
+	const boards = useMutation( {
+		mutationFn: ( { team, playerIds } ) =>
+			api.patch( `seasons/${ season.id }/boards`, {
+				team,
+				player_ids: playerIds,
+			} ),
+		onMutate: async ( { playerIds } ) => {
+			await queryClient.cancelQueries( { queryKey: seasonKey } );
+			const prev = queryClient.getQueryData( seasonKey );
+			const boardOf = new Map(
+				playerIds.map( ( id, i ) => [ id, i + 1 ] )
+			);
+			queryClient.setQueryData( seasonKey, ( old ) =>
+				old
+					? {
+							...old,
+							players: old.players.map( ( p ) =>
+								boardOf.has( p.player_id )
+									? {
+											...p,
+											board_number: boardOf.get(
+												p.player_id
+											),
+									  }
+									: p
+							),
+					  }
+					: old
+			);
+			return { prev };
+		},
+		onError: ( _e, _v, ctx ) => {
+			if ( ctx?.prev ) {
+				queryClient.setQueryData( seasonKey, ctx.prev );
+			}
+		},
+		onSettled: () =>
+			queryClient.invalidateQueries( { queryKey: seasonKey } ),
+	} );
+
 	// Even split by rating: strongest players fill the first group; when the
 	// count doesn't divide evenly the remainder lands in the lowest groups, so
 	// those end up one larger.
@@ -211,6 +257,34 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 			return;
 		}
 		assign.mutate( { playerId: d.playerId, category: target } );
+	};
+
+	// Dropping onto a row places the dragged player at that board, pushing the
+	// rest down. Only inside a team — categories have no order to hold.
+	const onDropOnRow = ( target ) => {
+		const d = drag.current;
+		if ( ! d || ! isTeam || ! target.category ) {
+			return;
+		}
+		drag.current = null;
+		setOver( null );
+
+		if ( d.from !== target.category ) {
+			assign.mutate( {
+				playerId: d.playerId,
+				category: target.category,
+			} );
+			return;
+		}
+		if ( d.playerId === target.player_id ) {
+			return;
+		}
+
+		const order = ( grouped.groups[ target.category ] ?? [] )
+			.map( ( p ) => p.player_id )
+			.filter( ( id ) => id !== d.playerId );
+		order.splice( order.indexOf( target.player_id ), 0, d.playerId );
+		boards.mutate( { team: target.category, playerIds: order } );
 	};
 
 	return (
@@ -304,6 +378,8 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 							<p className="text-xs text-muted">
 								Drag a player into a { term }, or back to
 								Unassigned to clear it.
+								{ isTeam &&
+									' Drop one onto another to change the board order.' }
 							</p>
 						) }
 					</div>
@@ -329,6 +405,8 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 									onLeave={ () => setOver( null ) }
 									onDrop={ () => onDropTo( c ) }
 									onDragStart={ onDragStart }
+									onDropOnRow={ isTeam ? onDropOnRow : null }
+									showBoards={ isTeam }
 									onRemove={ () => removeAt( c ) }
 									locked={ locked }
 									empty="Drop players here"
@@ -384,6 +462,8 @@ function AssignBox( {
 	onLeave,
 	onDrop,
 	onDragStart,
+	onDropOnRow = null,
+	showBoards = false,
 	onRemove,
 	locked = false,
 	empty,
@@ -434,19 +514,39 @@ function AssignBox( {
 						{ empty }
 					</li>
 				) : (
-					rows.map( ( p ) => (
+					rows.map( ( p, i ) => (
 						<li
 							key={ p.player_id }
 							draggable={ ! locked }
 							onDragStart={
 								locked ? undefined : () => onDragStart( p )
 							}
+							onDragOver={
+								locked || ! onDropOnRow
+									? undefined
+									: ( e ) => e.preventDefault()
+							}
+							onDrop={
+								locked || ! onDropOnRow
+									? undefined
+									: ( e ) => {
+											e.stopPropagation();
+											onDropOnRow( p );
+									  }
+							}
 							className={
 								'flex items-center justify-between rounded px-2 py-1.5 text-sm text-ink-3 ' +
 								( locked ? '' : 'cursor-grab hover:bg-paper' )
 							}
 						>
-							<span className="truncate">{ p.name }</span>
+							<span className="flex min-w-0 items-baseline gap-2">
+								{ showBoards && (
+									<span className="num w-4 shrink-0 text-right font-mono text-xs text-muted">
+										{ p.board_number ?? i + 1 }
+									</span>
+								) }
+								<span className="truncate">{ p.name }</span>
+							</span>
 							{ !! p.elo && (
 								<span className="num ml-2 shrink-0 font-mono text-xs text-muted">
 									{ p.elo }

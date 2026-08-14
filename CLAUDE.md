@@ -223,6 +223,19 @@ A tournament is one or the other, never both, which is why nothing was added
 alongside. Like the pairing system and the tempo, it is fixed once the tournament
 leaves preparation.
 
+**Boards.** A team plays in board order — board 1 against board 1 — so a team
+season's enrolments carry a `board_number`, seeded from rating when a player
+joins a team and reordered by dropping one player onto another in the Teams tab.
+It sits on the enrolment beside the team rather than in a map of its own, which
+would hold membership a second time and be free to disagree with
+`season_players.category`.
+
+`PATCH /seasons/{id}/boards` takes a team and its players **in playing order**,
+never the numbers themselves: 1..n is assigned server-side, so no request can
+leave a gap or put two players on one board. Auto Fill renumbers every team by
+rating, which is consistent with it overriding whatever was set by hand.
+Individual tournaments never set the column.
+
 The consequence to know: everything that reads `category` still reads it. Under
 Keizer that includes `categoryPairing`, which defaults to `adjacent` — so on a
 team season it constrains pairing to a player's own team or the next one along,
@@ -612,7 +625,7 @@ hardcode `wp_scs_`.
 - `…scs_seasons` — competition seasons (name, dates, pairing system,
   `time_control`, `is_team`)
 - `…scs_season_players` — player enrollment (season + category + player, plus
-  `default_absent`)
+  `default_absent` and `board_number`)
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type

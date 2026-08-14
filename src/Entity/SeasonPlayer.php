@@ -11,6 +11,7 @@ class SeasonPlayer
         public readonly int $season_id,
         public readonly int $player_id,
         public readonly ?string $category,
+        public readonly ?int $board_number,
         public readonly int $elo_rating,
         public readonly \DateTimeImmutable $enrolled_at,
         public readonly bool $default_absent = false,

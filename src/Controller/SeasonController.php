@@ -29,6 +29,7 @@ use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\SetDefaultAbsenceRequest;
+use SCS\Request\SetTeamBoardsRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
@@ -552,7 +553,17 @@ class SeasonController extends RestController
                 }
             }
 
-            $this->seasonPlayerRepository->update($seasonPlayer->id, ['category' => $category]);
+            $data = ['category' => $category];
+
+            // A board only means anything inside a team, so joining one takes the
+            // next free board and leaving one gives it up.
+            if ($season->is_team) {
+                $data['board_number'] = $category === null
+                    ? null
+                    : $this->nextBoardNumber($season->id, $category, $seasonPlayer->id);
+            }
+
+            $this->seasonPlayerRepository->update($seasonPlayer->id, $data);
             $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
 
             return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
@@ -704,10 +715,112 @@ class SeasonController extends RestController
 
             $this->seasonPlayerRepository->updateCategories($updates);
 
+            // Auto Fill overrides what was set by hand, boards included — a fresh
+            // split has no order to preserve.
+            if ($season->is_team) {
+                $this->renumberBoards($season->id);
+            }
+
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
             return $this->ok(array_map($this->serializer->serialize(...), $players));
         });
+    }
+
+    /**
+     * Set one team's board order from the players in the order they play. The
+     * client sends the order, never the numbers: 1..n is assigned here, so no
+     * request can leave a team with a gap or two players on the same board.
+     */
+    public function setTeamBoards(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $this->requireOpenSeason($season);
+
+            if (!$season->is_team) {
+                throw new ConflictException('This tournament is played individually, so it has no boards to order.');
+            }
+
+            $input = SetTeamBoardsRequest::fromRequest($request);
+            $this->validate($input);
+
+            if (!in_array($input->team, $season->categories, true)) {
+                throw new ValidationException([
+                    'team' => sprintf('Team must be one of: %s.', implode(', ', $season->categories)),
+                ]);
+            }
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = $sp;
+            }
+
+            $updates = [];
+            $board   = 1;
+            foreach ($input->player_ids ?? [] as $playerId) {
+                $sp = $enrolled[$playerId] ?? null;
+                if ($sp === null || $sp->category !== $input->team) {
+                    throw new ValidationException([
+                        'player_ids' => 'Every player must be enrolled in this tournament and in that team.',
+                    ]);
+                }
+                $updates[] = [ 'id' => $sp->id, 'board_number' => $board++ ];
+            }
+
+            $this->seasonPlayerRepository->updateBoardNumbers($updates);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
+    }
+
+    // The next free board in a team, ignoring the player being moved into it.
+    private function nextBoardNumber(int $seasonId, string $team, int $excludeId): int
+    {
+        $highest = 0;
+        foreach ($this->seasonPlayerRepository->findBySeason($seasonId) as $sp) {
+            if ($sp->id === $excludeId || $sp->category !== $team) {
+                continue;
+            }
+            $highest = max($highest, $sp->board_number ?? 0);
+        }
+
+        return $highest + 1;
+    }
+
+    // Number every team 1..n by rating, strongest on board 1.
+    private function renumberBoards(int $seasonId): void
+    {
+        $byTeam = [];
+        foreach ($this->seasonPlayerRepository->findBySeason($seasonId) as $sp) {
+            $byTeam[$sp->category ?? ''][] = $sp;
+        }
+
+        $updates = [];
+        foreach ($byTeam as $team => $members) {
+            if ($team === '') {
+                foreach ($members as $sp) {
+                    $updates[] = [ 'id' => $sp->id, 'board_number' => null ];
+                }
+
+                continue;
+            }
+
+            usort($members, static fn ($a, $b) => $b->elo_rating <=> $a->elo_rating ?: $a->id <=> $b->id);
+
+            $board = 1;
+            foreach ($members as $sp) {
+                $updates[] = [ 'id' => $sp->id, 'board_number' => $board++ ];
+            }
+        }
+
+        $this->seasonPlayerRepository->updateBoardNumbers($updates);
     }
 
     // The Absences tab: the roster split by standing absence, plus the absences

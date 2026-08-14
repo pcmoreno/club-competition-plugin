@@ -22,7 +22,7 @@ class PlayerDisplayService
     }
 
     /**
-     * @return array<int, array{season_player_id: int, player_id: int, name: ?string, category: ?string, elo: int}>
+     * @return array<int, array{season_player_id: int, player_id: int, name: ?string, category: ?string, board_number: ?int, elo: int}>
      */
     public function mapForSeason(int $season_id): array
     {
@@ -38,6 +38,7 @@ class PlayerDisplayService
                 'player_id'        => $sp->player_id,
                 'name'             => $names[$sp->player_id] ?? null,
                 'category'         => $sp->category,
+                'board_number'     => $sp->board_number,
                 'elo'              => $sp->elo_rating,
             ];
         }

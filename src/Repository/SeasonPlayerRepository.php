@@ -161,6 +161,25 @@ class SeasonPlayerRepository
         });
     }
 
+    /**
+     * Number a team's boards, in one transaction so a reorder is never half
+     * applied — a partial run would leave two players sharing a board.
+     *
+     * @param list<array{id: int, board_number: ?int}> $updates
+     */
+    public function updateBoardNumbers(array $updates): void
+    {
+        $this->connection->transactional(function () use ($updates): void {
+            foreach ($updates as $update) {
+                $this->connection->update(
+                    SCS_TABLE_PREFIX . 'season_players',
+                    [ 'board_number' => $update['board_number'] ],
+                    [ 'id' => $update['id'] ]
+                );
+            }
+        });
+    }
+
     // Scoped to the season so a stray enrolment id can't flag another season's row.
     /** @param list<int> $ids */
     public function updateDefaultAbsent(int $season_id, array $ids, bool $default_absent): void
@@ -221,6 +240,7 @@ class SeasonPlayerRepository
             season_id:   (int)$row['season_id'],
             player_id:   (int)$row['player_id'],
             category:    $row['category'] !== null ? (string)$row['category'] : null,
+            board_number: $row['board_number'] !== null ? (int)$row['board_number'] : null,
             elo_rating:  (int)$row['elo_rating'],
             enrolled_at: new \DateTimeImmutable($row['enrolled_at']),
             default_absent: (bool)($row['default_absent'] ?? false),

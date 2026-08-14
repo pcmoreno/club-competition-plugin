@@ -99,6 +99,7 @@ class SerializerService
             'season_id'   => $sp->season_id,
             'player_id'   => $sp->player_id,
             'category'    => $sp->category,
+            'board_number' => $sp->board_number,
             'elo_rating'  => $sp->elo_rating,
             'enrolled_at' => $sp->enrolled_at->format('Y-m-d'),
             'default_absent' => $sp->default_absent,
