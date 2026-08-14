@@ -281,6 +281,12 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 			</div>
 			) }
 
+			<p className="text-xs text-muted">
+				{ players.length } { players.length === 1 ? 'player' : 'players' }
+				{ ' · ' }
+				{ list.length } { list.length === 1 ? term : plural }
+			</p>
+
 			{ list.length > 0 && (
 				<div
 					className={
