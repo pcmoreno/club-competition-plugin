@@ -170,6 +170,26 @@ export function CreateTournamentDialog( { onClose } ) {
 
 				<label className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Competition type
+					</span>
+					<select
+						value={ isTeam ? 'team' : 'individual' }
+						onChange={ ( e ) =>
+							setIsTeam( e.target.value === 'team' )
+						}
+						className={ fieldInput }
+					>
+						<option value="individual">Individual</option>
+						<option value="team">Team</option>
+					</select>
+					<span className="mt-1 block text-xs text-muted">
+						A team tournament groups its players into teams instead
+						of categories.
+					</span>
+				</label>
+
+				<label className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Location
 					</span>
 					<input
