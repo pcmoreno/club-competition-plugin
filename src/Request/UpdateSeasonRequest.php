@@ -46,10 +46,14 @@ class UpdateSeasonRequest
     /** @var array<string,mixed>|null */
     public ?array $display_settings = null;
 
+    // Wider than the create form's list on purpose: a season already running on
+    // a system that has since been marked unimplemented must stay editable, and
+    // the Basic details form sends the current system on every save. Switching
+    // *to* an unimplemented one is refused in SeasonController::applySettings.
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
-        return PairingSystem::implementedValues();
+        return array_column(PairingSystem::cases(), 'value');
     }
 
     /** @return list<string> */

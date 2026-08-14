@@ -21,14 +21,26 @@ enum PairingSystem: string
         };
     }
 
-    // Selectable for a season. The gate is whether the system's scoring can be
-    // computed — without that, completing a round throws and the season is
-    // stuck — which every system currently satisfies, so this is where a system
-    // added before its scoring strategy gets refused. Whether a system can
-    // *pair* itself is a separate question: see generatesPairings() below.
+    /**
+     * Selectable for a new season: the system has to be able to score, and to
+     * produce the tournament its name promises.
+     *
+     * Swiss has no pairing engine, so choosing it gives you Manual under another
+     * label. The grouped round-robin runs an independent round-robin inside each
+     * category — it is a sectioned individual tournament, not the team
+     * competition (group A versus group B, board by board) the name describes,
+     * and none of that exists: no team entity, no fixture spanning several
+     * boards, no team standings.
+     *
+     * Manual pairs nothing either, but that is what it is for — see
+     * generatesPairings(), which answers a different question.
+     */
     public function isImplemented(): bool
     {
-        return $this->scoringSystem()->isImplemented();
+        return match ($this) {
+            self::Swiss, self::RoundRobinGroups => false,
+            default                             => $this->scoringSystem()->isImplemented(),
+        };
     }
 
     /** @return list<string> the only values a season may be created or updated with */

@@ -23,6 +23,8 @@ something is missing, believe it and check the code before assuming otherwise.
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
+| Swiss pairing | **Not implemented** — no engine, so it is Manual under another name. Not selectable |
+| Round-robin (groups) | **Not implemented** as intended. What exists sections an individual tournament by category; it is meant to be a **team** competition — group A vs group B, board by board — which needs a team entity, a fixture spanning several boards, and team standings. None of those exist. Not selectable |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -106,10 +108,13 @@ engine is still verified by hand in the UI.
 
 ### Keizer
 
-Every pairing system is now selectable — `ScoringStrategyResolver` builds a
-strategy for both scoring systems, so nothing gates a season any more. `swiss`
-still has no pairing engine and is hand-built; Keizer and both round-robins
-generate their own boards.
+`ScoringStrategyResolver` builds a strategy for both scoring systems, so scoring
+gates nothing. **Selectability is now gated on pairing** instead
+(`PairingSystem::isImplemented()`): three of the five systems can be chosen for a
+new tournament — Keizer, Manual and Round-robin. Swiss and Round-robin (groups)
+are refused; see the goals table for why. Both dialogs render them disabled and
+labelled "(not implemented)", and `UpdateSeasonRequest` still *accepts* them so a
+season already on one stays editable.
 
 **Scoring** (`src/Engine/Scoring/KeizerScoring.php`):
 
@@ -208,7 +213,8 @@ One loose end: paired players are markedly closer in **rating order**
 (median gap 5, max 24) than in **Keizer-score order** (median 9, max 43). The
 pairing order may not be the score at all. Deliberately not acted on yet.
 
-Categories also drive grouped round-robin (`GroupingMode::Categories`) and the
+Categories also drive grouped round-robin (`GroupingMode::Categories`, no longer
+selectable — see the goals table) and the
 standings filter.
 
 Absence recording is load-bearing under Keizer in a way it never was under
@@ -257,7 +263,9 @@ because the odd player out takes the `pairing_bye` that scoring already prices.
 actually bounded is legs × field size (100 legs is fine for a two-player match
 and impossible for four players), so the real ceiling belongs to the generator.
 `Grouping` only implements "the season's categories"; the rating splits need a
-conditional group-count field the settings form can't render yet.
+conditional group-count field the settings form can't render yet. All of it is
+moot while the grouped variant is unselectable — and finishing those splits would
+not make it the team competition it is meant to be either.
 
 `roundLimit()` returns null for round-robin, and deliberately: the schedule is
 the round set, so `RoundService::createRound` refuses a hand-made round outright
