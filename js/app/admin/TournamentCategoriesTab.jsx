@@ -167,9 +167,20 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		save.mutate( next );
 	};
 
+	// An empty box adds the next unused name in the sequence, so a tournament
+	// with plain A/B/C groups needs no typing at all.
+	const nextName = () => {
+		for ( let i = 0; ; i++ ) {
+			const name = `${ isTeam ? 'Team' : 'Group' } ${ letters( i ) }`;
+			if ( ! list.includes( name ) ) {
+				return name;
+			}
+		}
+	};
+
 	const add = () => {
-		const name = input.trim();
-		if ( name === '' || list.includes( name ) ) {
+		const name = input.trim() === '' ? nextName() : input.trim();
+		if ( list.includes( name ) ) {
 			return;
 		}
 		persist( [ ...list, name ] );
@@ -238,7 +249,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 						type="button"
 						className={ primaryBtn }
 						onClick={ add }
-						disabled={ input.trim() === '' || save.isPending }
+						disabled={ save.isPending }
 					>
 						Add
 					</button>
@@ -441,4 +452,13 @@ function AssignBox( {
 			</ul>
 		</section>
 	);
+}
+
+// Spreadsheet-style sequence: A…Z, then AA, AB — so naming can't run out.
+function letters( n ) {
+	let out = '';
+	for ( let i = n; i >= 0; i = Math.floor( i / 26 ) - 1 ) {
+		out = String.fromCharCode( 65 + ( i % 26 ) ) + out;
+	}
+	return out;
 }
