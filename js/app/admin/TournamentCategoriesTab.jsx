@@ -293,6 +293,25 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		assign.mutate( { playerId: d.playerId, category: target } );
 	};
 
+	// Drag and drop isn't obvious on a list, so a board can also be nudged one
+	// place at a time.
+	const moveBoard = ( player, delta ) => {
+		const team = player.category;
+		if ( ! isTeam || ! team ) {
+			return;
+		}
+		const order = ( grouped.groups[ team ] ?? [] ).map(
+			( p ) => p.player_id
+		);
+		const from = order.indexOf( player.player_id );
+		const to = from + delta;
+		if ( from < 0 || to < 0 || to >= order.length ) {
+			return;
+		}
+		order.splice( to, 0, order.splice( from, 1 )[ 0 ] );
+		boards.mutate( { team, playerIds: order } );
+	};
+
 	// Dropping onto a row places the dragged player at that board, pushing the
 	// rest down. Only inside a team — categories have no order to hold.
 	const onDropOnRow = ( target ) => {
@@ -428,7 +447,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 								Drag a player into a { term }, or back to
 								Unassigned to clear it.
 								{ isTeam &&
-									' Drop one onto another to change the board order.' }
+									' Change the board order with the arrows, or by dropping one player onto another.' }
 							</p>
 						) }
 					</div>
@@ -455,6 +474,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 									onDrop={ () => onDropTo( c ) }
 									onDragStart={ onDragStart }
 									onDropOnRow={ isTeam ? onDropOnRow : null }
+									onMove={ isTeam && ! locked ? moveBoard : null }
 									showBoards={ isTeam }
 									onRemove={ () => removeAt( c ) }
 									locked={ locked }
@@ -526,6 +546,7 @@ function AssignBox( {
 	onDrop,
 	onDragStart,
 	onDropOnRow = null,
+	onMove = null,
 	showBoards = false,
 	onRemove,
 	locked = false,
@@ -610,11 +631,31 @@ function AssignBox( {
 								) }
 								<span className="truncate">{ p.name }</span>
 							</span>
-							{ !! p.elo && (
-								<span className="num ml-2 shrink-0 font-mono text-xs text-muted">
-									{ p.elo }
-								</span>
-							) }
+							<span className="ml-2 flex shrink-0 items-center gap-1">
+								{ !! p.elo && (
+									<span className="num font-mono text-xs text-muted">
+										{ p.elo }
+									</span>
+								) }
+								{ onMove && (
+									<>
+										<MoveButton
+											label={ `Move ${ p.name } up a board` }
+											disabled={ i === 0 }
+											onClick={ () => onMove( p, -1 ) }
+										>
+											↑
+										</MoveButton>
+										<MoveButton
+											label={ `Move ${ p.name } down a board` }
+											disabled={ i === rows.length - 1 }
+											onClick={ () => onMove( p, 1 ) }
+										>
+											↓
+										</MoveButton>
+									</>
+								) }
+							</span>
 						</li>
 					) )
 				) }
@@ -630,4 +671,25 @@ function letters( n ) {
 		out = String.fromCharCode( 65 + ( i % 26 ) ) + out;
 	}
 	return out;
+}
+
+// One board nudge. Kept off the row's drag handle so a click can't start a drag.
+function MoveButton( { label, disabled, onClick, children } ) {
+	return (
+		<button
+			type="button"
+			aria-label={ label }
+			title={ label }
+			disabled={ disabled }
+			draggable={ false }
+			onDragStart={ ( e ) => e.preventDefault() }
+			onClick={ ( e ) => {
+				e.stopPropagation();
+				onClick();
+			} }
+			className="rounded px-1 text-xs leading-none text-muted hover:bg-paper hover:text-ink disabled:invisible"
+		>
+			{ children }
+		</button>
+	);
 }
