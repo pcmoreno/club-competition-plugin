@@ -100,6 +100,7 @@ class SerializerService
             'category'    => $sp->category,
             'elo_rating'  => $sp->elo_rating,
             'enrolled_at' => $sp->enrolled_at->format('Y-m-d'),
+            'default_absent' => $sp->default_absent,
         ];
     }
 

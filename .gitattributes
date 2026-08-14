@@ -16,3 +16,6 @@
 /webpack.config.js export-ignore
 /css              export-ignore
 /js               export-ignore
+/bin              export-ignore
+/phpunit.xml      export-ignore
+/tests            export-ignore

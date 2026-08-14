@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace SCS\Controller;
 
 use SCS\Engine\SettingsResolver;
+use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
+use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
@@ -25,6 +28,7 @@ use SCS\Request\AssignCategoriesRequest;
 use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
+use SCS\Request\SetDefaultAbsenceRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
@@ -229,6 +233,15 @@ class SeasonController extends RestController
 
             $data = $input->toUpdateData();
 
+            // Closed by completing its last round, so RoundService::closeSeason's rule can't be stepped around.
+            if (($data['status'] ?? null) === SeasonStatus::Completed->value) {
+                throw new ConflictException('A tournament is completed by completing its final round.');
+            }
+
+            if ($season->status === SeasonStatus::Completed) {
+                $this->requireDisplaySettingsOnly($input, $data !== []);
+            }
+
             // The tempo is fixed once the tournament leaves preparation. Games
             // take it when they are paired, so changing it mid-tournament would
             // split one tournament across two tempos — and a full-schedule
@@ -240,7 +253,15 @@ class SeasonController extends RestController
                 throw new ValidationException(['time_control' => 'The time control can only be changed while the tournament is in preparation.']);
             }
 
-            $this->applySettings($input, $season, $data);
+            // Same rule for the start date: once it has begun, that's a fact rather than a plan.
+            if (isset($data['start_date'])
+                && $data['start_date'] !== $season->start_date?->format('Y-m-d')
+                && $season->status !== SeasonStatus::Preparation
+            ) {
+                throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
+            }
+
+            $systemChanged = $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is
             // a normal edit, not an empty request.
@@ -255,8 +276,35 @@ class SeasonController extends RestController
                 $this->seasonRepository->update($season->id, $data);
             }
 
+            // Standing absences are system-specific in the same way pairing settings
+            // are: a full-schedule system can't act on them and won't let them be
+            // cleared, so a switch would strand them on the enrolment.
+            if ($systemChanged) {
+                $this->seasonPlayerRepository->clearDefaultAbsent($season->id);
+            }
+
             return $this->ok($this->serializer->serialize($this->seasonRepository->findById($season->id), SerializerService::GROUP_ADMIN));
         });
+    }
+
+    // Standings columns only; the flag predates applySettings, so false means settings-only.
+    private function requireDisplaySettingsOnly(UpdateSeasonRequest $input, bool $touchesSeasonRow): void
+    {
+        if ($touchesSeasonRow
+            || $input->contact_admin_ids !== null
+            || $input->pairing_settings !== null
+            || $input->scoring_settings !== null
+        ) {
+            throw new ConflictException('This tournament is completed. Only the standings columns can still be changed.');
+        }
+    }
+
+    // The roster and its categories are frozen with the rest of the record.
+    private function requireOpenSeason(Season $season): void
+    {
+        if ($season->status === SeasonStatus::Completed) {
+            throw new ConflictException('This tournament is completed and can no longer be changed.');
+        }
     }
 
     // Delete a tournament and all its scoped data. Restricted to Preparation for
@@ -364,9 +412,11 @@ class SeasonController extends RestController
      * system scores differently; scoring settings lock after the first completed
      * round; display settings are always editable.
      *
+     * Returns whether the pairing system changed.
+     *
      * @param array<string,mixed> $data
      */
-    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): void
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): bool
     {
         $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
         $systemChanged = $newSystem !== $season->pairing_system;
@@ -405,6 +455,8 @@ class SeasonController extends RestController
         if ($input->display_settings !== null) {
             $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
         }
+
+        return $systemChanged;
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response
@@ -414,6 +466,8 @@ class SeasonController extends RestController
             if ($season === null) {
                 throw new NotFoundException('Season not found.');
             }
+
+            $this->requireOpenSeason($season);
 
             $input = EnrollPlayerRequest::fromRequest($request);
             $this->validate($input);
@@ -459,6 +513,8 @@ class SeasonController extends RestController
             if ($season === null) {
                 throw new NotFoundException('Season not found.');
             }
+
+            $this->requireOpenSeason($season);
 
             $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
                 $season->id,
@@ -527,6 +583,8 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            $this->requireOpenSeason($season);
+
             $input = BulkPlayerIdsRequest::fromRequest($request);
             $this->validate($input);
 
@@ -594,6 +652,8 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
+            $this->requireOpenSeason($season);
+
             $input = AssignCategoriesRequest::fromRequest($request);
             $this->validate($input);
 
@@ -634,5 +694,114 @@ class SeasonController extends RestController
 
             return $this->ok(array_map($this->serializer->serialize(...), $players));
         });
+    }
+
+    // The Absences tab: the roster split by standing absence, plus the absences
+    // already recorded for the round about to be played.
+    public function absences(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $display = $this->playerDisplay->mapForSeason($season->id);
+
+            $enrolments = [];
+            $flagged    = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolments[] = ($display[$sp->id] ?? []) + [ 'default_absent' => $sp->default_absent ];
+                if ($sp->default_absent) {
+                    $flagged[$sp->id] = true;
+                }
+            }
+
+            $round = $this->latestOpenRound($season->id);
+
+            // Standing absences are the upper boxes' subject, so listing them here would drown the news.
+            $declared = [];
+            if ($round !== null) {
+                foreach ($this->attendanceRepository->findByRound($round->id) as $row) {
+                    if ($row->status !== AttendanceStatus::Absent || isset($flagged[$row->season_player_id])) {
+                        continue;
+                    }
+
+                    $declared[] = [
+                        'season_player_id' => $row->season_player_id,
+                        'name'             => $display[$row->season_player_id]['name'] ?? null,
+                        'bye_type'         => $row->bye_type?->value,
+                    ];
+                }
+            }
+
+            usort($declared, static fn (array $a, array $b): int => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
+
+            return $this->ok([
+                'enrolments' => $enrolments,
+                'round'      => $round === null ? null : [
+                    'id'     => $round->id,
+                    'number' => $round->round_number,
+                    'date'   => $round->date?->format('Y-m-d'),
+                    'status' => $round->status->value,
+                ],
+                'declared'   => $declared,
+            ]);
+        });
+    }
+
+    // Move enrolments between default-present and default-absent (the Absences tab transfer list).
+    public function setDefaultAbsence(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $this->requireOpenSeason($season);
+
+            // A full schedule pairs every round up front, so it never runs the round-creation trigger.
+            if ($season->pairing_system->cadence() === 'full') {
+                throw new ConflictException('This tournament lays out its whole schedule at once, so a standing absence has nothing to apply to.');
+            }
+
+            $input = SetDefaultAbsenceRequest::fromRequest($request);
+            $this->validate($input);
+
+            $enrolled = [];
+            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
+                $enrolled[$sp->player_id] = $sp;
+            }
+
+            $ids = [];
+            foreach (array_unique($input->player_ids ?? []) as $playerId) {
+                if (isset($enrolled[$playerId])) {
+                    $ids[] = $enrolled[$playerId]->id;
+                }
+            }
+
+            $this->seasonPlayerRepository->updateDefaultAbsent($season->id, $ids, (bool)$input->default_absent);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok(array_map($this->serializer->serialize(...), $players));
+        });
+    }
+
+    // The round about to be played: the highest-numbered one that isn't complete.
+    private function latestOpenRound(int $seasonId): ?Round
+    {
+        $latest = null;
+        foreach ($this->roundRepository->findBySeason($seasonId) as $round) {
+            if ($round->status === RoundStatus::Complete) {
+                continue;
+            }
+            if ($latest === null || $round->round_number > $latest->round_number) {
+                $latest = $round;
+            }
+        }
+
+        return $latest;
     }
 }

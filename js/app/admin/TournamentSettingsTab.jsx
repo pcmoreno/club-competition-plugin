@@ -707,7 +707,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 	return null;
 }
 
-export function TournamentSettingsTab( { season } ) {
+export function TournamentSettingsTab( { season, locked = false } ) {
 	const queryClient = useQueryClient();
 	const [ pairing, setPairing ] = useState( null );
 	const [ scoring, setScoring ] = useState( null );
@@ -786,11 +786,12 @@ export function TournamentSettingsTab( { season } ) {
 
 	const submit = () => {
 		setSaved( false );
+		// requireDisplaySettingsOnly rejects the whole request if anything rides along.
 		const payload = {};
-		if ( pairing ) {
+		if ( pairing && ! locked ) {
 			payload.pairing_settings = pairing;
 		}
-		if ( scoring && ! scoringLocked ) {
+		if ( scoring && ! scoringLocked && ! locked ) {
 			payload.scoring_settings = scoring;
 		}
 		if ( display ) {
@@ -808,7 +809,7 @@ export function TournamentSettingsTab( { season } ) {
 
 	return (
 		<div className="flex max-w-2xl flex-col gap-6">
-			{ scoringLocked && (
+			{ scoringLocked && ! locked && (
 				<Notice>
 					A round has been completed, so scoring settings are locked for
 					this tournament. Display settings can still be changed.
@@ -833,6 +834,7 @@ export function TournamentSettingsTab( { season } ) {
 										values={ pairing }
 										setValues={ editPairing }
 										disabled={
+											locked ||
 											save.isPending ||
 											! isEnabled( f, pairing )
 										}
@@ -851,7 +853,7 @@ export function TournamentSettingsTab( { season } ) {
 						group={ group }
 						values={ scoring }
 						setValues={ editScoring }
-						disabled={ scoringLocked || save.isPending }
+						disabled={ locked || scoringLocked || save.isPending }
 					/>
 				) )
 			) : (

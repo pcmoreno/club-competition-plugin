@@ -19,6 +19,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Member invitations and auth (no WP account) | Built |
 | Admin invitations | Built — first admin only, see below |
 | Member self-report absence | Built — see below |
+| Standing absence per enrolment | Built — admin Absences tab, see below |
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
@@ -394,6 +395,52 @@ pending invites. The tournament-contacts picker reads the same endpoint and
 filters to `active` in `ContactsField` — an admin who hasn't accepted yet
 shouldn't be pickable as a notification recipient.
 
+### Tournament Lifecycle
+
+`SeasonStatus` runs preparation → active → completed. Only two of those moves
+are wired up, and they are not symmetrical.
+
+**Starting** is the header's Start button — `PATCH /seasons/{id}` with
+`status: 'active'`. `preparation ↔ active` is otherwise unvalidated and
+deliberately left that way: an admin who started a tournament by mistake can put
+it back and delete it (`destroy` is preparation-only).
+
+**Completing is not a status write at all.** `PATCH /seasons/{id}` rejects
+`status: 'completed'` outright, so there is exactly one way in: ticking *"Also
+complete the tournament"* in the Complete-round modal, which sends
+`complete_season` on `PATCH /rounds/{id}/status` and lands in
+`RoundService::closeSeason` — inside the same transaction as the round's own
+completion, because closing the tournament is irreversible and must not survive
+scoring refusing the round. It refuses unless **every** round is complete, and
+refuses a season with **no** rounds: one that never played a round was cancelled,
+not finished. The frontend offers the tick only on the last round, which is the
+admin's cue rather than the real condition.
+
+**Completed is final and read-only.** There is no reopen, by decision — recovery
+would be a DB edit. The freeze is enforced in three places, none of which is the
+round status (a season can be completed with a draft round sitting in it, and
+round status wouldn't catch a *new* round, a reopen, or a date edit):
+
+- `RoundService::assertSeasonOpen` — from `createRound`, `generateSchedule`,
+  `pairRound`, `completeRound`, `reopenRound`, and both `require*Round` helpers.
+  Public, because `RoundController` writes the round date and the plain
+  draft/published/finalised transitions straight through the repository.
+- `SeasonController::requireOpenSeason` — the roster and category writes.
+- `SeasonController::requireDisplaySettingsOnly` — `PATCH /seasons/{id}` accepts
+  **only** `display_settings` on a completed tournament and rejects the whole
+  request if anything rides along, so the frontend must send that key alone.
+
+The standings columns are the single exception, and `display_settings` holds
+nothing else (`StandingsDisplaySettings`): they change how the finished record is
+read, not what it says.
+
+The frontend mirrors this from `isLocked(season)` in `tournamentShared.js`,
+passed down as `locked` to all five tabs. Editing apparatus is **removed** rather
+than disabled — the Categories add-form goes, the Players transfer list collapses
+to the roster it ended with — because there is nothing to add to a finished
+record. The member absence path needs no guard: `seasonAccepts` already requires
+`Active`.
+
 ### Time Control
 
 Both `seasons` and `games` carry a `time_control` (`TimeControl` enum: blitz /
@@ -425,7 +472,8 @@ offered to accounts with a linked player.
 
 **"I can't play this round"** (`POST`/`DELETE /me/rounds/{id}/absence`,
 `RoundAbsenceService`) has two modes, decided by **whether the member is already
-paired** — not by round status:
+paired** — not by round status. An enrolment marked default absent is outside
+this flow entirely (see Standing Absence below):
 
 - not on a board — the absence is recorded outright (`Absent` +
   `ByeType::Personal`) and can be withdrawn. Under standard scoring that is
@@ -480,6 +528,44 @@ which is deliberately not guarded on round status: it records the evening a
 round was played, not competition data, so correcting it afterwards is a
 legitimate admin fix.
 
+### Standing Absence
+
+An enrolment can be marked **default absent** (`season_players.default_absent`),
+for the member who plays five evenings a season rather than thirty-four.
+`RoundService::createRound` then writes an `Absent` + `ByeType::Personal` row for
+them as each round is created, so the round opens with them already in the
+Personal bye box and `presentPlayers()` leaves them out of a generated board.
+
+**Round creation is the only trigger.** Flagging an enrolment does not backfill
+rounds that already exist, and un-flagging does not clear the rows it wrote — the
+admin drags the player out of the bye box, which writes `Present` and makes them
+pairable again. That keeps the write out of every enrolment path and away from
+completed rounds, at the cost of a stale row after a mid-season change.
+
+It is **scored**, like any personal bye: `Par(personal) × OwnV` under Keizer, a
+third of the player's own value at the club's setting. Intended — see the
+absence-scoring note above.
+
+Offered wherever `cadence() !== 'full'`. A full schedule pairs every round up
+front and `generateSchedule` bypasses `createRound` entirely, so the trigger
+would never fire; `SeasonController::setDefaultAbsence` refuses those seasons and
+the tab isn't rendered for them. Manual and Swiss qualify despite having no
+pairing engine — the row is written at round creation, not at pairing.
+
+A flagged enrolment is **out of the member self-report flow** altogether:
+`declinableRounds` skips it, and `declare` / `withdraw` refuse via `resolve()`.
+Without the second guard `withdraw` would let a member clear their own standing
+absence a round at a time — `isOwnDeclaration` matches exactly the row the flag
+writes.
+
+The admin **Absences tab** (`TournamentAbsencesTab`, `GET`/`PATCH
+/seasons/{id}/absences`) sets it as a transfer list over the roster, and lists
+the absences recorded for the round about to be played — the highest-numbered
+round that isn't complete, rather than the lowest, so an unfinished previous
+round doesn't hide the one being paired. Standing absences never appear in that
+list; neither do declarations made after the pairings go out, which write nothing
+and only mail the tournament's contacts.
+
 ### Tournament Contacts
 
 The admins a tournament's notifications go to (`…scs_season_contacts`,
@@ -509,7 +595,8 @@ site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
 hardcode `wp_scs_`.
 
 - `…scs_seasons` — competition seasons (name, dates, pairing system, `time_control`)
-- `…scs_season_players` — player enrollment (season + category + player)
+- `…scs_season_players` — player enrollment (season + category + player, plus
+  `default_absent`)
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type

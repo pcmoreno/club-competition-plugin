@@ -193,6 +193,8 @@ class RoundController extends RestController
                 throw new NotFoundException('Round not found.');
             }
 
+            $this->roundService->assertSeasonOpen($round->season_id);
+
             $input = UpdateRoundRequest::fromRequest($request);
             $this->validate($input);
 
@@ -214,6 +216,9 @@ class RoundController extends RestController
                 throw new NotFoundException('Round not found.');
             }
 
+            // The plain transitions below write through the repository; the service guards its own.
+            $this->roundService->assertSeasonOpen($round->season_id);
+
             $input = UpdateRoundStatusRequest::fromRequest($request);
             $this->validate($input);
 
@@ -232,7 +237,7 @@ class RoundController extends RestController
             // The service owns that status write so it shares a transaction
             // with the scoring that can refuse it.
             if ($newStatus === RoundStatus::Complete) {
-                $this->roundService->completeRound($round);
+                $this->roundService->completeRound($round, $input->complete_season);
             } else {
                 $this->roundRepository->updateStatus($round->id, $newStatus);
             }
