@@ -505,7 +505,16 @@ final class RoundService
             ));
         }
 
-        $this->seasons->updateStatus($season->id, SeasonStatus::Completed);
+        $update = [ 'status' => SeasonStatus::Completed->value ];
+
+        // Until now the end date was a projection; completing is what turns it
+        // into a fact, and nothing can set it afterwards. One that was already
+        // entered stands — this only fills a blank.
+        if ($season->end_date === null) {
+            $update['end_date'] = current_time('Y-m-d');
+        }
+
+        $this->seasons->update($season->id, $update);
     }
 
     /**

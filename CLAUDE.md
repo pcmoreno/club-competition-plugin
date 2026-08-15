@@ -499,7 +499,14 @@ completion, because closing the tournament is irreversible and must not survive
 scoring refusing the round. It refuses unless **every** round is complete, and
 refuses a season with **no** rounds: one that never played a round was cancelled,
 not finished. The frontend offers the tick only on the last round, which is the
-admin's cue rather than the real condition.
+admin's cue rather than the real condition. `complete_season` is only accepted
+alongside `status: 'complete'`; sent with any other transition it is refused
+rather than quietly dropped, since nothing else can act on it.
+
+**Closing stamps `end_date` when it is blank**, with the day it was closed. Until
+then the date is a projection; completing turns it into a fact, and afterwards
+`requireDisplaySettingsOnly` means nothing can set it. A date already entered
+stands — this only fills a blank.
 
 **Completed is final and read-only.** There is no reopen, by decision — recovery
 would be a DB edit. The freeze is enforced in three places, none of which is the
