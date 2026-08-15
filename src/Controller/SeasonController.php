@@ -7,6 +7,7 @@ namespace SCS\Controller;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\Role;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
@@ -93,17 +94,25 @@ class SeasonController extends RestController
             // server-side so the roster renders without a separate fetch.
             $players = array_values($this->playerDisplay->mapForSeason($season->id));
 
-            // Whether the tournament can be closed, and why not — reported here
-            // so the admin header doesn't re-derive completeSeason's rule.
-            $blocker = $season->status === SeasonStatus::Active
-                ? $this->lifecycle->completionBlocker($season)
-                : null;
+            $payload = $this->serializer->serialize($season);
+
+            // Whether the tournament can be closed, and why not — for the admin
+            // header, so it doesn't re-derive the lifecycle's rule. This route is
+            // member-readable, and the reason names a round they can't see, so it
+            // is added only for an admin rather than serialized for everyone.
+            if (($this->authContext->currentClaims()['role'] ?? null) === Role::Admin->value) {
+                $blocker = $season->status === SeasonStatus::Active
+                    ? $this->lifecycle->completionBlocker($season)
+                    : null;
+
+                $payload += [
+                    'can_complete'       => $season->status === SeasonStatus::Active && $blocker === null,
+                    'completion_blocker' => $blocker,
+                ];
+            }
 
             return $this->ok([
-                'season'  => $this->serializer->serialize($season) + [
-                    'can_complete'      => $season->status === SeasonStatus::Active && $blocker === null,
-                    'completion_blocker' => $blocker,
-                ],
+                'season'  => $payload,
                 'players' => $players,
             ]);
         });
