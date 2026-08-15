@@ -9,6 +9,7 @@ use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
+use SCS\Entity\ValueObjects\TeamSheet;
 
 class SeasonRepository
 {
@@ -105,6 +106,17 @@ class SeasonRepository
 
     private function hydrate(array $row): Season
     {
+        $decoded = json_decode($row['categories'] ?? '[]', true);
+        $decoded = is_array($decoded) ? $decoded : [];
+        $isTeam  = (bool)($row['is_team'] ?? false);
+
+        // One column, two readings: a team season's holds the line-up, and its
+        // team names are the same list an individual season keeps as categories.
+        $teams      = $isTeam ? TeamSheet::fromColumn($decoded) : new TeamSheet();
+        $categories = $isTeam
+            ? $teams->names()
+            : array_values(array_filter($decoded, is_string(...)));
+
         return new Season(
             id:             (int)$row['id'],
             name:           $row['name'],
@@ -113,13 +125,14 @@ class SeasonRepository
             end_date:       $row['end_date'] !== null ? new \DateTimeImmutable($row['end_date']) : null,
             pairing_system: PairingSystem::from($row['pairing_system']),
             status:         SeasonStatus::from($row['status']),
-            categories:     json_decode($row['categories'] ?? '[]', true),
+            categories:     $categories,
             created_at:     new \DateTimeImmutable($row['created_at']),
             pairing_settings: $this->decodeSettings($row['pairing_settings'] ?? null),
             scoring_settings: $this->decodeSettings($row['scoring_settings'] ?? null),
             display_settings: $this->decodeSettings($row['display_settings'] ?? null),
             time_control:     TimeControl::from($row['time_control']),
-            is_team:          (bool)($row['is_team'] ?? false),
+            is_team:          $isTeam,
+            teams:            $teams,
         );
     }
 

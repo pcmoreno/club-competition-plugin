@@ -215,20 +215,51 @@ pairing order may not be the score at all. Deliberately not acted on yet.
 
 Categories also drive the standings filter.
 
-**Teams reuse all of it.** `seasons.is_team` doesn't add storage: a team
-tournament's teams *are* its `categories`, and a player's team is their
-`season_players.category`. The flag decides what the groups are called, and the
-Categories tab renders as the Teams tab — one component, `TournamentCategoriesTab`.
-A tournament is one or the other, never both, which is why nothing was added
-alongside. Like the pairing system and the tempo, it is fixed once the tournament
-leaves preparation.
+**Teams reuse all of it.** `seasons.is_team` adds no table: a team tournament's
+teams *are* its `categories`. The flag decides what the groups are called, and
+the Categories tab renders as the Teams tab — one component,
+`TournamentCategoriesTab`. A tournament is one or the other, never both, which is
+why nothing was added alongside. Like the pairing system and the tempo, it is
+fixed once the tournament leaves preparation.
 
 **Boards.** A team plays in board order — board 1 against board 1 — so a team
-season's enrolments carry a `board_number`, seeded from rating when a player
-joins a team and reordered by dropping one player onto another in the Teams tab.
-It sits on the enrolment beside the team rather than in a map of its own, which
-would hold membership a second time and be free to disagree with
-`season_players.category`.
+season's `categories` column holds the line-up rather than a bare list of names:
+
+```json
+{ "Team A": { "1": 14, "2": 3 }, "Team B": { "1": 8, "2": 19 } }
+```
+
+One column, two readings, decided by `is_team`: `Season::$categories` is always
+the list of names (`array_keys` for a team season), and `Season::$teams` is the
+`TeamSheet` behind them. Nothing else changes shape, so every caller that
+validates a group name against `$season->categories` reads the same thing it
+always did.
+
+`TeamSheet` (`src/Entity/ValueObjects/TeamSheet.php`) owns that JSON. It keeps
+each team as an ordered list and writes the board numbers out on encode, so
+**1..n with one player per board holds by construction** — no caller can leave a
+gap or put two players on one board, because no caller ever names a number. Its
+mutations (`place`, `without`, `reorder`, `withNames`, `withAssignments`,
+`replace`) each return a new sheet, and `SeasonController::saveTeams` writes it
+whole in one update.
+
+**A team season doesn't use `season_players.category`.** Membership lives in the
+sheet, and `SeasonPlayerRepository` joins the season row into every enrolment
+query so `hydrate` can fill `category` and `board_number` from it. Both stay
+ordinary properties on `SeasonPlayer`, so the ~30 call sites that load enrolments
+and the viewer code that shows a group are untouched — a team season's player
+simply reports their team where an individual season's reports their category.
+`board_number` is **not** a column; it's the sheet index plus one.
+
+The consequence to keep in mind: any write that changes team membership has to
+go through the season row, not the enrolment. That's `enrollPlayer`,
+`setPlayerCategory`, `assignCategories`, `setTeamBoards`, `removePlayer(s)`, and
+`PlayerMergeService` — a merge repoints the ids inside the sheet, which the
+enrolment repoint doesn't reach.
+
+Joining a team takes the bottom board and leaving one gives it up; Auto Fill
+rebuilds every team and orders each by rating, strongest on board 1. The order
+is changed with the per-row arrows or by dropping one player onto another.
 
 **Teams are fixed once the tournament starts** — `requireTeamsEditable` refuses
 the team list, the assignments and the board order from `active` onwards, not

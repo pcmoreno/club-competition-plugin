@@ -19,6 +19,8 @@ class SetTeamBoardsRequest
     #[Assert\All([
         new Assert\Positive(message: 'Each player id must be a positive integer.'),
     ])]
+    #[Assert\Unique(message: 'A player can only hold one board.')]
+    #[Assert\Count(max: 255, maxMessage: 'A team cannot have more than {{ limit }} boards.')]
     public ?array $player_ids = null;
 
     public static function fromRequest(\WP_REST_Request $request): self

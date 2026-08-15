@@ -2,13 +2,18 @@ import { useState, useMemo, useRef } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ConfirmModal } from '../components/ui';
-import { fieldInput, primaryBtn, errorMessage } from './tournamentShared';
+import {
+	fieldInput,
+	primaryBtn,
+	errorMessage,
+	isTeamLocked,
+} from './tournamentShared';
 import { keys } from '../api/keys';
 
-// ADMIN. Categories tab, and the Teams tab — one component, because a team
-// tournament groups its players out of the same `categories` column and the
-// same `season_players.category`. `season.is_team` only changes what the groups
-// are called; nothing about the storage or the interaction differs.
+// ADMIN. Categories tab, and the Teams tab — one component, because a season is
+// one or the other and both group their players out of the `categories` column.
+// A team season's column also holds the line-ups, but that's the server's
+// business: each enrolment arrives carrying its group and board either way.
 //
 // Add groups (persisted via PATCH /seasons/{id}) then assign enrolled players by
 // dragging them between a box per group and the "Unassigned" box (PATCH
@@ -343,7 +348,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				{ locked && isTeam && season.status !== 'completed'
+				{ isTeamLocked( season ) && season.status !== 'completed'
 					? 'Teams and board order are fixed now that the tournament has started.'
 					: locked
 					? `The ${ plural } this tournament was played in, and who was in each.`

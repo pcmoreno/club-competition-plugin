@@ -3,7 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
-import { STATUS_LABELS, errorMessage, isLocked } from './tournamentShared';
+import {
+	STATUS_LABELS,
+	errorMessage,
+	isLocked,
+	isTeamLocked,
+} from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
@@ -173,11 +178,7 @@ export function TournamentDetail( { seasonId } ) {
 					<TournamentCategoriesTab
 						season={ season }
 						players={ players }
-						locked={
-							locked ||
-							( season.is_team &&
-								season.status !== 'preparation' )
-						}
+						locked={ locked || isTeamLocked( season ) }
 					/>
 				) }
 				{ activeTab === 'settings' && (

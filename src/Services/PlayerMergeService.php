@@ -70,8 +70,28 @@ class PlayerMergeService
             ));
         }
 
-        $this->transactions->transactional(function () use ($keep, $remove): void {
+        // A team season names its players inside the season row, which the
+        // enrolment repoint below doesn't reach.
+        $teamSeasonIds = [];
+        foreach ($this->seasonPlayers->findByPlayer($remove->id) as $enrolment) {
+            $season = $this->seasons->findById($enrolment->season_id);
+            if ($season !== null && $season->is_team) {
+                $teamSeasonIds[] = $season->id;
+            }
+        }
+
+        $this->transactions->transactional(function () use ($keep, $remove, $teamSeasonIds): void {
             $this->seasonPlayers->reassignPlayer($remove->id, $keep->id);
+
+            foreach ($teamSeasonIds as $seasonId) {
+                $season = $this->seasons->findById($seasonId);
+                if ($season === null) {
+                    continue;
+                }
+                $this->seasons->update($seasonId, [
+                    'categories' => json_encode($season->teams->replace($remove->id, $keep->id)->toColumn()),
+                ]);
+            }
 
             $this->mergeMemberAccount($keep->id, $remove->id);
 

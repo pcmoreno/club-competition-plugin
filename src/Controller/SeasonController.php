@@ -12,6 +12,7 @@ use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
+use SCS\Entity\ValueObjects\TeamSheet;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
 use SCS\Exception\ValidationException;
@@ -276,6 +277,14 @@ class SeasonController extends RestController
             // players holding that name.
             if (isset($data['categories'])) {
                 $this->requireTeamsEditable($season);
+
+                // The request carries names only; a team season's column also
+                // holds the line-ups, so the surviving teams keep theirs.
+                if ($season->is_team) {
+                    $data['categories'] = json_encode(
+                        $season->teams->withNames($input->categories ?? [])->toColumn()
+                    );
+                }
             }
 
             $systemChanged = $this->applySettings($input, $season, $data);
@@ -505,6 +514,9 @@ class SeasonController extends RestController
 
             // Category is optional on enrol; when given it must match the season's set.
             if ($input->category !== null) {
+                // Enrolling straight into a team is a team-list write like any other.
+                $this->requireTeamsEditable($season);
+
                 if ($season->categories === []) {
                     throw new ValidationException([
                         'category' => 'This season has no categories; leave the category empty.',
@@ -529,7 +541,17 @@ class SeasonController extends RestController
 
             $eloRating = $input->elo_rating ?? $player->knsb_elo ?? 0;
 
-            $seasonPlayer = $this->seasonPlayerRepository->create($season->id, $input->player_id, $input->category, $eloRating);
+            $seasonPlayer = $this->seasonPlayerRepository->create(
+                $season->id,
+                $input->player_id,
+                $season->is_team ? null : $input->category,
+                $eloRating
+            );
+
+            if ($season->is_team && $input->category !== null) {
+                $this->saveTeams($season, $season->teams->place($input->player_id, $input->category));
+                $seasonPlayer = $this->seasonPlayerRepository->findById($seasonPlayer->id) ?? $seasonPlayer;
+            }
 
             return $this->created($this->serializer->serialize($seasonPlayer));
         });
@@ -571,17 +593,14 @@ class SeasonController extends RestController
                 }
             }
 
-            $data = ['category' => $category];
-
-            // A board only means anything inside a team, so joining one takes the
-            // next free board and leaving one gives it up.
+            // A team season keeps membership in its line-up, where joining takes
+            // the bottom board and leaving gives it up.
             if ($season->is_team) {
-                $data['board_number'] = $category === null
-                    ? null
-                    : $this->nextBoardNumber($season->id, $category, $seasonPlayer->id);
+                $this->saveTeams($season, $season->teams->place($seasonPlayer->player_id, $category));
+            } else {
+                $this->seasonPlayerRepository->update($seasonPlayer->id, ['category' => $category]);
             }
 
-            $this->seasonPlayerRepository->update($seasonPlayer->id, $data);
             $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
 
             return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
@@ -610,6 +629,10 @@ class SeasonController extends RestController
             }
 
             $this->seasonPlayerRepository->delete($seasonPlayer->id);
+
+            if ($season->is_team) {
+                $this->saveTeams($season, $season->teams->without([ $seasonPlayer->player_id ]));
+            }
 
             return $this->noContent();
         });
@@ -680,6 +703,10 @@ class SeasonController extends RestController
 
             $this->seasonPlayerRepository->deleteBySeasonAndPlayers($season->id, $input->player_ids ?? []);
 
+            if ($season->is_team) {
+                $this->saveTeams($season, $season->teams->without($input->player_ids ?? []));
+            }
+
             return $this->noContent();
         });
     }
@@ -706,8 +733,9 @@ class SeasonController extends RestController
                 $enrolled[$sp->player_id] = $sp;
             }
 
-            $errors  = [];
-            $updates = [];
+            $errors   = [];
+            $updates  = [];
+            $assigned = [];
             foreach ($input->assignments ?? [] as $i => $assignment) {
                 $playerId = (int)$assignment['player_id'];
                 $raw      = $assignment['category'] ?? null;
@@ -725,19 +753,24 @@ class SeasonController extends RestController
                     continue;
                 }
 
-                $updates[] = [ 'id' => $enrolled[$playerId]->id, 'category' => $category ];
+                $updates[]              = [ 'id' => $enrolled[$playerId]->id, 'category' => $category ];
+                $assigned[$playerId]    = $category;
             }
 
             if ($errors !== []) {
                 throw new ValidationException($errors);
             }
 
-            $this->seasonPlayerRepository->updateCategories($updates);
-
             // Auto Fill overrides what was set by hand, boards included — a fresh
-            // split has no order to preserve.
+            // split has no order to preserve, so each team is ordered by rating.
             if ($season->is_team) {
-                $this->renumberBoards($season->id);
+                $strength = [];
+                foreach ($enrolled as $playerId => $sp) {
+                    $strength[$playerId] = $sp->elo_rating;
+                }
+                $this->saveTeams($season, $season->teams->withAssignments($assigned, $strength));
+            } else {
+                $this->seasonPlayerRepository->updateCategories($updates);
             }
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
@@ -770,30 +803,28 @@ class SeasonController extends RestController
             $input = SetTeamBoardsRequest::fromRequest($request);
             $this->validate($input);
 
-            if (!in_array($input->team, $season->categories, true)) {
+            $team = (string)$input->team;
+            if (!in_array($team, $season->categories, true)) {
                 throw new ValidationException([
                     'team' => sprintf('Team must be one of: %s.', implode(', ', $season->categories)),
                 ]);
             }
 
-            $enrolled = [];
-            foreach ($this->seasonPlayerRepository->findBySeason($season->id) as $sp) {
-                $enrolled[$sp->player_id] = $sp;
+            // A partial or repeating order is refused rather than applied: it
+            // would decide some of the team's boards and leave the rest behind.
+            $order     = $input->player_ids ?? [];
+            $submitted = $order;
+            $members   = $season->teams->membersOf($team);
+            sort($submitted);
+            sort($members);
+
+            if ($submitted !== $members) {
+                throw new ValidationException([
+                    'player_ids' => 'The order must list every player in that team exactly once.',
+                ]);
             }
 
-            $updates = [];
-            $board   = 1;
-            foreach ($input->player_ids ?? [] as $playerId) {
-                $sp = $enrolled[$playerId] ?? null;
-                if ($sp === null || $sp->category !== $input->team) {
-                    throw new ValidationException([
-                        'player_ids' => 'Every player must be enrolled in this tournament and in that team.',
-                    ]);
-                }
-                $updates[] = [ 'id' => $sp->id, 'board_number' => $board++ ];
-            }
-
-            $this->seasonPlayerRepository->updateBoardNumbers($updates);
+            $this->saveTeams($season, $season->teams->reorder($team, $order));
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
@@ -801,47 +832,11 @@ class SeasonController extends RestController
         });
     }
 
-    // The next free board in a team, ignoring the player being moved into it.
-    private function nextBoardNumber(int $seasonId, string $team, int $excludeId): int
+    // A team season's line-up is written whole, so a board can't drift from
+    // the order it was given in.
+    private function saveTeams(Season $season, TeamSheet $teams): void
     {
-        $highest = 0;
-        foreach ($this->seasonPlayerRepository->findBySeason($seasonId) as $sp) {
-            if ($sp->id === $excludeId || $sp->category !== $team) {
-                continue;
-            }
-            $highest = max($highest, $sp->board_number ?? 0);
-        }
-
-        return $highest + 1;
-    }
-
-    // Number every team 1..n by rating, strongest on board 1.
-    private function renumberBoards(int $seasonId): void
-    {
-        $byTeam = [];
-        foreach ($this->seasonPlayerRepository->findBySeason($seasonId) as $sp) {
-            $byTeam[$sp->category ?? ''][] = $sp;
-        }
-
-        $updates = [];
-        foreach ($byTeam as $team => $members) {
-            if ($team === '') {
-                foreach ($members as $sp) {
-                    $updates[] = [ 'id' => $sp->id, 'board_number' => null ];
-                }
-
-                continue;
-            }
-
-            usort($members, static fn ($a, $b) => $b->elo_rating <=> $a->elo_rating ?: $a->id <=> $b->id);
-
-            $board = 1;
-            foreach ($members as $sp) {
-                $updates[] = [ 'id' => $sp->id, 'board_number' => $board++ ];
-            }
-        }
-
-        $this->seasonPlayerRepository->updateBoardNumbers($updates);
+        $this->seasonRepository->update($season->id, [ 'categories' => json_encode($teams->toColumn()) ]);
     }
 
     // The Absences tab: the roster split by standing absence, plus the absences
