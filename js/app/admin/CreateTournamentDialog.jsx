@@ -180,11 +180,15 @@ export function CreateTournamentDialog( { onClose } ) {
 						className={ fieldInput }
 					>
 						<option value="individual">Individual</option>
-						<option value="team">Team</option>
+						{ /* Teams can be built, but nothing pairs one against
+						     another yet. Mirrors the server, which refuses it. */ }
+						<option value="team" disabled>
+							Team (not implemented)
+						</option>
 					</select>
 					<span className="mt-1 block text-xs text-muted">
-						A team tournament groups its players into teams instead
-						of categories.
+						Team play can be set up but not yet played: no pairing
+						system puts one team against another.
 					</span>
 				</label>
 

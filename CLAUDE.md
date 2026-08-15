@@ -24,7 +24,7 @@ something is missing, believe it and check the code before assuming otherwise.
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
 | Swiss pairing | **Not implemented** — no engine, so it is Manual under another name. Not selectable |
-| Team play (group vs group) | **Partly built.** `seasons.is_team` marks a tournament as team play and the Categories tab becomes the Teams tab — so teams can be named and players assigned. Nothing yet pairs group against group, groups boards into a match result, or produces team standings. Not a pairing system: it is orthogonal to how a round is paired |
+| Team play (team vs team) | **Not implemented, and not selectable.** The roster half is built — `seasons.is_team`, the Teams tab, assignments, board order — but nothing pairs team against team, sums boards into a match result, or produces team standings. The engine never reads `is_team`. Both dialogs render Team disabled and `SeasonController::requireTeamPlayImplemented` refuses it; a season already on it stays editable. Not a pairing system: it is orthogonal to how a round is paired |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -214,6 +214,26 @@ One loose end: paired players are markedly closer in **rating order**
 pairing order may not be the score at all. Deliberately not acted on yet.
 
 Categories also drive the standings filter.
+
+**Nothing plays a team tournament yet.** What exists is the roster: teams are
+named, filled and put in board order, and that is where it stops. `is_team` is
+read only by storage, serialization and guards — **the engine has no reference
+to it at all** (`grep is_team src/Engine/` finds nothing). Pair a round on a team
+season and you get whatever the season's pairing system does to individuals;
+board numbers take no part, six boards between two teams stay six separate
+games, and standings rank players rather than teams.
+
+Worse, `categoryPairing` defaults to `adjacent` and reads `category` — which on
+a team season resolves to the player's *team*. So Keizer would prefer to pair
+teammates, the opposite of the point. `free` is the workaround.
+
+So Team is refused for a **new** tournament, the same way Swiss is: both admin
+selects render it disabled and `SeasonController::requireTeamPlayImplemented`
+refuses `is_team: true` on create and on any switch onto it. A season already on
+it stays fully editable, and turning it off is allowed — that's a move towards
+something playable. Building the real thing means a pairing engine that pairs
+*teams* and then expands each match into boards, which is a third shape
+alongside `PerRoundPairing` and `FullSchedulePairing`.
 
 **Teams reuse all of it.** `seasons.is_team` adds no table: a team tournament's
 teams *are* its `categories`. The flag decides what the groups are called, and

@@ -243,12 +243,16 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					}
 				>
 					<option value="individual">Individual</option>
-					<option value="team">Team</option>
+					{ /* Keep it selectable on a season that already is one, so
+					     the select can render it. */ }
+					<option value="team" disabled={ season.is_team !== true }>
+						Team{ season.is_team !== true ? ' (not implemented)' : '' }
+					</option>
 				</select>
 				<span className="mt-1 block text-xs text-muted">
 					{ fixedOnStart
 						? 'The competition type is locked once the tournament has started.'
-						: 'A team tournament groups its players into teams instead of categories.' }
+						: 'Team play can be set up but not yet played: no pairing system puts one team against another.' }
 				</span>
 			</label>
 

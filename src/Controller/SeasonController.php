@@ -198,6 +198,8 @@ class SeasonController extends RestController
             $input = CreateSeasonRequest::fromRequest($request);
             $this->validate($input);
 
+            $this->requireTeamPlayImplemented($input->is_team);
+
             $season = $this->seasonRepository->create(
                 name:           $input->name,
                 location:       $input->location,
@@ -265,6 +267,12 @@ class SeasonController extends RestController
                 throw new ValidationException(['is_team' => 'Team play can only be changed while the tournament is in preparation.']);
             }
 
+            // Turning it on is refused; a season already on it stays editable,
+            // and turning it off is a move towards something that can be played.
+            if (!$season->is_team) {
+                $this->requireTeamPlayImplemented((bool)($data['is_team'] ?? false));
+            }
+
             // Same rule for the start date: once it has begun, that's a fact rather than a plan.
             if (isset($data['start_date'])
                 && $data['start_date'] !== $season->start_date?->format('Y-m-d')
@@ -322,6 +330,18 @@ class SeasonController extends RestController
             || $input->scoring_settings !== null
         ) {
             throw new ConflictException('This tournament is completed. Only the standings columns can still be changed.');
+        }
+    }
+
+    // Teams can be named, filled and ordered, but no pairing system puts one
+    // against another — so a new team tournament couldn't be played. Refused
+    // here as well as in the admin selects, which only hide the option.
+    private function requireTeamPlayImplemented(bool $isTeam): void
+    {
+        if ($isTeam) {
+            throw new ValidationException([
+                'is_team' => 'Team play isn\'t implemented yet: no pairing system puts one team against another.',
+            ]);
         }
     }
 
