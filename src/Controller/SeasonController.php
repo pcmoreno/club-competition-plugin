@@ -35,6 +35,7 @@ use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
+use SCS\Services\RoundService;
 use SCS\Services\SeasonContactService;
 use SCS\Services\SerializerService;
 use SCS\Services\SettingsValidator;
@@ -62,6 +63,7 @@ class SeasonController extends RestController
         private readonly AdminRepository $adminRepository,
         private readonly AuthContextService $authContext,
         private readonly TransactionManager $transactions,
+        private readonly RoundService $roundService,
     ) {
         parent::__construct($validator);
     }
@@ -91,10 +93,37 @@ class SeasonController extends RestController
             // server-side so the roster renders without a separate fetch.
             $players = array_values($this->playerDisplay->mapForSeason($season->id));
 
+            // Whether the tournament can be closed, and why not — reported here
+            // so the admin header doesn't re-derive completeSeason's rule.
+            $blocker = $season->status === SeasonStatus::Active
+                ? $this->roundService->completionBlocker($season)
+                : null;
+
             return $this->ok([
-                'season'  => $this->serializer->serialize($season),
+                'season'  => $this->serializer->serialize($season) + [
+                    'can_complete'      => $season->status === SeasonStatus::Active && $blocker === null,
+                    'completion_blocker' => $blocker,
+                ],
                 'players' => $players,
             ]);
+        });
+    }
+
+    // Close a tournament for good. Its own route rather than a status write:
+    // PATCH still refuses `completed`, so there remains exactly one way in.
+    public function complete(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $this->roundService->completeSeason($season);
+
+            $updated = $this->seasonRepository->findById($season->id);
+
+            return $this->ok($this->serializer->serialize($updated ?? $season, SerializerService::GROUP_ADMIN));
         });
     }
 

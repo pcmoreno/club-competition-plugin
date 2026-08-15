@@ -491,17 +491,20 @@ deliberately left that way: an admin who started a tournament by mistake can put
 it back and delete it (`destroy` is preparation-only).
 
 **Completing is not a status write at all.** `PATCH /seasons/{id}` rejects
-`status: 'completed'` outright, so there is exactly one way in: ticking *"Also
-complete the tournament"* in the Complete-round modal, which sends
-`complete_season` on `PATCH /rounds/{id}/status` and lands in
-`RoundService::closeSeason` — inside the same transaction as the round's own
-completion, because closing the tournament is irreversible and must not survive
-scoring refusing the round. It refuses unless **every** round is complete, and
-refuses a season with **no** rounds: one that never played a round was cancelled,
-not finished. The frontend offers the tick only on the last round, which is the
-admin's cue rather than the real condition. `complete_season` is only accepted
-alongside `status: 'complete'`; sent with any other transition it is refused
-rather than quietly dropped, since nothing else can act on it.
+`status: 'completed'` outright, so there is exactly one way in:
+**`POST /seasons/{id}/complete`**, the header's Complete-tournament button,
+landing in `RoundService::completeSeason`. It refuses unless **every** round is
+complete, and refuses a season with **no** rounds: one that never played a round
+was cancelled, not finished. The rounds are read *inside* the transaction, so a
+round created or reopened alongside can't be missed by the check that is about to
+outlive it.
+
+Completing a round and completing the tournament are separate acts: the round is
+finished first, and closing is asked of the tournament, whose rounds
+`completeSeason` checks for itself.
+
+`GET /seasons/{id}` reports `can_complete` and a `completion_blocker` string, so
+the header can disable the button and say *why* without re-deriving the rule.
 
 **Closing stamps `end_date` when it is blank**, with the day it was closed. Until
 then the date is a projection; completing turns it into a fact, and afterwards
@@ -999,8 +1002,7 @@ CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
 - **Source**: `https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip`
 - **Trigger**: manual only — `wp scs fetch-knsb-ratings`, or the "Fetch KNSB
-  ratings" dialog in the admin roster. **No cron is registered**, despite the
-  monthly schedule this file used to claim.
+  ratings" dialog in the admin roster. **No cron is registered.**
 - **Storage**: `KnsbRatingStore` writes the parsed list under
   `uploads/scs-knsb-<random>/`, hardened with `.htaccess` + `index.php`. It is
   personal data for ~20k non-users, so it must not sit in a web-reachable plugin

@@ -434,6 +434,16 @@ class RestApi
                 ],
             ]);
 
+            // Closing a tournament is irreversible, so it gets its own verb
+            // rather than riding on a status write.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/complete', [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [$seasons, 'complete'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)', [
                 [
                     'methods'             => 'GET',

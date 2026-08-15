@@ -285,7 +285,8 @@ class Container
             ->addArgument(new Reference('season_contact_service'))
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('auth_context_service'))
-            ->addArgument(new Reference('transaction_manager'));
+            ->addArgument(new Reference('transaction_manager'))
+            ->addArgument(new Reference('round_service'));
 
         $container->register('admin_controller', Controller\AdminController::class)
             ->setPublic(true)

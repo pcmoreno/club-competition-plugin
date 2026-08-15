@@ -389,10 +389,8 @@ final class RoundService
      * and 5. Recomputing only the round being completed is what made a
      * post-completion result edit desync the games from the snapshots
      * permanently.
-     *
-     * $completeSeason shares this transaction because closing is irreversible.
      */
-    public function completeRound(Round $round, bool $completeSeason = false): void
+    public function completeRound(Round $round): void
     {
         $season = $this->seasons->findById($round->season_id);
         if ($season === null) {
@@ -428,7 +426,7 @@ final class RoundService
         // touching.
         $computed = [];
 
-        $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, $completeSeason, &$computed): void {
+        $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
             // In the same transaction as the scoring, because scoring can
             // refuse: Keizer prices a round against the one before it and
             // throws when that has no standings. A status committed outside
@@ -478,43 +476,70 @@ final class RoundService
                     );
                 }
             }
-
-            if ($completeSeason) {
-                $this->closeSeason($season, $seasonRounds, $round);
-            }
         });
     }
 
-    // Refused unless every round is complete; $seasonRounds is stale for this one, so it goes by id.
-    /** @param list<Round> $seasonRounds */
-    private function closeSeason(Season $season, array $seasonRounds, Round $completing): void
+    /**
+     * Close a tournament for good. Its own act rather than a flag on the last
+     * round: the condition is "every round is complete", which is a fact about
+     * the tournament, and a round is a poor place to ask about one.
+     *
+     * The rounds are read inside the transaction so a round created or reopened
+     * alongside can't be missed by the check that is about to outlive it.
+     */
+    public function completeSeason(Season $season): void
     {
-        if ($seasonRounds === []) {
-            throw new ConflictException('A tournament with no rounds cannot be completed.');
-        }
+        $this->assertSeasonOpen($season->id);
 
-        foreach ($seasonRounds as $r) {
-            if ($r->id === $completing->id || $r->status === RoundStatus::Complete) {
-                continue;
+        $this->transactions->transactional(function () use ($season): void {
+            $rounds = $this->rounds->findBySeason($season->id);
+
+            if ($rounds === []) {
+                throw new ConflictException('A tournament with no rounds cannot be completed.');
             }
 
-            throw new ConflictException(sprintf(
-                'Round %d is still %s, so the tournament cannot be completed yet.',
-                $r->round_number,
-                $r->status->value
-            ));
+            foreach ($rounds as $r) {
+                if ($r->status === RoundStatus::Complete) {
+                    continue;
+                }
+
+                throw new ConflictException(sprintf(
+                    'Round %d is still %s, so the tournament cannot be completed yet.',
+                    $r->round_number,
+                    $r->status->value
+                ));
+            }
+
+            $update = [ 'status' => SeasonStatus::Completed->value ];
+
+            // Until now the end date was a projection; completing is what turns
+            // it into a fact, and nothing can set it afterwards. One that was
+            // already entered stands — this only fills a blank.
+            if ($season->end_date === null) {
+                $update['end_date'] = current_time('Y-m-d');
+            }
+
+            $this->seasons->update($season->id, $update);
+        });
+    }
+
+    // Why a tournament can't be closed yet, or null when it can — the admin
+    // screen asks so it doesn't have to re-derive completeSeason's rule.
+    public function completionBlocker(Season $season): ?string
+    {
+        $rounds = $this->rounds->findBySeason($season->id);
+
+        if ($rounds === []) {
+            return 'A tournament with no rounds cannot be completed.';
         }
 
-        $update = [ 'status' => SeasonStatus::Completed->value ];
-
-        // Until now the end date was a projection; completing is what turns it
-        // into a fact, and nothing can set it afterwards. One that was already
-        // entered stands — this only fills a blank.
-        if ($season->end_date === null) {
-            $update['end_date'] = current_time('Y-m-d');
+        foreach ($rounds as $r) {
+            if ($r->status !== RoundStatus::Complete) {
+                return sprintf('Round %d is still %s.', $r->round_number, $r->status->value);
+            }
         }
 
-        $this->seasons->update($season->id, $update);
+        return null;
     }
 
     /**
