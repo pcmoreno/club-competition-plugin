@@ -425,6 +425,15 @@ class RestApi
                 ],
             ]);
 
+            // One team's board order, sent as the players in playing order.
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/boards', [
+                [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$seasons, 'setTeamBoards'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)', [
                 [
                     'methods'             => 'GET',

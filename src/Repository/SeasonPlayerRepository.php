@@ -6,7 +6,9 @@ namespace SCS\Repository;
 
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\QueryBuilder;
 use SCS\Entity\SeasonPlayer;
+use SCS\Entity\ValueObjects\TeamSheet;
 
 class SeasonPlayerRepository
 {
@@ -16,12 +18,10 @@ class SeasonPlayerRepository
 
     public function findBySeason(int $season_id): array
     {
-        $rows = $this->connection->createQueryBuilder()
-            ->select('*')
-            ->from(SCS_TABLE_PREFIX . 'season_players')
-            ->where('season_id = :season_id')
+        $rows = $this->selectWithSeason()
+            ->where('sp.season_id = :season_id')
             ->setParameter('season_id', $season_id)
-            ->orderBy('enrolled_at', 'ASC')
+            ->orderBy('sp.enrolled_at', 'ASC')
             ->fetchAllAssociative();
 
         return array_map($this->hydrate(...), $rows);
@@ -30,12 +30,10 @@ class SeasonPlayerRepository
     /** @return SeasonPlayer[] */
     public function findByPlayer(int $player_id): array
     {
-        $rows = $this->connection->createQueryBuilder()
-            ->select('*')
-            ->from(SCS_TABLE_PREFIX . 'season_players')
-            ->where('player_id = :player_id')
+        $rows = $this->selectWithSeason()
+            ->where('sp.player_id = :player_id')
             ->setParameter('player_id', $player_id)
-            ->orderBy('enrolled_at', 'DESC')
+            ->orderBy('sp.enrolled_at', 'DESC')
             ->fetchAllAssociative();
 
         return array_map($this->hydrate(...), $rows);
@@ -61,10 +59,8 @@ class SeasonPlayerRepository
 
     public function findById(int $id): ?SeasonPlayer
     {
-        $row = $this->connection->createQueryBuilder()
-            ->select('*')
-            ->from(SCS_TABLE_PREFIX . 'season_players')
-            ->where('id = :id')
+        $row = $this->selectWithSeason()
+            ->where('sp.id = :id')
             ->setParameter('id', $id)
             ->fetchAssociative();
 
@@ -73,11 +69,9 @@ class SeasonPlayerRepository
 
     public function findBySeasonAndPlayer(int $season_id, int $player_id): ?SeasonPlayer
     {
-        $row = $this->connection->createQueryBuilder()
-            ->select('*')
-            ->from(SCS_TABLE_PREFIX . 'season_players')
-            ->where('season_id = :season_id')
-            ->andWhere('player_id = :player_id')
+        $row = $this->selectWithSeason()
+            ->where('sp.season_id = :season_id')
+            ->andWhere('sp.player_id = :player_id')
             ->setParameter('season_id', $season_id)
             ->setParameter('player_id', $player_id)
             ->fetchAssociative();
@@ -214,16 +208,37 @@ class SeasonPlayerRepository
         $this->connection->delete(SCS_TABLE_PREFIX . 'season_players', [ 'season_id' => $season_id ]);
     }
 
+    // Enrolments always arrive with their season's line-up alongside, so a team
+    // season's group and board can be read from it rather than from the row.
+    private function selectWithSeason(): QueryBuilder
+    {
+        return $this->connection->createQueryBuilder()
+            ->select('sp.*', 's.is_team AS season_is_team', 's.categories AS season_categories')
+            ->from(SCS_TABLE_PREFIX . 'season_players', 'sp')
+            ->innerJoin('sp', SCS_TABLE_PREFIX . 'seasons', 's', 's.id = sp.season_id');
+    }
+
     private function hydrate(array $row): SeasonPlayer
     {
+        $playerId = (int)$row['player_id'];
+        $sheet    = null;
+
+        if ((bool)($row['season_is_team'] ?? false)) {
+            $decoded = json_decode((string)($row['season_categories'] ?? '[]'), true);
+            $sheet   = TeamSheet::fromColumn(is_array($decoded) ? $decoded : []);
+        }
+
         return new SeasonPlayer(
             id:          (int)$row['id'],
             season_id:   (int)$row['season_id'],
-            player_id:   (int)$row['player_id'],
-            category:    $row['category'] !== null ? (string)$row['category'] : null,
+            player_id:   $playerId,
+            category:    $sheet !== null
+                ? $sheet->teamOf($playerId)
+                : ($row['category'] !== null ? (string)$row['category'] : null),
             elo_rating:  (int)$row['elo_rating'],
             enrolled_at: new \DateTimeImmutable($row['enrolled_at']),
             default_absent: (bool)($row['default_absent'] ?? false),
+            board_number: $sheet?->boardOf($playerId),
         );
     }
 }

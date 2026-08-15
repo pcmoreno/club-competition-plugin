@@ -14,6 +14,8 @@ class SeasonPlayer
         public readonly int $elo_rating,
         public readonly \DateTimeImmutable $enrolled_at,
         public readonly bool $default_absent = false,
+        // Team seasons only, and read from the season's line-up rather than stored here.
+        public readonly ?int $board_number = null,
     ) {
     }
 }

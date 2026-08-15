@@ -23,6 +23,8 @@ something is missing, believe it and check the code before assuming otherwise.
 | KNSB rating integration | Fetch, per-player apply and bulk sync built; no cron |
 | Keizer pairing and scoring | Built — `KeizerScoring` + `KeizerPairing`, verified against the shipped 2025-26 fixture |
 | Round-robin pairing | Built — whole fixture generated as a Berger table |
+| Swiss pairing | **Not implemented** — no engine, so it is Manual under another name. Not selectable |
+| Team play (team vs team) | **Not implemented, and not selectable.** The roster half is built — `seasons.is_team`, the Teams tab, assignments, board order — but nothing pairs team against team, sums boards into a match result, or produces team standings. The engine never reads `is_team`. Both dialogs render Team disabled and `SeasonController::requireTeamPlayImplemented` refuses it; a season already on it stays editable. Not a pairing system: it is orthogonal to how a round is paired |
 | Email notifications | Invites, password resets, absence notices |
 | Round dates in the admin UI | Built — set per round on the Pairings tab |
 | PDF generation | **Not implemented** (dompdf is installed, unused) |
@@ -106,10 +108,13 @@ engine is still verified by hand in the UI.
 
 ### Keizer
 
-Every pairing system is now selectable — `ScoringStrategyResolver` builds a
-strategy for both scoring systems, so nothing gates a season any more. `swiss`
-still has no pairing engine and is hand-built; Keizer and both round-robins
-generate their own boards.
+`ScoringStrategyResolver` builds a strategy for both scoring systems, so scoring
+gates nothing. **Selectability is now gated on pairing** instead
+(`PairingSystem::isImplemented()`): three of the four systems can be chosen for a
+new tournament — Keizer, Manual and Round-robin. Swiss is refused: it has no
+pairing engine, so it would be Manual under another label. Both dialogs render it
+disabled and labelled "(not implemented)", and `UpdateSeasonRequest` still
+*accepts* every system so a season already on one stays editable.
 
 **Scoring** (`src/Engine/Scoring/KeizerScoring.php`):
 
@@ -208,8 +213,91 @@ One loose end: paired players are markedly closer in **rating order**
 (median gap 5, max 24) than in **Keizer-score order** (median 9, max 43). The
 pairing order may not be the score at all. Deliberately not acted on yet.
 
-Categories also drive grouped round-robin (`GroupingMode::Categories`) and the
-standings filter.
+Categories also drive the standings filter.
+
+**Nothing plays a team tournament yet.** What exists is the roster: teams are
+named, filled and put in board order, and that is where it stops. `is_team` is
+read only by storage, serialization and guards — **the engine has no reference
+to it at all** (`grep is_team src/Engine/` finds nothing). Pair a round on a team
+season and you get whatever the season's pairing system does to individuals;
+board numbers take no part, six boards between two teams stay six separate
+games, and standings rank players rather than teams.
+
+Worse, `categoryPairing` defaults to `adjacent` and reads `category` — which on
+a team season resolves to the player's *team*. So Keizer would prefer to pair
+teammates, the opposite of the point. `free` is the workaround.
+
+So Team is refused for a **new** tournament, the same way Swiss is: both admin
+selects render it disabled and `SeasonController::requireTeamPlayImplemented`
+refuses `is_team: true` on create and on any switch onto it. A season already on
+it stays fully editable, and turning it off is allowed — that's a move towards
+something playable. Building the real thing means a pairing engine that pairs
+*teams* and then expands each match into boards, which is a third shape
+alongside `PerRoundPairing` and `FullSchedulePairing`.
+
+**Teams reuse all of it.** `seasons.is_team` adds no table: a team tournament's
+teams *are* its `categories`. The flag decides what the groups are called, and
+the Categories tab renders as the Teams tab — one component,
+`TournamentCategoriesTab`. A tournament is one or the other, never both, which is
+why nothing was added alongside. Like the pairing system and the tempo, it is
+fixed once the tournament leaves preparation.
+
+**Boards.** A team plays in board order — board 1 against board 1 — so a team
+season's `categories` column holds the line-up rather than a bare list of names:
+
+```json
+{ "Team A": { "1": 14, "2": 3 }, "Team B": { "1": 8, "2": 19 } }
+```
+
+One column, two readings, decided by `is_team`: `Season::$categories` is always
+the list of names (`array_keys` for a team season), and `Season::$teams` is the
+`TeamSheet` behind them. Nothing else changes shape, so every caller that
+validates a group name against `$season->categories` reads the same thing it
+always did.
+
+`TeamSheet` (`src/Entity/ValueObjects/TeamSheet.php`) owns that JSON. It keeps
+each team as an ordered list and writes the board numbers out on encode, so
+**1..n with one player per board holds by construction** — no caller can leave a
+gap or put two players on one board, because no caller ever names a number. Its
+mutations (`place`, `without`, `reorder`, `withNames`, `withAssignments`,
+`replace`) each return a new sheet, and `SeasonController::saveTeams` writes it
+whole in one update.
+
+**A team season doesn't use `season_players.category`.** Membership lives in the
+sheet, and `SeasonPlayerRepository` joins the season row into every enrolment
+query so `hydrate` can fill `category` and `board_number` from it. Both stay
+ordinary properties on `SeasonPlayer`, so the ~30 call sites that load enrolments
+and the viewer code that shows a group are untouched — a team season's player
+simply reports their team where an individual season's reports their category.
+`board_number` is **not** a column; it's the sheet index plus one.
+
+The consequence to keep in mind: any write that changes team membership has to
+go through the season row, not the enrolment. That's `enrollPlayer`,
+`setPlayerCategory`, `assignCategories`, `setTeamBoards`, `removePlayer(s)`, and
+`PlayerMergeService` — a merge repoints the ids inside the sheet, which the
+enrolment repoint doesn't reach.
+
+Joining a team takes the bottom board and leaving one gives it up; Auto Fill
+rebuilds every team and orders each by rating, strongest on board 1. The order
+is changed with the per-row arrows or by dropping one player onto another.
+
+**Teams are fixed once the tournament starts** — `requireTeamsEditable` refuses
+the team list, the assignments and the board order from `active` onwards, not
+just from `completed`, because by then boards are published and being played.
+Individual categories keep their old behaviour and stay editable while the
+tournament runs; only `is_team` seasons freeze early.
+
+`PATCH /seasons/{id}/boards` takes a team and its players **in playing order**,
+never the numbers themselves: 1..n is assigned server-side, so no request can
+leave a gap or put two players on one board. Auto Fill renumbers every team by
+rating, which is consistent with it overriding whatever was set by hand.
+Individual tournaments never set the column.
+
+The consequence to know: everything that reads `category` still reads it. Under
+Keizer that includes `categoryPairing`, which defaults to `adjacent` — so on a
+team season it constrains pairing to a player's own team or the next one along,
+which is backwards for a competition where teams are meant to play each other.
+Latent while no team pairing exists, and the workaround is `categoryPairing: free`.
 
 Absence recording is load-bearing under Keizer in a way it never was under
 standard scoring: an absence scores `Par × OwnV`, so whether an admin marks a
@@ -249,15 +337,13 @@ reads it by key, and `RoundRepository::createNextForSeason` refuses a round past
 it — inside the same `forUpdate()` lock as the number it's checked against, so
 two concurrent appends can't overshoot.
 
-Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`; the grouped
-variant adds `Grouping`. **There is deliberately no round count** — it is
+Round-robin composes `Legs`, `Seeding` and `AlternateColoursPerLeg`. **There is
+deliberately no round count** — it is
 legs × (N-1) for an even field and legs × N for an odd one — and no bye value,
 because the odd player out takes the `pairing_bye` that scoring already prices.
 `Legs` caps at a flat 100 because a Setting can't see the roster: what is
 actually bounded is legs × field size (100 legs is fine for a two-player match
 and impossible for four players), so the real ceiling belongs to the generator.
-`Grouping` only implements "the season's categories"; the rating splits need a
-conditional group-count field the settings form can't render yet.
 
 `roundLimit()` returns null for round-robin, and deliberately: the schedule is
 the round set, so `RoundService::createRound` refuses a hand-made round outright
@@ -291,9 +377,8 @@ Three things follow from the fixture being derived from pairing numbers:
   exists (see the round-limit note above).
 
 Guards live in the engine because only it sees both the legs and the roster:
-fewer than two players, a category with one player (grouped variant), and a
-schedule longer than 255 rounds — legs × (N-1) for an even field and legs × N
-for an odd one, taken from the largest group — all throw a `ConflictException`
+fewer than two players, and a schedule longer than 255 rounds — legs × (N-1) for
+an even field and legs × N for an odd one — both throw a `ConflictException`
 naming the real numbers. They run before the transaction, so a rejected
 generation deletes nothing.
 
@@ -594,9 +679,10 @@ they follow the host's WordPress prefix. **Production is not `wp_`** — the liv
 site uses `boa_scs_*`. Always compose names with `SCS_TABLE_PREFIX`; never
 hardcode `wp_scs_`.
 
-- `…scs_seasons` — competition seasons (name, dates, pairing system, `time_control`)
+- `…scs_seasons` — competition seasons (name, dates, pairing system,
+  `time_control`, `is_team`)
 - `…scs_season_players` — player enrollment (season + category + player, plus
-  `default_absent`)
+  `default_absent` and `board_number`)
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
 - `…scs_attendance` — per-round presence and bye type
@@ -618,8 +704,13 @@ no "single active season" invariant: don't add a unique constraint, and note
 property (`categories` column), optional — a season may run as one undivided
 pool, so `season_players.category` is nullable.
 
-Migrations live in `includes/migrations/` and are tracked per file in the
-`scs_applied_migrations` WordPress option — not a version number. They run on
+Migrations live in `includes/migrations/` and are tracked in the
+`scs_applied_migrations` WordPress option by their **numeric prefix**, not their
+filename and not a global version number. So a number is spent the moment a
+database applies it, whatever the file behind it was called: withdrawing a
+migration and reusing its number means any database that ran the old one
+silently skips the new one. Either take the next number, or — if the withdrawn
+one never left a dev machine — drop it from that option and reuse the number. They run on
 `plugins_loaded`, because the deploy flow (git pull / upload-replace) never
 fires the activation hook. The `SCS_DB_VERSION` constant is currently unused.
 

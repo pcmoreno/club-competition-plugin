@@ -7,6 +7,7 @@ namespace SCS\Entity;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
+use SCS\Entity\ValueObjects\TeamSheet;
 
 class Season
 {
@@ -30,6 +31,10 @@ class Season
         public readonly ?array $display_settings = null,
         // The tempo this tournament is played at; its games inherit it.
         public readonly TimeControl $time_control = TimeControl::Classical,
+        // Team play: `categories` holds team names rather than category names.
+        public readonly bool $is_team = false,
+        // The line-up behind those names, empty unless this is a team season.
+        public readonly TeamSheet $teams = new TeamSheet(),
     ) {
     }
 }

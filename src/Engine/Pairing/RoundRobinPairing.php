@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace SCS\Engine\Pairing;
 
-use SCS\Engine\Settings\RoundRobinSettings;
+use SCS\Engine\Settings\RoundRobinPairingSettings;
 use SCS\Entity\Enum\ByeType;
-use SCS\Entity\Enum\GroupingMode;
 use SCS\Entity\Enum\SeedingMethod;
 use SCS\Entity\Season;
 use SCS\Entity\SeasonPlayer;
@@ -27,7 +26,7 @@ final class RoundRobinPairing implements FullSchedulePairing
     // rounds.round_number is TINYINT UNSIGNED, so no schedule can run past this.
     public const MAX_ROUNDS = 255;
 
-    public function __construct(private readonly RoundRobinSettings $settings)
+    public function __construct(private readonly RoundRobinPairingSettings $settings)
     {
     }
 
@@ -37,47 +36,40 @@ final class RoundRobinPairing implements FullSchedulePairing
      */
     public function pairSchedule(Season $season, array $roster): array
     {
-        $groups  = $this->groups($roster);
-        $biggest = max(array_map('count', $groups));
+        if (count($roster) < 2) {
+            throw new ConflictException('A round-robin needs at least two enrolled players.');
+        }
+
+        $players = $this->seed($roster);
 
         // Checked before anything is built: the settings cap legs on their own,
         // but what is actually bounded is legs × field size, and only here are
         // both known.
-        $roundCount = $this->settings->legs() * $this->roundsPerLeg($biggest);
+        $roundCount = $this->settings->legs() * $this->roundsPerLeg(count($players));
         if ($roundCount > self::MAX_ROUNDS) {
             throw new ConflictException(sprintf(
                 '%d legs of %d players is %d rounds, and a tournament can run at most %d.',
                 $this->settings->legs(),
-                $biggest,
+                count($players),
                 $roundCount,
                 self::MAX_ROUNDS
             ));
         }
 
-        $schedules = array_map($this->groupSchedule(...), $groups);
-
-        // Groups can be different sizes, so a smaller one runs out of rounds
-        // before the rest. Its players simply have no game that round — not a
-        // bye, which is a scored outcome; they have finished their schedule.
         $rounds = [];
-        for ($i = 0; $i < $roundCount; $i++) {
+        foreach ($this->buildSchedule($players) as $round) {
             $pairings = [];
             $byes     = [];
             $board    = 1;
 
-            foreach ($schedules as $schedule) {
-                if (!isset($schedule[$i])) {
-                    continue;
-                }
-                foreach ($schedule[$i]['pairs'] as [$white, $black]) {
-                    $pairings[] = ['white' => $white, 'black' => $black, 'board' => $board++];
-                }
-                foreach ($schedule[$i]['byes'] as $seasonPlayerId) {
-                    $byes[] = [
-                        'season_player_id' => $seasonPlayerId,
-                        'bye_type'         => ByeType::PairingBye->value,
-                    ];
-                }
+            foreach ($round['pairs'] as [$white, $black]) {
+                $pairings[] = ['white' => $white, 'black' => $black, 'board' => $board++];
+            }
+            foreach ($round['byes'] as $seasonPlayerId) {
+                $byes[] = [
+                    'season_player_id' => $seasonPlayerId,
+                    'bye_type'         => ByeType::PairingBye->value,
+                ];
             }
 
             $rounds[] = new PairingResult($pairings, $byes);
@@ -91,46 +83,6 @@ final class RoundRobinPairing implements FullSchedulePairing
     private function roundsPerLeg(int $size): int
     {
         return $size % 2 === 0 ? $size - 1 : $size;
-    }
-
-    /**
-     * Split the roster into the fields that each play their own round-robin, and
-     * seed each one.
-     *
-     * @param  list<SeasonPlayer>                 $roster
-     * @return non-empty-list<list<SeasonPlayer>>
-     */
-    private function groups(array $roster): array
-    {
-        if (count($roster) < 2) {
-            throw new ConflictException('A round-robin needs at least two enrolled players.');
-        }
-
-        if ($this->settings->grouping() !== GroupingMode::Categories) {
-            return [$this->seed($roster)];
-        }
-
-        // Uncategorised players are a group of their own rather than an error:
-        // categories are optional per season, and a half-categorised roster is
-        // the admin's to sort out — but a group of one has no tournament to play.
-        $byCategory = [];
-        foreach ($roster as $player) {
-            $byCategory[$player->category ?? ''][] = $player;
-        }
-        ksort($byCategory);
-
-        $groups = [];
-        foreach ($byCategory as $category => $players) {
-            if (count($players) < 2) {
-                throw new ConflictException(sprintf(
-                    '%s has only one player, so it has no round-robin to play. Move them to another category first.',
-                    $category === '' ? 'The players without a category' : sprintf('Category “%s”', $category)
-                ));
-            }
-            $groups[] = $this->seed($players);
-        }
-
-        return $groups;
     }
 
     /**
@@ -165,13 +117,13 @@ final class RoundRobinPairing implements FullSchedulePairing
     }
 
     /**
-     * One group's rounds, with pairing numbers already resolved to season-player
-     * ids.
+     * Every round of the fixture, with pairing numbers already resolved to
+     * season-player ids.
      *
      * @param  list<SeasonPlayer> $players seeded
      * @return list<array{pairs: list<array{0:int,1:int}>, byes: list<int>}>
      */
-    private function groupSchedule(array $players): array
+    private function buildSchedule(array $players): array
     {
         $size = count($players);
         // An odd field plays as if one more player were present; whoever draws

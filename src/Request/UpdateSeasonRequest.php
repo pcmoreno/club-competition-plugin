@@ -32,6 +32,9 @@ class UpdateSeasonRequest
     /** @var list<string>|null */
     public ?array $categories = null;
 
+    // Team play: `categories` then holds team names. Null means unchanged.
+    public ?bool $is_team = null;
+
     // The tournament's notification recipients. Lives in its own table, so it's
     // handled beside toUpdateData() rather than in it. Null means "unchanged";
     // an empty array is a real value and clears the list back to "all admins".
@@ -46,10 +49,14 @@ class UpdateSeasonRequest
     /** @var array<string,mixed>|null */
     public ?array $display_settings = null;
 
+    // Wider than the create form's list on purpose: a season already running on
+    // a system that has since been marked unimplemented must stay editable, and
+    // the Basic details form sends the current system on every save. Switching
+    // *to* an unimplemented one is refused in SeasonController::applySettings.
     /** @return list<string> */
     public static function pairingSystemChoices(): array
     {
-        return PairingSystem::implementedValues();
+        return array_column(PairingSystem::cases(), 'value');
     }
 
     /** @return list<string> */
@@ -85,6 +92,9 @@ class UpdateSeasonRequest
         }
         if ($request->get_param('time_control') !== null) {
             $dto->time_control = (string)$request->get_param('time_control');
+        }
+        if ($request->get_param('is_team') !== null) {
+            $dto->is_team = filter_var($request->get_param('is_team'), FILTER_VALIDATE_BOOLEAN);
         }
         if ($request->get_param('status') !== null) {
             $dto->status = (string)$request->get_param('status');
@@ -129,6 +139,9 @@ class UpdateSeasonRequest
         }
         if ($this->time_control !== null) {
             $data['time_control'] = $this->time_control;
+        }
+        if ($this->is_team !== null) {
+            $data['is_team'] = $this->is_team ? 1 : 0;
         }
         if ($this->status !== null) {
             $data['status'] = $this->status;

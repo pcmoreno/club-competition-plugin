@@ -9,6 +9,7 @@ use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Season;
+use SCS\Entity\ValueObjects\TeamSheet;
 
 class SeasonRepository
 {
@@ -70,7 +71,7 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
-    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control): Season
+    public function create(string $name, ?string $location, ?string $start_date, ?string $end_date, PairingSystem $pairing_system, array $categories, TimeControl $time_control, bool $is_team = false): Season
     {
         $this->connection->insert(SCS_TABLE_PREFIX . 'seasons', [
             'name'           => $name,
@@ -81,6 +82,7 @@ class SeasonRepository
             'pairing_system' => $pairing_system->value,
             'status'         => SeasonStatus::Preparation->value,
             'categories'     => json_encode($categories),
+            'is_team'        => $is_team ? 1 : 0,
         ]);
 
         return $this->findById((int)$this->connection->lastInsertId());
@@ -104,6 +106,17 @@ class SeasonRepository
 
     private function hydrate(array $row): Season
     {
+        $decoded = json_decode($row['categories'] ?? '[]', true);
+        $decoded = is_array($decoded) ? $decoded : [];
+        $isTeam  = (bool)($row['is_team'] ?? false);
+
+        // One column, two readings: a team season's holds the line-up, and its
+        // team names are the same list an individual season keeps as categories.
+        $teams      = $isTeam ? TeamSheet::fromColumn($decoded) : new TeamSheet();
+        $categories = $isTeam
+            ? $teams->names()
+            : array_values(array_filter($decoded, is_string(...)));
+
         return new Season(
             id:             (int)$row['id'],
             name:           $row['name'],
@@ -112,12 +125,14 @@ class SeasonRepository
             end_date:       $row['end_date'] !== null ? new \DateTimeImmutable($row['end_date']) : null,
             pairing_system: PairingSystem::from($row['pairing_system']),
             status:         SeasonStatus::from($row['status']),
-            categories:     json_decode($row['categories'] ?? '[]', true),
+            categories:     $categories,
             created_at:     new \DateTimeImmutable($row['created_at']),
             pairing_settings: $this->decodeSettings($row['pairing_settings'] ?? null),
             scoring_settings: $this->decodeSettings($row['scoring_settings'] ?? null),
             display_settings: $this->decodeSettings($row['display_settings'] ?? null),
             time_control:     TimeControl::from($row['time_control']),
+            is_team:          $isTeam,
+            teams:            $teams,
         );
     }
 

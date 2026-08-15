@@ -7,7 +7,6 @@ namespace SCS\Engine\Settings;
 use SCS\Engine\Settings\Setting\AlternateColoursPerLeg;
 use SCS\Engine\Settings\Setting\Legs;
 use SCS\Engine\Settings\Setting\Seeding;
-use SCS\Entity\Enum\GroupingMode;
 use SCS\Entity\Enum\SeedingMethod;
 
 /**
@@ -19,7 +18,7 @@ use SCS\Entity\Enum\SeedingMethod;
  * contradicts the roster. And there is no bye value: the odd player out gets a
  * pairing bye, which is a reserved key in the scoring settings and priced there.
  */
-final class RoundRobinPairingSettings implements RoundRobinSettings
+final class RoundRobinPairingSettings implements TournamentPairingSettings
 {
     public function __construct(
         private readonly int $legsValue = 1,
@@ -41,12 +40,6 @@ final class RoundRobinPairingSettings implements RoundRobinSettings
     public function alternateColoursPerLeg(): bool
     {
         return $this->alternateColours;
-    }
-
-    // One undivided field — the grouped variant is its own settings class.
-    public function grouping(): ?GroupingMode
-    {
-        return null;
     }
 
     /** @return array<string,mixed> */

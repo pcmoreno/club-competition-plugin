@@ -8,7 +8,7 @@ use SCS\Engine\Pairing\KeizerPairing;
 use SCS\Engine\Pairing\PairingEngineInterface;
 use SCS\Engine\Pairing\RoundRobinPairing;
 use SCS\Engine\Settings\KeizerPairingSettings;
-use SCS\Engine\Settings\RoundRobinSettings;
+use SCS\Engine\Settings\RoundRobinPairingSettings;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
@@ -55,9 +55,8 @@ final class PairingEngineResolver
                 return new KeizerPairing($keizer);
 
             case PairingSystem::RoundRobinFull:
-            case PairingSystem::RoundRobinGroups:
                 $settings = $this->settings->pairing($season);
-                if (!$settings instanceof RoundRobinSettings) {
+                if (!$settings instanceof RoundRobinPairingSettings) {
                     throw new ConflictException('This tournament has no round-robin settings to pair from.');
                 }
 

@@ -7,14 +7,13 @@ import { ApiError } from '../api/client';
 // PairingSystem enum (src/Entity/Enum/PairingSystem.php). Scoring is derived
 // from the pairing system on the backend, so it isn't chosen separately.
 //
-// Swiss is selectable but has no pairing engine, so its boards are built by
-// hand; Keizer and both round-robins generate their own.
+// `implemented: false` keeps the option visible but unselectable. Mirrors
+// PairingSystem::isImplemented(), which refuses it server-side.
 export const PAIRING_OPTIONS = [
 	{ value: 'keizer', label: 'Keizer' },
-	{ value: 'swiss', label: 'Swiss' },
+	{ value: 'swiss', label: 'Swiss', implemented: false },
 	{ value: 'manual', label: 'Manual' },
 	{ value: 'round-robin-full', label: 'Round-robin' },
-	{ value: 'round-robin-groups', label: 'Round-robin (groups)' },
 ];
 
 // The system a fresh tournament starts on.
@@ -38,6 +37,12 @@ export const STATUS_LABELS = {
 // Completed tournaments are read-only bar the standings columns; the server refuses the rest.
 export function isLocked( season ) {
 	return season.status === 'completed';
+}
+
+// A team competition's line-ups are settled once it starts, which is earlier
+// than the completed lock. Mirrors SeasonController::requireTeamsEditable.
+export function isTeamLocked( season ) {
+	return season.is_team === true && season.status !== 'preparation';
 }
 
 // RoundStatus enum (src/Entity/Enum/RoundStatus.php). Pairings are editable

@@ -3,7 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
-import { STATUS_LABELS, errorMessage, isLocked } from './tournamentShared';
+import {
+	STATUS_LABELS,
+	errorMessage,
+	isLocked,
+	isTeamLocked,
+} from './tournamentShared';
 import { TournamentBasicTab } from './TournamentBasicTab';
 import { TournamentPairingsTab } from './TournamentPairingsTab';
 import { TournamentPlayersTab } from './TournamentPlayersTab';
@@ -24,6 +29,9 @@ import { keys } from '../api/keys';
 // Absences is offered wherever rounds are created one at a time — a full
 // schedule pairs every round up front, so a standing absence has nothing to
 // apply to.
+//
+// Teams and Categories are the same tab: a team tournament groups its players
+// into teams instead of categories, out of the same column.
 function tabsFor( season ) {
 	return [
 		{ key: 'basic', label: 'Basic details' },
@@ -34,7 +42,7 @@ function tabsFor( season ) {
 		...( season.cadence !== 'full'
 			? [ { key: 'absences', label: 'Absences' } ]
 			: [] ),
-		{ key: 'categories', label: 'Categories' },
+		{ key: 'categories', label: season.is_team ? 'Teams' : 'Categories' },
 		{ key: 'settings', label: 'Settings' },
 	];
 }
@@ -170,7 +178,7 @@ export function TournamentDetail( { seasonId } ) {
 					<TournamentCategoriesTab
 						season={ season }
 						players={ players }
-						locked={ locked }
+						locked={ locked || isTeamLocked( season ) }
 					/>
 				) }
 				{ activeTab === 'settings' && (
