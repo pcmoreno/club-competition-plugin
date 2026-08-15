@@ -5,6 +5,7 @@ import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
 import {
 	STATUS_LABELS,
+	ROUND_STATUS_LABELS,
 	errorMessage,
 	isLocked,
 	isTeamLocked,
@@ -45,6 +46,21 @@ function tabsFor( season ) {
 		{ key: 'categories', label: season.is_team ? 'Teams' : 'Categories' },
 		{ key: 'settings', label: 'Settings' },
 	];
+}
+
+// The server reports why a tournament can't be closed as facts, not a sentence;
+// the wording is ours, and reuses the round labels the rest of the admin shows.
+function completionHint( season ) {
+	const blocker = season.completion_blocker;
+	if ( ! blocker ) {
+		return 'Close this tournament for good.';
+	}
+	if ( blocker.reason === 'no_rounds' ) {
+		return 'A tournament with no rounds can’t be completed.';
+	}
+	const status =
+		ROUND_STATUS_LABELS[ blocker.round_status ] ?? blocker.round_status;
+	return `Round ${ blocker.round_number } is still ${ status.toLowerCase() }.`;
 }
 
 export function TournamentDetail( { seasonId } ) {
@@ -134,10 +150,7 @@ export function TournamentDetail( { seasonId } ) {
 							disabled={
 								! season.can_complete || complete.isPending
 							}
-							title={
-								season.completion_blocker ??
-								'Close this tournament for good.'
-							}
+							title={ completionHint( season ) }
 							className="shrink-0 rounded border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-40"
 						>
 							{ complete.isPending

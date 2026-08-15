@@ -77,7 +77,7 @@ final class SeasonLifecycleService
 
             $blocker = $this->blockerFor($this->rounds->findBySeason($season->id));
             if ($blocker !== null) {
-                throw new ConflictException($blocker);
+                throw new ConflictException($this->describe($blocker));
             }
 
             $update = [ 'status' => SeasonStatus::Completed->value ];
@@ -93,27 +93,50 @@ final class SeasonLifecycleService
         });
     }
 
-    // Why a tournament can't be closed yet, or null when it can — the admin
-    // screen asks so it doesn't have to re-derive the rule complete() enforces.
-    public function completionBlocker(Season $season): ?string
+    // Why a tournament can't be closed yet, or null when it can — as facts, so
+    // the screen that shows it writes its own words.
+    /** @return array{reason: string, round_number?: int, round_status?: string}|null */
+    public function completionBlocker(Season $season): ?array
     {
         return $this->blockerFor($this->rounds->findBySeason($season->id));
     }
 
     // One rule, so what the screen reports and what the write refuses can't drift.
-    /** @param array<Round> $rounds */
-    private function blockerFor(array $rounds): ?string
+    /**
+     * @param  array<Round> $rounds
+     * @return array{reason: string, round_number?: int, round_status?: string}|null
+     */
+    private function blockerFor(array $rounds): ?array
     {
         if ($rounds === []) {
-            return 'A tournament with no rounds cannot be completed.';
+            return [ 'reason' => 'no_rounds' ];
         }
 
         foreach ($rounds as $round) {
             if ($round->status !== RoundStatus::Complete) {
-                return sprintf('Round %d is still %s.', $round->round_number, $round->status->value);
+                return [
+                    'reason'       => 'round_incomplete',
+                    'round_number' => $round->round_number,
+                    'round_status' => $round->status->value,
+                ];
             }
         }
 
         return null;
+    }
+
+    // Exception messages are for the log, so this one spells the reason out.
+    /** @param array{reason: string, round_number?: int, round_status?: string} $blocker */
+    private function describe(array $blocker): string
+    {
+        if ($blocker['reason'] === 'no_rounds') {
+            return 'A tournament with no rounds cannot be completed.';
+        }
+
+        return sprintf(
+            'Round %d is still %s, so the tournament cannot be completed yet.',
+            $blocker['round_number'] ?? 0,
+            $blocker['round_status'] ?? ''
+        );
     }
 }
