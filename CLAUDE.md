@@ -504,10 +504,19 @@ Completing a round and completing the tournament are separate acts: the round is
 finished first, and closing is asked of the tournament, whose rounds
 `SeasonLifecycleService` checks for itself.
 
-`GET /seasons/{id}` reports `can_complete` and a `completion_blocker` string, so
-the header can disable the button and say *why* without re-deriving the rule.
-Both come from the same `blockerFor()` the write refuses on, so the reason shown
-and the reason given are one string.
+`GET /seasons/{id}` reports `can_complete` and a `completion_blocker`, so the
+header can disable the button and say *why* without re-deriving the rule. Both
+come from the same `blockerFor()` the write refuses on, so what the screen shows
+and what the write refuses can't drift. The blocker carries facts — `reason`,
+`round_number`, `round_status` — and the screen writes the sentence from the
+round labels it already uses; the exception thrown by the write keeps a full
+sentence, which is for the log. Both fields are added for an **admin** caller
+only: the route is member-readable, and a draft round is one members can't see.
+
+**A completed round leaves `complete` only by being reopened** to `finalised`,
+which keeps its standings snapshot. `PATCH /rounds/{id}/status` refuses `draft`
+and `published` from there outright — they would skip that guard and strand the
+snapshot.
 
 **Closing stamps `end_date` when it is blank**, with the day it was closed. Until
 then the date is a projection; completing turns it into a fact, and afterwards

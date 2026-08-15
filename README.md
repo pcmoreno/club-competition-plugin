@@ -4,13 +4,12 @@ A WordPress plugin for managing chess competition pairings, standings, and resul
 
 ## Features
 
-- Live competition viewer with standings, cross-tables, and player stats
+- Live competition viewer with standings and player stats
 - Admin interface for round management, pairing generation, and result entry
-- Keizer pairing system with manual override capability
+- Keizer and round-robin pairing, with manual override
 - KNSB rating integration (Dutch chess federation)
-- Member invitations and authentication
-- Email notifications
-- PDF generation for pairings
+- Member accounts and invitations, separate from WordPress users
+- Email notifications for invites, password resets and absences
 
 ## Requirements
 
@@ -21,10 +20,9 @@ A WordPress plugin for managing chess competition pairings, standings, and resul
 
 ## Installation
 
-1. Clone the repository into `/wp-content/plugins/club-competition-plugin/`
-2. Run `composer install` to install PHP dependencies
-3. Activate the plugin in WordPress admin
-4. Run database migrations: `wp scs migrate`
+Build a zip with `bin/package.sh` and upload it in wp-admin under Plugins → Add
+New → Upload Plugin, choosing "Replace current with uploaded". Migrations run on
+`plugins_loaded`, so there is nothing to run afterwards.
 
 ## Development
 
@@ -45,16 +43,17 @@ npm run build
 
 ### Local Testing
 
-See `/docs/local-development.md` for detailed setup instructions.
+`dev/docker-compose.yml` brings up WordPress, MySQL and Mailpit. Run PHP tooling
+(`phpunit`, `phpstan`, `php-cs-fixer`) inside that container — it has the PHP
+version production runs.
 
 ## Architecture
 
-- **PHP Backend**: Symfony components for validation, DI, authentication
+- **PHP Backend**: Symfony components for validation, DI and CSRF
 - **Database**: MySQL with Doctrine DBAL
 - **REST API**: WordPress REST API with custom endpoints
-- **Frontend**: React-based viewer and admin interface
+- **Frontend**: React-based viewer and admin interface, one bundle
 - **Email**: WordPress wp_mail integration
-- **PDF**: dompdf for pairing sheets
 
 ## Tech Stack
 
@@ -63,12 +62,12 @@ See `/docs/local-development.md` for detailed setup instructions.
 | Plugin Runtime | PHP (WordPress plugin API) |
 | Database | MySQL via Doctrine DBAL |
 | REST API | WordPress REST API |
-| Auth | Symfony Security + lcobucci/jwt (JWT cookie + CSRF) |
+| Auth | lcobucci/jwt (httpOnly JWT cookie) + Symfony CSRF |
 | Validation | Symfony Validator |
 | Serialization | Hand-rolled `SerializerService` |
 | DI Container | Symfony DependencyInjection |
-| Frontend | React |
-| PDF | dompdf |
+| Frontend | React 18 via `@wordpress/element` |
+| Styling | Tailwind v4 |
 
 ## License
 
