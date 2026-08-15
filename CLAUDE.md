@@ -718,8 +718,8 @@ database applies it, whatever the file behind it was called: withdrawing a
 migration and reusing its number means any database that ran the old one
 silently skips the new one. Either take the next number, or — if the withdrawn
 one never left a dev machine — drop it from that option and reuse the number. They run on
-`plugins_loaded`, because the deploy flow (git pull / upload-replace) never
-fires the activation hook. The `SCS_DB_VERSION` constant is currently unused.
+`plugins_loaded`, because the deploy flow (upload-replace in wp-admin) never
+fires the activation hook — and there is no CLI to run them from either. The `SCS_DB_VERSION` constant is currently unused.
 
 ## Development Workflow
 
@@ -772,6 +772,9 @@ wp scs create-admin --name="Admin Name" --email="admin@example.com"
 
 # Download the latest KNSB rating list to the server
 wp scs fetch-knsb-ratings
+
+# Build the uploadable release zip from a committed ref (default HEAD)
+bin/package.sh [git-ref]
 ```
 
 Those three are the **only** registered WP-CLI commands (see
@@ -912,40 +915,49 @@ Controllers catch and return appropriate HTTP responses.
 
 ## Deployment
 
-### Git → SiteGround Workflow
+### Zip → wp-admin upload
 
-**SiteGround has no Node.js** (Shared & Cloud plans), so `npm run build` cannot
-run on the host. The compiled frontend in `build/` is therefore **committed to
-git** (not gitignored) and shipped with the pull. Always rebuild and commit
-`build/` before deploying any frontend change — the server only runs Composer.
+**The deploy unit is a zip**, built by `bin/package.sh` and uploaded by hand
+through wp-admin. There is no `git pull` on the host and no deploy over SSH:
+SiteGround has neither Node nor a reliable Composer, so everything the plugin
+needs has to arrive already built.
 
 ```bash
-# 1. Build the frontend locally and commit the artifacts
+# 1. Build the frontend and commit it — build/ is committed, not gitignored
 npm run build
-git add build/
-git commit -m "Build frontend"   # on a branch, then merge per Git Workflow
+git add build/ && git commit -m "Build frontend"   # on a branch, per Git Workflow
 
-# 2. Push to GitHub
-git push origin master
-
-# 3. SSH into SiteGround
-ssh user@domain.com
-
-# 4. Pull and install PHP deps (no npm on host)
-cd /wp-content/plugins/club-competition-plugin
-git pull origin master
-composer install
-
-# 5. Run migrations
-wp scs migrate
-
-# 6. Clear cache (if using SG CachePress)
-wp siteground-cache purge
+# 2. Cut the zip from a committed ref (default HEAD)
+bin/package.sh                 # -> dist/club-competition-plugin-<version>.zip
+bin/package.sh v0.5.2          # or an older ref
+ALLOW_DIRTY=1 bin/package.sh   # package a dirty tree; only committed files ship
 ```
 
-**Important**: Test locally first. No staging environment — deployments go
-straight to production. If you forget to rebuild + commit `build/`, the site
-ships stale (or missing) frontend assets.
+Then: **wp-admin → Plugins → Add New → Upload Plugin →** pick the zip **→
+"Replace current with uploaded"**. Migrations run on `plugins_loaded`, so
+there's nothing to run afterwards — **not** `wp scs migrate`, which needs a CLI
+the host doesn't conveniently have. Purge the cache from the SG CachePress UI if
+the frontend changed.
+
+The script does three things worth knowing:
+
+- **It packages a committed ref**, via `git archive`. Anything uncommitted is
+  silently left out, so it refuses a dirty tree unless `ALLOW_DIRTY=1`. The
+  version in the file name is read from the ref too (`git show "$REF:…"`), not
+  from the working tree, so packaging an older ref names the zip correctly.
+- **It refuses a missing or stale `build/viewer.js`** — editing the frontend and
+  shipping the previous bundle is the one deploy mistake this repo can actually
+  make, and it fails silently because `build/` is always present. Note the guard
+  compares the *working tree*, so it means less when `$REF` isn't HEAD.
+- **What ships is decided by `.gitattributes`** (`export-ignore`), not by the
+  script — `/js`, `/css`, `/bin`, `/tests`, `phpunit.xml`, the build and analysis
+  configs and `CLAUDE.md` all stay out. Adding a dev-only file means adding a
+  rule there. `vendor/` is installed fresh into the staging copy with `--no-dev
+  --optimize-autoloader --classmap-authoritative`.
+
+**Important**: test locally first. No staging environment — deployments go
+straight to production. The running version shows in the app footer, which is
+how you tell whether an upload actually took.
 
 ### Database Backups
 
@@ -1053,6 +1065,8 @@ $container->register( 'service', MyClass::class );
   and composer **in the container** — it has the PHP version production runs)
 - Design bundle and Sevilla exports live outside the repo, in `../documents/`
 - WordPress hosting: SiteGround, `schaakclubsantpoort.nl`, table prefix `boa_`.
-  Composer runs on the host; a CLI session is not conveniently available, so
-  don't design a workflow that depends on WP-CLI.
+  Neither Node nor a reliable Composer runs on the host, and a CLI session is
+  not conveniently available — the plugin ships as a zip built locally and
+  uploaded through wp-admin, so don't design a workflow that depends on WP-CLI
+  or on running anything server-side.
 - REST routes: `includes/RestApi.php` is the authoritative list
