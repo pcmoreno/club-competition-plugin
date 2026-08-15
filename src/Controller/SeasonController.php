@@ -605,7 +605,7 @@ class SeasonController extends RestController
                 $seasonPlayer = $this->seasonPlayerRepository->findById($seasonPlayer->id) ?? $seasonPlayer;
             }
 
-            return $this->created($this->serializer->serialize($seasonPlayer));
+            return $this->created($this->serializer->serialize($seasonPlayer, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -655,7 +655,7 @@ class SeasonController extends RestController
 
             $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
 
-            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
+            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -731,7 +731,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -827,7 +827,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -880,7 +880,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -980,7 +980,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 

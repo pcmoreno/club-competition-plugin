@@ -23,7 +23,7 @@ class SerializerService
         return match(true) {
             $entity instanceof Player       => $this->player($entity, $group),
             $entity instanceof Season       => $this->season($entity, $group),
-            $entity instanceof SeasonPlayer => $this->seasonPlayer($entity),
+            $entity instanceof SeasonPlayer => $this->seasonPlayer($entity, $group),
             $entity instanceof Round        => $this->round($entity, $group),
             $entity instanceof Game         => $this->game($entity),
             $entity instanceof Attendance   => $this->attendance($entity),
@@ -92,9 +92,9 @@ class SerializerService
         return $data;
     }
 
-    private function seasonPlayer(SeasonPlayer $sp): array
+    private function seasonPlayer(SeasonPlayer $sp, string $group): array
     {
-        return [
+        $data = [
             'id'          => $sp->id,
             'season_id'   => $sp->season_id,
             'player_id'   => $sp->player_id,
@@ -102,8 +102,15 @@ class SerializerService
             'board_number' => $sp->board_number,
             'elo_rating'  => $sp->elo_rating,
             'enrolled_at' => $sp->enrolled_at->format('Y-m-d'),
-            'default_absent' => $sp->default_absent,
         ];
+
+        // Sitting a whole tournament out is the member's own availability, not
+        // part of the competition record the viewer reads.
+        if ($group === self::GROUP_ADMIN) {
+            $data['default_absent'] = $sp->default_absent;
+        }
+
+        return $data;
     }
 
     private function round(Round $r, string $group): array
