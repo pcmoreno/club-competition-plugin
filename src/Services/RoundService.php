@@ -96,17 +96,6 @@ final class RoundService
             throw new ConflictException('This tournament pairs one round at a time, not as a whole schedule.');
         }
 
-        $existing = $this->rounds->findBySeason($season->id);
-        foreach ($existing as $round) {
-            if ($round->status !== RoundStatus::Draft) {
-                throw new ConflictException(sprintf(
-                    'Round %d is already %s, so the schedule can no longer be generated.',
-                    $round->round_number,
-                    $round->status->value
-                ));
-            }
-        }
-
         /** @var list<\SCS\Entity\SeasonPlayer> $roster */
         $roster = $this->seasonPlayers->findBySeason($season->id);
 
@@ -114,17 +103,33 @@ final class RoundService
         // players, too many rounds) should fail before anything is deleted.
         $schedule = $engine->pairSchedule($season, $roster);
 
-        return $this->transactions->transactional(function () use ($season, $existing, $schedule): array {
+        return $this->transactions->transactional(function () use ($season, $schedule): array {
             $this->lockOpenSeason($season->id);
 
+            // Read under the lock, and delete exactly what was read. Deciding
+            // from an earlier read would destroy rounds it never examined —
+            // one published in between takes its games and snapshots with it.
+            $existing = $this->rounds->findBySeason($season->id);
+            foreach ($existing as $round) {
+                if ($round->status !== RoundStatus::Draft) {
+                    throw new ConflictException(sprintf(
+                        'Round %d is already %s, so the schedule can no longer be generated.',
+                        $round->round_number,
+                        $round->status->value
+                    ));
+                }
+            }
+
             if ($existing !== []) {
+                $roundIds = array_values(array_map(static fn (Round $r): int => $r->id, $existing));
+
                 // No FK cascade, so clear the child rows first — snapshots
                 // included, or they outlive the round ids they point at and the
                 // read paths' inner join hides them.
-                $this->snapshots->deleteBySeason($season->id);
-                $this->games->deleteBySeason($season->id);
-                $this->attendance->deleteBySeason($season->id);
-                $this->rounds->deleteBySeason($season->id);
+                $this->snapshots->deleteByRounds($roundIds);
+                $this->games->deleteByRounds($roundIds);
+                $this->attendance->deleteByRounds($roundIds);
+                $this->rounds->deleteByIds($roundIds);
             }
 
             $created = [];
@@ -426,6 +431,10 @@ final class RoundService
         $computed = [];
 
         $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
+            // Completing takes a round out of draft, which is what generating a
+            // schedule requires of every round — so the two must not overlap.
+            $this->lockOpenSeason($season->id);
+
             // In the same transaction as the scoring, because scoring can
             // refuse: Keizer prices a round against the one before it and
             // throws when that has no standings. A status committed outside
