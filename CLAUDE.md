@@ -345,11 +345,12 @@ because the odd player out takes the `pairing_bye` that scoring already prices.
 actually bounded is legs × field size (100 legs is fine for a two-player match
 and impossible for four players), so the real ceiling belongs to the generator.
 
-`roundLimit()` returns null for round-robin, and deliberately: the schedule is
-the round set, so `RoundService::createRound` refuses a hand-made round outright
-once a season with `cadence() === 'full'` has one — rather than capping at a
-number. Before there is a schedule the manual path stays open, so a failed
-generation can't leave the admin with no way to create a round at all.
+`roundLimit()` returns null for round-robin, and deliberately: the schedule *is*
+the round set, so `RoundService::createRound` refuses a hand-made round on any
+`cadence() === 'full'` season rather than capping at a number. Every round comes
+from `generateSchedule`, which is also why regenerating is the way to change the
+fixture. The admin screens never offer Add round there either
+(`canAddRound` in `TournamentPairingsTab`).
 
 ### Round-Robin Pairing
 

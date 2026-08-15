@@ -44,19 +44,14 @@ final class RoundService
     ) {
     }
 
-    /**
-     * Append a round to a season that pairs one at a time.
-     *
-     * A full-schedule tournament's rounds come from its generated fixture, so an
-     * extra one would sit outside the schedule. Before there is a schedule the
-     * manual path stays open, so a failed generation can never leave the admin
-     * with no way to create a round at all.
-     */
+    // Append a round to a season that pairs one at a time.
     public function createRound(Season $season, ?string $date): Round
     {
         $this->assertSeasonNotCompleted($season);
 
-        if ($season->pairing_system->cadence() === 'full' && $this->rounds->findBySeason($season->id) !== []) {
+        // A full schedule is the round set: every round comes from the fixture,
+        // so there is no such thing as one made by hand.
+        if ($season->pairing_system->cadence() === 'full') {
             throw new ConflictException('This tournament’s rounds come from its generated schedule.');
         }
 
