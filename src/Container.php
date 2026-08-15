@@ -221,6 +221,11 @@ class Container
 
         $container->register('settings_resolver', Engine\SettingsResolver::class);
 
+        $container->register('season_lifecycle_service', Services\SeasonLifecycleService::class)
+            ->addArgument(new Reference('season_repository'))
+            ->addArgument(new Reference('round_repository'))
+            ->addArgument(new Reference('transaction_manager'));
+
         $container->register('round_service', Services\RoundService::class)
             ->addArgument(new Reference('scoring_strategy_resolver'))
             ->addArgument(new Reference('transaction_manager'))
@@ -231,7 +236,8 @@ class Container
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('pairing_engine_resolver'))
-            ->addArgument(new Reference('settings_resolver'));
+            ->addArgument(new Reference('settings_resolver'))
+            ->addArgument(new Reference('season_lifecycle_service'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
@@ -286,7 +292,7 @@ class Container
             ->addArgument(new Reference('admin_repository'))
             ->addArgument(new Reference('auth_context_service'))
             ->addArgument(new Reference('transaction_manager'))
-            ->addArgument(new Reference('round_service'));
+            ->addArgument(new Reference('season_lifecycle_service'));
 
         $container->register('admin_controller', Controller\AdminController::class)
             ->setPublic(true)
@@ -307,7 +313,8 @@ class Container
             ->addArgument(new Reference('season_repository'))
             ->addArgument(new Reference('player_display_service'))
             ->addArgument(new Reference('serializer_service'))
-            ->addArgument(new Reference('round_service'));
+            ->addArgument(new Reference('round_service'))
+            ->addArgument(new Reference('season_lifecycle_service'));
 
         $container->register('import_controller', Controller\ImportController::class)
             ->setPublic(true)

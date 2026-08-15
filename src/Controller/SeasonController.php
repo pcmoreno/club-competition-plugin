@@ -35,8 +35,8 @@ use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
-use SCS\Services\RoundService;
 use SCS\Services\SeasonContactService;
+use SCS\Services\SeasonLifecycleService;
 use SCS\Services\SerializerService;
 use SCS\Services\SettingsValidator;
 use SCS\Services\TransactionManager;
@@ -63,7 +63,7 @@ class SeasonController extends RestController
         private readonly AdminRepository $adminRepository,
         private readonly AuthContextService $authContext,
         private readonly TransactionManager $transactions,
-        private readonly RoundService $roundService,
+        private readonly SeasonLifecycleService $lifecycle,
     ) {
         parent::__construct($validator);
     }
@@ -96,7 +96,7 @@ class SeasonController extends RestController
             // Whether the tournament can be closed, and why not — reported here
             // so the admin header doesn't re-derive completeSeason's rule.
             $blocker = $season->status === SeasonStatus::Active
-                ? $this->roundService->completionBlocker($season)
+                ? $this->lifecycle->completionBlocker($season)
                 : null;
 
             return $this->ok([
@@ -119,7 +119,7 @@ class SeasonController extends RestController
                 throw new NotFoundException('Season not found.');
             }
 
-            $this->roundService->completeSeason($season);
+            $this->lifecycle->complete($season);
 
             $updated = $this->seasonRepository->findById($season->id);
 

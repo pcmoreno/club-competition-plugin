@@ -494,7 +494,7 @@ it back and delete it (`destroy` is preparation-only).
 **Completing is not a status write at all.** `PATCH /seasons/{id}` rejects
 `status: 'completed'` outright, so there is exactly one way in:
 **`POST /seasons/{id}/complete`**, the header's Complete-tournament button,
-landing in `RoundService::completeSeason`. It refuses unless **every** round is
+landing in `SeasonLifecycleService::complete`. It refuses unless **every** round is
 complete, and refuses a season with **no** rounds: one that never played a round
 was cancelled, not finished. The rounds are read *inside* the transaction, so a
 round created or reopened alongside can't be missed by the check that is about to
@@ -502,10 +502,12 @@ outlive it.
 
 Completing a round and completing the tournament are separate acts: the round is
 finished first, and closing is asked of the tournament, whose rounds
-`completeSeason` checks for itself.
+`SeasonLifecycleService` checks for itself.
 
 `GET /seasons/{id}` reports `can_complete` and a `completion_blocker` string, so
 the header can disable the button and say *why* without re-deriving the rule.
+Both come from the same `blockerFor()` the write refuses on, so the reason shown
+and the reason given are one string.
 
 **Closing stamps `end_date` when it is blank**, with the day it was closed. Until
 then the date is a projection; completing turns it into a fact, and afterwards
@@ -517,10 +519,12 @@ would be a DB edit. The freeze is enforced in three places, none of which is the
 round status (a season can be completed with a draft round sitting in it, and
 round status wouldn't catch a *new* round, a reopen, or a date edit):
 
-- `RoundService::assertSeasonOpen` — from `createRound`, `generateSchedule`,
-  `pairRound`, `completeRound`, `reopenRound`, and both `require*Round` helpers.
-  Public, because `RoundController` writes the round date and the plain
-  draft/published/finalised transitions straight through the repository.
+- `SeasonLifecycleService::assertOpen` — from `createRound`, `generateSchedule`,
+  `pairRound`, `completeRound`, `reopenRound`, both `require*Round` helpers, and
+  `RoundController` directly, which writes the round date and the plain
+  draft/published/finalised transitions straight through the repository. Its
+  `lock()` is the transaction-time counterpart: every write that changes a
+  season's round set takes the season row first and re-checks under it.
 - `SeasonController::requireOpenSeason` — the roster and category writes.
 - `SeasonController::requireDisplaySettingsOnly` — `PATCH /seasons/{id}` accepts
   **only** `display_settings` on a completed tournament and rejects the whole

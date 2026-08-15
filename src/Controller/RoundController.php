@@ -23,6 +23,7 @@ use SCS\Request\UpdateRoundRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\RoundService;
+use SCS\Services\SeasonLifecycleService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -37,6 +38,7 @@ class RoundController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
         private readonly RoundService $roundService,
+        private readonly SeasonLifecycleService $lifecycle,
     ) {
         parent::__construct($validator);
     }
@@ -193,7 +195,7 @@ class RoundController extends RestController
                 throw new NotFoundException('Round not found.');
             }
 
-            $this->roundService->assertSeasonOpen($round->season_id);
+            $this->lifecycle->assertOpen($round->season_id);
 
             $input = UpdateRoundRequest::fromRequest($request);
             $this->validate($input);
@@ -217,7 +219,7 @@ class RoundController extends RestController
             }
 
             // The plain transitions below write through the repository; the service guards its own.
-            $this->roundService->assertSeasonOpen($round->season_id);
+            $this->lifecycle->assertOpen($round->season_id);
 
             $input = UpdateRoundStatusRequest::fromRequest($request);
             $this->validate($input);

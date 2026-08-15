@@ -13,7 +13,6 @@ use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\GameResult;
 use SCS\Entity\Enum\RoundStatus;
-use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Game;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
@@ -41,13 +40,14 @@ final class RoundService
         private readonly StandingsSnapshotRepository $snapshots,
         private readonly PairingEngineResolver $pairingEngines,
         private readonly SettingsResolver $settings,
+        private readonly SeasonLifecycleService $lifecycle,
     ) {
     }
 
     // Append a round to a season that pairs one at a time.
     public function createRound(Season $season, ?string $date): Round
     {
-        $this->assertSeasonNotCompleted($season);
+        $this->lifecycle->assertNotCompleted($season);
 
         // A full schedule is the round set: every round comes from the fixture,
         // so there is no such thing as one made by hand.
@@ -56,7 +56,7 @@ final class RoundService
         }
 
         return $this->transactions->transactional(function () use ($season, $date): Round {
-            $this->lockOpenSeason($season->id);
+            $this->lifecycle->lock($season->id);
 
             $round = $this->rounds->createNextForSeason(
                 season_id: $season->id,
@@ -89,7 +89,7 @@ final class RoundService
      */
     public function generateSchedule(Season $season): array
     {
-        $this->assertSeasonNotCompleted($season);
+        $this->lifecycle->assertNotCompleted($season);
 
         $engine = $this->pairingEngines->resolve($season);
         if (!$engine instanceof FullSchedulePairing) {
@@ -104,7 +104,7 @@ final class RoundService
         $schedule = $engine->pairSchedule($season, $roster);
 
         return $this->transactions->transactional(function () use ($season, $schedule): array {
-            $this->lockOpenSeason($season->id);
+            $this->lifecycle->lock($season->id);
 
             // Read under the lock, and delete exactly what was read. Deciding
             // from an earlier read would destroy rounds it never examined —
@@ -400,7 +400,7 @@ final class RoundService
         if ($season === null) {
             throw new NotFoundException('Season not found for round.');
         }
-        $this->assertSeasonNotCompleted($season);
+        $this->lifecycle->assertNotCompleted($season);
 
         /** @var list<\SCS\Entity\SeasonPlayer> $roster */
         $roster = $this->seasonPlayers->findBySeason($season->id);
@@ -433,7 +433,7 @@ final class RoundService
         $this->transactions->transactional(function () use ($round, $season, $roster, $seasonRounds, $targets, $strategy, &$computed): void {
             // Completing takes a round out of draft, which is what generating a
             // schedule requires of every round — so the two must not overlap.
-            $this->lockOpenSeason($season->id);
+            $this->lifecycle->lock($season->id);
 
             // In the same transaction as the scoring, because scoring can
             // refuse: Keizer prices a round against the one before it and
@@ -488,71 +488,6 @@ final class RoundService
     }
 
     /**
-     * Close a tournament for good. Its own act rather than a flag on the last
-     * round: the condition is "every round is complete", which is a fact about
-     * the tournament, and a round is a poor place to ask about one.
-     *
-     * The rounds are read inside the transaction so a round created or reopened
-     * alongside can't be missed by the check that is about to outlive it.
-     */
-    public function completeSeason(Season $season): void
-    {
-        $this->assertSeasonOpen($season->id);
-
-        $this->transactions->transactional(function () use ($season): void {
-            $locked = $this->lockOpenSeason($season->id);
-
-            $rounds = $this->rounds->findBySeason($season->id);
-
-            if ($rounds === []) {
-                throw new ConflictException('A tournament with no rounds cannot be completed.');
-            }
-
-            foreach ($rounds as $r) {
-                if ($r->status === RoundStatus::Complete) {
-                    continue;
-                }
-
-                throw new ConflictException(sprintf(
-                    'Round %d is still %s, so the tournament cannot be completed yet.',
-                    $r->round_number,
-                    $r->status->value
-                ));
-            }
-
-            $update = [ 'status' => SeasonStatus::Completed->value ];
-
-            // Until now the end date was a projection; completing is what turns
-            // it into a fact, and nothing can set it afterwards. One that was
-            // already entered stands — this only fills a blank.
-            if ($locked->end_date === null) {
-                $update['end_date'] = current_time('Y-m-d');
-            }
-
-            $this->seasons->update($season->id, $update);
-        });
-    }
-
-    // Why a tournament can't be closed yet, or null when it can — the admin
-    // screen asks so it doesn't have to re-derive completeSeason's rule.
-    public function completionBlocker(Season $season): ?string
-    {
-        $rounds = $this->rounds->findBySeason($season->id);
-
-        if ($rounds === []) {
-            return 'A tournament with no rounds cannot be completed.';
-        }
-
-        foreach ($rounds as $r) {
-            if ($r->status !== RoundStatus::Complete) {
-                return sprintf('Round %d is still %s.', $r->round_number, $r->status->value);
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Record a game result. Guarded on the round's status: a completed round's
      * standings are frozen, so editing a result there would leave the games and
      * the snapshot disagreeing with nothing to reconcile them.
@@ -599,7 +534,7 @@ final class RoundService
      */
     public function reopenRound(Round $round): void
     {
-        $this->assertSeasonOpen($round->season_id);
+        $this->lifecycle->assertOpen($round->season_id);
 
         if ($round->status !== RoundStatus::Complete) {
             throw new ConflictException('Only a completed round can be reopened.');
@@ -608,7 +543,7 @@ final class RoundService
         // Reopening makes a round incomplete, which is exactly what closing the
         // tournament checks against — so the two must not overlap.
         $this->transactions->transactional(function () use ($round): void {
-            $this->lockOpenSeason($round->season_id);
+            $this->lifecycle->lock($round->season_id);
 
             $this->rounds->updateStatus($round->id, RoundStatus::Finalised);
         });
@@ -635,36 +570,6 @@ final class RoundService
         return $previous;
     }
 
-    // A completed tournament is frozen; the round guards below still allow add/reopen/redate.
-    public function assertSeasonOpen(int $seasonId): void
-    {
-        $season = $this->seasons->findById($seasonId);
-        if ($season !== null) {
-            $this->assertSeasonNotCompleted($season);
-        }
-    }
-
-    private function assertSeasonNotCompleted(Season $season): void
-    {
-        if ($season->status === SeasonStatus::Completed) {
-            throw new ConflictException('This tournament is completed and can no longer be changed.');
-        }
-    }
-
-    // Re-check inside the transaction: the guards above run before one is open,
-    // so alone they can pass against a season closed by the time the write lands.
-    private function lockOpenSeason(int $seasonId): Season
-    {
-        $season = $this->seasons->findByIdForUpdate($seasonId);
-        if ($season === null) {
-            throw new NotFoundException('Season not found.');
-        }
-
-        $this->assertSeasonNotCompleted($season);
-
-        return $season;
-    }
-
     private function requireGame(int $gameId): Game
     {
         $game = $this->games->findById($gameId);
@@ -685,7 +590,7 @@ final class RoundService
         if ($round === null) {
             throw new NotFoundException('Round not found.');
         }
-        $this->assertSeasonOpen($round->season_id);
+        $this->lifecycle->assertOpen($round->season_id);
         if ($round->status === RoundStatus::Complete) {
             throw new ConflictException(
                 'This round is complete and its standings are frozen. Reopen the round to correct a result.'
@@ -701,7 +606,7 @@ final class RoundService
         if ($round === null) {
             throw new NotFoundException('Round not found.');
         }
-        $this->assertSeasonOpen($round->season_id);
+        $this->lifecycle->assertOpen($round->season_id);
         if ($round->status === RoundStatus::Finalised || $round->status === RoundStatus::Complete) {
             throw new ConflictException('Pairings are locked once the round is finalised.');
         }
