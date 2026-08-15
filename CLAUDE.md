@@ -945,10 +945,14 @@ The script does three things worth knowing:
   silently left out, so it refuses a dirty tree unless `ALLOW_DIRTY=1`. The
   version in the file name is read from the ref too (`git show "$REF:…"`), not
   from the working tree, so packaging an older ref names the zip correctly.
-- **It refuses a missing or stale `build/viewer.js`** — editing the frontend and
-  shipping the previous bundle is the one deploy mistake this repo can actually
-  make, and it fails silently because `build/` is always present. Note the guard
-  compares the *working tree*, so it means less when `$REF` isn't HEAD.
+- **It refuses a stale `build/`** — editing the frontend and shipping the
+  previous bundle is the one deploy mistake this repo can actually make, and it
+  fails silently because `build/` is always present. When packaging HEAD from a
+  clean tree it rebuilds and fails if that changes anything committed, which is
+  exact: a change the bundle doesn't encode (a comment) correctly passes. It
+  can't do that for an older ref or under `ALLOW_DIRTY`, since the sources being
+  checked aren't the ones in the tree — there it says so rather than reporting a
+  pass it can't back.
 - **What ships is decided by `.gitattributes`** (`export-ignore`), not by the
   script — `/js`, `/css`, `/bin`, `/tests`, `phpunit.xml`, the build and analysis
   configs and `CLAUDE.md` all stay out. Adding a dev-only file means adding a

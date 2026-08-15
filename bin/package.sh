@@ -45,17 +45,31 @@ fi
 # shipping the previous bundle, which fails silently because build/ is committed
 # and therefore always present.
 #
-# Checked first because `find -newer` errors when its reference file is missing,
-# and that error is discarded below — so no bundle at all would pass the guard
-# that exists to catch a stale one.
-if [ ! -f build/viewer.js ]; then
-    echo "package: build/viewer.js is missing — run 'npm run build'." >&2
+# Asked of the ref being packaged, not of the working tree: the zip carries the
+# ref's committed build/, so working-tree mtimes answer a different question —
+# they pass for an older ref, pass under ALLOW_DIRTY once a rebuild has touched
+# the tree, and fail for a comment-only edit that the bundle rightly ignores.
+if ! git cat-file -e "$REF:build/viewer.js" 2>/dev/null; then
+    echo "package: $REF has no build/viewer.js — run 'npm run build' and commit it." >&2
     exit 1
 fi
 
-if [ -n "$(find js css -type f -newer build/viewer.js -print -quit 2>/dev/null)" ]; then
-    echo "package: build/viewer.js is older than the frontend sources — run 'npm run build'." >&2
-    exit 1
+# The only exact answer is to build the sources and see whether the committed
+# bundle changes, which needs those sources in the tree — so it holds when we
+# are packaging HEAD with nothing uncommitted, and not otherwise. Saying so is
+# the point: reporting a pass it cannot back is what the mtime check did.
+if [ "$(git rev-parse "$REF")" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
+    npm run build --silent >/dev/null 2>&1 || {
+        echo "package: 'npm run build' failed, so the bundle could not be verified." >&2
+        exit 1
+    }
+    if [ -n "$(git status --porcelain build)" ]; then
+        echo "package: build/ is out of date — it has just been rebuilt, so commit it and re-run." >&2
+        git status --short build >&2
+        exit 1
+    fi
+else
+    echo "package: not verifying build/ — it ships as committed in $REF, which isn't the tree being built." >&2
 fi
 
 STAGE=$(mktemp -d)
