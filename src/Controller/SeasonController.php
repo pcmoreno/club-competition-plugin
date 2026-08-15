@@ -327,7 +327,7 @@ class SeasonController extends RestController
                 }
             }
 
-            $systemChanged = $this->applySettings($input, $season, $data);
+            $switchedTo = $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is
             // a normal edit, not an empty request.
@@ -342,10 +342,10 @@ class SeasonController extends RestController
                 $this->seasonRepository->update($season->id, $data);
             }
 
-            // Standing absences are system-specific in the same way pairing settings
-            // are: a full-schedule system can't act on them and won't let them be
-            // cleared, so a switch would strand them on the enrolment.
-            if ($systemChanged) {
+            // A full-schedule system writes no per-round absence rows and refuses
+            // to have them cleared, so a switch onto one would strand the flags on
+            // the enrolment. Between two per-round systems they carry over.
+            if ($switchedTo !== null && $switchedTo->cadence() === 'full') {
                 $this->seasonPlayerRepository->clearDefaultAbsent($season->id);
             }
 
@@ -500,11 +500,11 @@ class SeasonController extends RestController
      * system scores differently; scoring settings lock after the first completed
      * round; display settings are always editable.
      *
-     * Returns whether the pairing system changed.
+     * Returns the system it switched to, or null when it didn't change.
      *
      * @param array<string,mixed> $data
      */
-    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): bool
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): ?PairingSystem
     {
         $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
         $systemChanged = $newSystem !== $season->pairing_system;
@@ -548,7 +548,7 @@ class SeasonController extends RestController
             $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
         }
 
-        return $systemChanged;
+        return $systemChanged ? $newSystem : null;
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response
