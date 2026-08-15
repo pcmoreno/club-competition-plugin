@@ -224,6 +224,18 @@ class RoundController extends RestController
 
             $newStatus = RoundStatus::from($input->status);
 
+            // Finalised is the only way back out of complete, so reopening is the
+            // only thing that makes a round incomplete. Sent straight to draft or
+            // published it would skip that guard and leave the snapshot behind.
+            if ($round->status === RoundStatus::Complete
+                && $newStatus !== RoundStatus::Complete
+                && $newStatus !== RoundStatus::Finalised
+            ) {
+                throw new ValidationException([
+                    'status' => 'A completed round is reopened to finalised, not sent back to draft or published.',
+                ]);
+            }
+
             // Reopening runs through the service so the "only a completed round"
             // guard applies; it deliberately keeps the existing snapshot.
             if ($round->status === RoundStatus::Complete && $newStatus === RoundStatus::Finalised) {
