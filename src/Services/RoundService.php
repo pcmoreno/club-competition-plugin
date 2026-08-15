@@ -61,6 +61,8 @@ final class RoundService
         }
 
         return $this->transactions->transactional(function () use ($season, $date): Round {
+            $this->lockOpenSeason($season->id);
+
             $round = $this->rounds->createNextForSeason(
                 season_id: $season->id,
                 date:      $date,
@@ -118,6 +120,8 @@ final class RoundService
         $schedule = $engine->pairSchedule($season, $roster);
 
         return $this->transactions->transactional(function () use ($season, $existing, $schedule): array {
+            $this->lockOpenSeason($season->id);
+
             if ($existing !== []) {
                 // No FK cascade, so clear the child rows first — snapshots
                 // included, or they outlive the round ids they point at and the
@@ -492,6 +496,8 @@ final class RoundService
         $this->assertSeasonOpen($season->id);
 
         $this->transactions->transactional(function () use ($season): void {
+            $this->lockOpenSeason($season->id);
+
             $rounds = $this->rounds->findBySeason($season->id);
 
             if ($rounds === []) {
@@ -595,7 +601,13 @@ final class RoundService
             throw new ConflictException('Only a completed round can be reopened.');
         }
 
-        $this->rounds->updateStatus($round->id, RoundStatus::Finalised);
+        // Reopening makes a round incomplete, which is exactly what closing the
+        // tournament checks against — so the two must not overlap.
+        $this->transactions->transactional(function () use ($round): void {
+            $this->lockOpenSeason($round->season_id);
+
+            $this->rounds->updateStatus($round->id, RoundStatus::Finalised);
+        });
     }
 
     /**
@@ -633,6 +645,20 @@ final class RoundService
         if ($season->status === SeasonStatus::Completed) {
             throw new ConflictException('This tournament is completed and can no longer be changed.');
         }
+    }
+
+    // Re-check inside the transaction: the guards above run before one is open,
+    // so alone they can pass against a season closed by the time the write lands.
+    private function lockOpenSeason(int $seasonId): Season
+    {
+        $season = $this->seasons->findByIdForUpdate($seasonId);
+        if ($season === null) {
+            throw new NotFoundException('Season not found.');
+        }
+
+        $this->assertSeasonNotCompleted($season);
+
+        return $season;
     }
 
     private function requireGame(int $gameId): Game

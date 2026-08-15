@@ -40,6 +40,22 @@ class SeasonRepository
         return $row ? $this->hydrate($row) : null;
     }
 
+    // Locked until the calling transaction ends, so operations that change a
+    // season's rounds serialize on it. Reads that follow see whatever committed
+    // while it waited, the snapshot forming at the first plain read after this.
+    public function findByIdForUpdate(int $id): ?Season
+    {
+        $row = $this->connection->createQueryBuilder()
+            ->select('*')
+            ->from(SCS_TABLE_PREFIX . 'seasons')
+            ->where('id = :id')
+            ->setParameter('id', $id)
+            ->forUpdate()
+            ->fetchAssociative();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
     /**
      * Multiple seasons can be active at once (e.g. a league season running
      * alongside a mid-season tournament), so this returns all of them.
