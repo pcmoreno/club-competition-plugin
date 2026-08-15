@@ -273,9 +273,12 @@ class SeasonController extends RestController
                 $this->requireTeamPlayImplemented((bool)($data['is_team'] ?? false));
             }
 
-            // Same rule for the start date: once it has begun, that's a fact rather than a plan.
+            // Same rule for the start date: once it has begun, that's a fact rather
+            // than a plan. Recording one that was never set is still allowed — the
+            // rule is against rewriting a fact, not against filling in a blank.
             if (isset($data['start_date'])
-                && $data['start_date'] !== $season->start_date?->format('Y-m-d')
+                && $season->start_date !== null
+                && $data['start_date'] !== $season->start_date->format('Y-m-d')
                 && $season->status !== SeasonStatus::Preparation
             ) {
                 throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);

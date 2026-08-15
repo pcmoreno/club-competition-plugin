@@ -24,9 +24,16 @@ class UpdateRoundStatusRequest
 
     public static function fromRequest(\WP_REST_Request $request): self
     {
-        $dto                  = new self();
-        $dto->status          = (string)$request->get_param('status');
-        $dto->complete_season = (bool)$request->get_param('complete_season');
+        $dto         = new self();
+        $dto->status = (string)$request->get_param('status');
+        // Closing a tournament can't be undone, and get_param also resolves query
+        // args and form bodies, where (bool) reads "false" and "off" as true — so
+        // only an affirmative boolean closes it.
+        $dto->complete_season = filter_var(
+            $request->get_param('complete_season'),
+            FILTER_VALIDATE_BOOLEAN,
+            FILTER_NULL_ON_FAILURE
+        ) === true;
 
         return $dto;
     }
