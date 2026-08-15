@@ -58,18 +58,22 @@ fi
 # bundle changes, which needs those sources in the tree — so it holds when we
 # are packaging HEAD with nothing uncommitted, and not otherwise. Saying so is
 # the point: reporting a pass it cannot back is what the mtime check did.
+VERIFIED="rebuilt and matched"
 if [ "$(git rev-parse "$REF")" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
-    npm run build --silent >/dev/null 2>&1 || {
+    # webpack reports compile errors on stdout, so the output is held rather
+    # than discarded: silent when it succeeds, and the reason when it doesn't.
+    if ! BUILD_LOG=$(npm run build --silent 2>&1); then
         echo "package: 'npm run build' failed, so the bundle could not be verified." >&2
+        echo "$BUILD_LOG" >&2
         exit 1
-    }
+    fi
     if [ -n "$(git status --porcelain build)" ]; then
         echo "package: build/ is out of date — it has just been rebuilt, so commit it and re-run." >&2
         git status --short build >&2
         exit 1
     fi
 else
-    echo "package: not verifying build/ — it ships as committed in $REF, which isn't the tree being built." >&2
+    VERIFIED="NOT VERIFIED — ships as committed in $REF, which isn't the tree being built"
 fi
 
 STAGE=$(mktemp -d)
@@ -101,3 +105,4 @@ echo "  ref     $REF ($(git rev-parse --short "$REF"))"
 echo "  version $VERSION"
 echo "  size    $(du -h "$ZIP" | cut -f1)"
 echo "  files   $(python3 -m zipfile -l "$ZIP" | tail -n +2 | wc -l)"
+echo "  build/  $VERIFIED"
