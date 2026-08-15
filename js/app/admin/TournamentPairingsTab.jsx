@@ -921,7 +921,12 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					onConfirm={ () =>
 						setStatus.mutate( {
 							status: nextStatus,
-							completeSeason: closeSeason && isLastRound,
+							// Only ever sent affirmatively with 'complete'; the
+							// tick's state outlives a confirm that failed.
+							completeSeason:
+								nextStatus === 'complete' &&
+								closeSeason &&
+								isLastRound,
 						} )
 					}
 				>

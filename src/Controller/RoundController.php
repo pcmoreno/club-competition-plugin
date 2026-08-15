@@ -224,6 +224,15 @@ class RoundController extends RestController
 
             $newStatus = RoundStatus::from($input->status);
 
+            // Only completing a round can close the tournament, and every other
+            // branch below would drop the flag without saying so — too quiet for
+            // the one write with no undo. Opting out stays harmless.
+            if ($input->complete_season && $newStatus !== RoundStatus::Complete) {
+                throw new ValidationException([
+                    'complete_season' => 'A tournament is completed along with its final round, so this needs status "complete".',
+                ]);
+            }
+
             // Reopening runs through the service so the "only a completed round"
             // guard applies; it deliberately keeps the existing snapshot.
             if ($round->status === RoundStatus::Complete && $newStatus === RoundStatus::Finalised) {
