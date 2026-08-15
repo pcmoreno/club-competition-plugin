@@ -267,9 +267,10 @@ class SeasonController extends RestController
 
             $data = $input->toUpdateData();
 
-            // Closed by completing its last round, so RoundService::closeSeason's rule can't be stepped around.
+            // Closed through its own route, so completeSeason's rule — every round
+            // complete — can't be stepped around with a status write.
             if (($data['status'] ?? null) === SeasonStatus::Completed->value) {
-                throw new ConflictException('A tournament is completed by completing its final round.');
+                throw new ConflictException('A tournament is completed through POST /seasons/{id}/complete.');
             }
 
             if ($season->status === SeasonStatus::Completed) {

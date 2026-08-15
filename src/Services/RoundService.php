@@ -500,7 +500,7 @@ final class RoundService
         $this->assertSeasonOpen($season->id);
 
         $this->transactions->transactional(function () use ($season): void {
-            $this->lockOpenSeason($season->id);
+            $locked = $this->lockOpenSeason($season->id);
 
             $rounds = $this->rounds->findBySeason($season->id);
 
@@ -525,7 +525,7 @@ final class RoundService
             // Until now the end date was a projection; completing is what turns
             // it into a fact, and nothing can set it afterwards. One that was
             // already entered stands — this only fills a blank.
-            if ($season->end_date === null) {
+            if ($locked->end_date === null) {
                 $update['end_date'] = current_time('Y-m-d');
             }
 
