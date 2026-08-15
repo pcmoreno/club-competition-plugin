@@ -109,11 +109,6 @@ class SeasonRepository
         $this->connection->update(SCS_TABLE_PREFIX . 'seasons', $data, [ 'id' => $id ]);
     }
 
-    public function updateStatus(int $id, SeasonStatus $status): void
-    {
-        $this->connection->update(SCS_TABLE_PREFIX . 'seasons', [ 'status' => $status->value ], [ 'id' => $id ]);
-    }
-
     // Only the season row; child rows (rounds/games/etc.) are cleared by the caller.
     public function delete(int $id): void
     {

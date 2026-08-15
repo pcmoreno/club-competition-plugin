@@ -65,7 +65,12 @@ final class SeasonLifecycleService
      */
     public function complete(Season $season): void
     {
-        $this->assertOpen($season->id);
+        // Only a running tournament finishes. One still in preparation has
+        // nothing to finish, and closing it would strand a record that can no
+        // longer be edited and is past the point where it could be deleted.
+        if ($season->status !== SeasonStatus::Active) {
+            throw new ConflictException('Only a tournament that has started can be completed.');
+        }
 
         $this->transactions->transactional(function () use ($season): void {
             $locked = $this->lock($season->id);
