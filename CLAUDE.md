@@ -345,11 +345,12 @@ because the odd player out takes the `pairing_bye` that scoring already prices.
 actually bounded is legs × field size (100 legs is fine for a two-player match
 and impossible for four players), so the real ceiling belongs to the generator.
 
-`roundLimit()` returns null for round-robin, and deliberately: the schedule is
-the round set, so `RoundService::createRound` refuses a hand-made round outright
-once a season with `cadence() === 'full'` has one — rather than capping at a
-number. Before there is a schedule the manual path stays open, so a failed
-generation can't leave the admin with no way to create a round at all.
+`roundLimit()` returns null for round-robin, and deliberately: the schedule *is*
+the round set, so `RoundService::createRound` refuses a hand-made round on any
+`cadence() === 'full'` season rather than capping at a number. Every round comes
+from `generateSchedule`, which is also why regenerating is the way to change the
+fixture. The admin screens never offer Add round there either
+(`canAddRound` in `TournamentPairingsTab`).
 
 ### Round-Robin Pairing
 
@@ -491,25 +492,48 @@ deliberately left that way: an admin who started a tournament by mistake can put
 it back and delete it (`destroy` is preparation-only).
 
 **Completing is not a status write at all.** `PATCH /seasons/{id}` rejects
-`status: 'completed'` outright, so there is exactly one way in: ticking *"Also
-complete the tournament"* in the Complete-round modal, which sends
-`complete_season` on `PATCH /rounds/{id}/status` and lands in
-`RoundService::closeSeason` — inside the same transaction as the round's own
-completion, because closing the tournament is irreversible and must not survive
-scoring refusing the round. It refuses unless **every** round is complete, and
-refuses a season with **no** rounds: one that never played a round was cancelled,
-not finished. The frontend offers the tick only on the last round, which is the
-admin's cue rather than the real condition.
+`status: 'completed'` outright, so there is exactly one way in:
+**`POST /seasons/{id}/complete`**, the header's Complete-tournament button,
+landing in `SeasonLifecycleService::complete`. It refuses unless **every** round is
+complete, and refuses a season with **no** rounds: one that never played a round
+was cancelled, not finished. The rounds are read *inside* the transaction, so a
+round created or reopened alongside can't be missed by the check that is about to
+outlive it.
+
+Completing a round and completing the tournament are separate acts: the round is
+finished first, and closing is asked of the tournament, whose rounds
+`SeasonLifecycleService` checks for itself.
+
+`GET /seasons/{id}` reports `can_complete` and a `completion_blocker`, so the
+header can disable the button and say *why* without re-deriving the rule. Both
+come from the same `blockerFor()` the write refuses on, so what the screen shows
+and what the write refuses can't drift. The blocker carries facts — `reason`,
+`round_number`, `round_status` — and the screen writes the sentence from the
+round labels it already uses; the exception thrown by the write keeps a full
+sentence, which is for the log. Both fields are added for an **admin** caller
+only: the route is member-readable, and a draft round is one members can't see.
+
+**A completed round leaves `complete` only by being reopened** to `finalised`,
+which keeps its standings snapshot. `PATCH /rounds/{id}/status` refuses `draft`
+and `published` from there outright — they would skip that guard and strand the
+snapshot.
+
+**Closing stamps `end_date` when it is blank**, with the day it was closed. Until
+then the date is a projection; completing turns it into a fact, and afterwards
+`requireDisplaySettingsOnly` means nothing can set it. A date already entered
+stands — this only fills a blank.
 
 **Completed is final and read-only.** There is no reopen, by decision — recovery
 would be a DB edit. The freeze is enforced in three places, none of which is the
 round status (a season can be completed with a draft round sitting in it, and
 round status wouldn't catch a *new* round, a reopen, or a date edit):
 
-- `RoundService::assertSeasonOpen` — from `createRound`, `generateSchedule`,
-  `pairRound`, `completeRound`, `reopenRound`, and both `require*Round` helpers.
-  Public, because `RoundController` writes the round date and the plain
-  draft/published/finalised transitions straight through the repository.
+- `SeasonLifecycleService::assertOpen` — from `createRound`, `generateSchedule`,
+  `pairRound`, `completeRound`, `reopenRound`, both `require*Round` helpers, and
+  `RoundController` directly, which writes the round date and the plain
+  draft/published/finalised transitions straight through the repository. Its
+  `lock()` is the transaction-time counterpart: every write that changes a
+  season's round set takes the season row first and re-checks under it.
 - `SeasonController::requireOpenSeason` — the roster and category writes.
 - `SeasonController::requireDisplaySettingsOnly` — `PATCH /seasons/{id}` accepts
   **only** `display_settings` on a completed tournament and rejects the whole
@@ -711,8 +735,8 @@ database applies it, whatever the file behind it was called: withdrawing a
 migration and reusing its number means any database that ran the old one
 silently skips the new one. Either take the next number, or — if the withdrawn
 one never left a dev machine — drop it from that option and reuse the number. They run on
-`plugins_loaded`, because the deploy flow (git pull / upload-replace) never
-fires the activation hook. The `SCS_DB_VERSION` constant is currently unused.
+`plugins_loaded`, because the deploy flow (upload-replace in wp-admin) never
+fires the activation hook — and there is no CLI to run them from either. The `SCS_DB_VERSION` constant is currently unused.
 
 ## Development Workflow
 
@@ -765,6 +789,9 @@ wp scs create-admin --name="Admin Name" --email="admin@example.com"
 
 # Download the latest KNSB rating list to the server
 wp scs fetch-knsb-ratings
+
+# Build the uploadable release zip from a committed ref (default HEAD)
+bin/package.sh [git-ref]
 ```
 
 Those three are the **only** registered WP-CLI commands (see
@@ -905,40 +932,53 @@ Controllers catch and return appropriate HTTP responses.
 
 ## Deployment
 
-### Git → SiteGround Workflow
+### Zip → wp-admin upload
 
-**SiteGround has no Node.js** (Shared & Cloud plans), so `npm run build` cannot
-run on the host. The compiled frontend in `build/` is therefore **committed to
-git** (not gitignored) and shipped with the pull. Always rebuild and commit
-`build/` before deploying any frontend change — the server only runs Composer.
+**The deploy unit is a zip**, built by `bin/package.sh` and uploaded by hand
+through wp-admin. There is no `git pull` on the host and no deploy over SSH:
+SiteGround has neither Node nor a reliable Composer, so everything the plugin
+needs has to arrive already built.
 
 ```bash
-# 1. Build the frontend locally and commit the artifacts
+# 1. Build the frontend and commit it — build/ is committed, not gitignored
 npm run build
-git add build/
-git commit -m "Build frontend"   # on a branch, then merge per Git Workflow
+git add build/ && git commit -m "Build frontend"   # on a branch, per Git Workflow
 
-# 2. Push to GitHub
-git push origin master
-
-# 3. SSH into SiteGround
-ssh user@domain.com
-
-# 4. Pull and install PHP deps (no npm on host)
-cd /wp-content/plugins/club-competition-plugin
-git pull origin master
-composer install
-
-# 5. Run migrations
-wp scs migrate
-
-# 6. Clear cache (if using SG CachePress)
-wp siteground-cache purge
+# 2. Cut the zip from a committed ref (default HEAD)
+bin/package.sh                 # -> dist/club-competition-plugin-<version>.zip
+bin/package.sh v0.5.2          # or an older ref
+ALLOW_DIRTY=1 bin/package.sh   # package a dirty tree; only committed files ship
 ```
 
-**Important**: Test locally first. No staging environment — deployments go
-straight to production. If you forget to rebuild + commit `build/`, the site
-ships stale (or missing) frontend assets.
+Then: **wp-admin → Plugins → Add New → Upload Plugin →** pick the zip **→
+"Replace current with uploaded"**. Migrations run on `plugins_loaded`, so
+there's nothing to run afterwards — **not** `wp scs migrate`, which needs a CLI
+the host doesn't conveniently have. Purge the cache from the SG CachePress UI if
+the frontend changed.
+
+The script does three things worth knowing:
+
+- **It packages a committed ref**, via `git archive`. Anything uncommitted is
+  silently left out, so it refuses a dirty tree unless `ALLOW_DIRTY=1`. The
+  version in the file name is read from the ref too (`git show "$REF:…"`), not
+  from the working tree, so packaging an older ref names the zip correctly.
+- **It refuses a stale `build/`** — editing the frontend and shipping the
+  previous bundle is the one deploy mistake this repo can actually make, and it
+  fails silently because `build/` is always present. When packaging HEAD from a
+  clean tree it rebuilds and fails if that changes anything committed, which is
+  exact: a change the bundle doesn't encode (a comment) correctly passes. It
+  can't do that for an older ref or under `ALLOW_DIRTY`, since the sources being
+  checked aren't the ones in the tree — there it says so rather than reporting a
+  pass it can't back.
+- **What ships is decided by `.gitattributes`** (`export-ignore`), not by the
+  script — `/js`, `/css`, `/bin`, `/tests`, `phpunit.xml`, the build and analysis
+  configs and `CLAUDE.md` all stay out. Adding a dev-only file means adding a
+  rule there. `vendor/` is installed fresh into the staging copy with `--no-dev
+  --optimize-autoloader --classmap-authoritative`.
+
+**Important**: test locally first. No staging environment — deployments go
+straight to production. The running version shows in the app footer, which is
+how you tell whether an upload actually took.
 
 ### Database Backups
 
@@ -976,8 +1016,7 @@ CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
 - **Source**: `https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip`
 - **Trigger**: manual only — `wp scs fetch-knsb-ratings`, or the "Fetch KNSB
-  ratings" dialog in the admin roster. **No cron is registered**, despite the
-  monthly schedule this file used to claim.
+  ratings" dialog in the admin roster. **No cron is registered.**
 - **Storage**: `KnsbRatingStore` writes the parsed list under
   `uploads/scs-knsb-<random>/`, hardened with `.htaccess` + `index.php`. It is
   personal data for ~20k non-users, so it must not sit in a web-reachable plugin
@@ -1046,6 +1085,8 @@ $container->register( 'service', MyClass::class );
   and composer **in the container** — it has the PHP version production runs)
 - Design bundle and Sevilla exports live outside the repo, in `../documents/`
 - WordPress hosting: SiteGround, `schaakclubsantpoort.nl`, table prefix `boa_`.
-  Composer runs on the host; a CLI session is not conveniently available, so
-  don't design a workflow that depends on WP-CLI.
+  Neither Node nor a reliable Composer runs on the host, and a CLI session is
+  not conveniently available — the plugin ships as a zip built locally and
+  uploaded through wp-admin, so don't design a workflow that depends on WP-CLI
+  or on running anything server-side.
 - REST routes: `includes/RestApi.php` is the authoritative list

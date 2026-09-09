@@ -13,9 +13,6 @@ class UpdateRoundStatusRequest
     #[Assert\Choice(callback: [self::class, 'statusChoices'], message: 'Status is not valid.')]
     public string $status = '';
 
-    // Close the tournament along with this round; only meaningful with 'complete'.
-    public bool $complete_season = false;
-
     /** @return list<string> */
     public static function statusChoices(): array
     {
@@ -24,9 +21,8 @@ class UpdateRoundStatusRequest
 
     public static function fromRequest(\WP_REST_Request $request): self
     {
-        $dto                  = new self();
-        $dto->status          = (string)$request->get_param('status');
-        $dto->complete_season = (bool)$request->get_param('complete_season');
+        $dto         = new self();
+        $dto->status = (string)$request->get_param('status');
 
         return $dto;
     }

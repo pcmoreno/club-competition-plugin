@@ -5,6 +5,7 @@ import { Link } from '../router/router';
 import { Notice, ConfirmModal } from '../components/ui';
 import {
 	STATUS_LABELS,
+	ROUND_STATUS_LABELS,
 	errorMessage,
 	isLocked,
 	isTeamLocked,
@@ -47,9 +48,25 @@ function tabsFor( season ) {
 	];
 }
 
+// The server reports why a tournament can't be closed as facts, not a sentence;
+// the wording is ours, and reuses the round labels the rest of the admin shows.
+function completionHint( season ) {
+	const blocker = season.completion_blocker;
+	if ( ! blocker ) {
+		return 'Close this tournament for good.';
+	}
+	if ( blocker.reason === 'no_rounds' ) {
+		return 'A tournament with no rounds can’t be completed.';
+	}
+	const status =
+		ROUND_STATUS_LABELS[ blocker.round_status ] ?? blocker.round_status;
+	return `Round ${ blocker.round_number } is still ${ status.toLowerCase() }.`;
+}
+
 export function TournamentDetail( { seasonId } ) {
 	const [ tab, setTab ] = useState( null );
 	const [ confirmingStart, setConfirmingStart ] = useState( false );
+	const [ confirmingComplete, setConfirmingComplete ] = useState( false );
 	const queryClient = useQueryClient();
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: keys.season( seasonId ),
@@ -62,6 +79,17 @@ export function TournamentDetail( { seasonId } ) {
 		mutationFn: () => api.patch( `seasons/${ seasonId }`, { status: 'active' } ),
 		onSuccess: () => {
 			setConfirmingStart( false );
+			queryClient.invalidateQueries( { queryKey: keys.season( seasonId ) } );
+			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
+		},
+	} );
+
+	// Closing is its own act, not a flag on the last round: the condition is
+	// that every round is complete, which the server reports as can_complete.
+	const complete = useMutation( {
+		mutationFn: () => api.post( `seasons/${ seasonId }/complete` ),
+		onSuccess: () => {
+			setConfirmingComplete( false );
 			queryClient.invalidateQueries( { queryKey: keys.season( seasonId ) } );
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
@@ -113,6 +141,21 @@ export function TournamentDetail( { seasonId } ) {
 							className="shrink-0 rounded bg-win px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-40"
 						>
 							{ start.isPending ? 'Starting…' : 'Start' }
+						</button>
+					) }
+					{ season.status === 'active' && (
+						<button
+							type="button"
+							onClick={ () => setConfirmingComplete( true ) }
+							disabled={
+								! season.can_complete || complete.isPending
+							}
+							title={ completionHint( season ) }
+							className="shrink-0 rounded border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-40"
+						>
+							{ complete.isPending
+								? 'Completing…'
+								: 'Complete tournament' }
 						</button>
 					) }
 				</div>
@@ -202,6 +245,28 @@ export function TournamentDetail( { seasonId } ) {
 					{ start.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( start.error ) }
+						</span>
+					) }
+				</ConfirmModal>
+			) }
+
+			{ confirmingComplete && (
+				<ConfirmModal
+					title="Complete tournament"
+					confirmLabel={
+						complete.isPending ? 'Completing…' : 'Complete'
+					}
+					busy={ complete.isPending }
+					danger
+					onCancel={ () => setConfirmingComplete( false ) }
+					onConfirm={ () => complete.mutate() }
+				>
+					This closes the tournament for good. Its record becomes
+					read-only and there is no way to reopen it — only the
+					standings columns can still be changed.
+					{ complete.isError && (
+						<span className="mt-2 block text-loss">
+							{ errorMessage( complete.error ) }
 						</span>
 					) }
 				</ConfirmModal>

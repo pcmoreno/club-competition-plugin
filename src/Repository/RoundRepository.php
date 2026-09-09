@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Round;
@@ -89,6 +90,22 @@ class RoundRepository
     public function deleteBySeason(int $season_id): void
     {
         $this->connection->delete(SCS_TABLE_PREFIX . 'rounds', [ 'season_id' => $season_id ]);
+    }
+
+    // Scoped to the rounds handed in, so a caller can delete exactly the rows it
+    // looked at rather than everything the season happens to hold.
+    /** @param list<int> $ids */
+    public function deleteByIds(array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        $this->connection->createQueryBuilder()
+            ->delete(SCS_TABLE_PREFIX . 'rounds')
+            ->where('id IN (:ids)')
+            ->setParameter('ids', $ids, ArrayParameterType::INTEGER)
+            ->executeStatement();
     }
 
     /**

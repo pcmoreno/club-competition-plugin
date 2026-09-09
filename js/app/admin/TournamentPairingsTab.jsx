@@ -29,10 +29,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	const [ confirmAdvance, setConfirmAdvance ] = useState( false );
 	const [ confirmReopen, setConfirmReopen ] = useState( false );
 	const [ confirmGenerate, setConfirmGenerate ] = useState( false );
-	// Ticked in the Complete-round modal to close the tournament along with it.
-	const [ closeSeason, setCloseSeason ] = useState( false );
-	// Held locally so the input doesn't snap back to the stored value between the
-	// change and the refetch that confirms it.
+	// The round's date, held locally so the input doesn't snap back to the stored
+	// value between the change and the refetch that confirms it.
 	const [ dateDraft, setDateDraft ] = useState( null );
 	// The player being dragged: { from: 'pool' | 'board', player, gameId? }.
 	const drag = useRef( null );
@@ -151,7 +149,6 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	useEffect( () => {
 		setBuilder( { white: null, black: null } );
 		setDateDraft( null );
-		setCloseSeason( false );
 	}, [ currentRoundId ] );
 
 	const roundKey = keys.round( currentRoundId );
@@ -171,6 +168,10 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 				setSelectedRoundId( created.id );
 			}
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
+			// A new draft round is one the tournament can't be completed over.
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( season.id ),
+			} );
 		},
 	} );
 
@@ -237,11 +238,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	} );
 
 	const setStatus = useMutation( {
-		mutationFn: ( { status, completeSeason = false } ) =>
-			api.patch( `rounds/${ currentRoundId }/status`, {
-				status,
-				complete_season: completeSeason,
-			} ),
+		mutationFn: ( { status } ) =>
+			api.patch( `rounds/${ currentRoundId }/status`, { status } ),
 		onSuccess: () => {
 			setConfirmAdvance( false );
 			setConfirmReopen( false );
@@ -406,7 +404,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// No rounds yet. A full-schedule tournament generates its whole fixture from
 	// the roster; anything else starts with one round and is paired by hand.
 	if ( ordered.length === 0 ) {
-		// Unreachable when locked (closeSeason refuses a season with no rounds).
+		// Unreachable when locked: a season with no rounds can't be completed.
 		if ( locked ) {
 			return <Notice>This tournament has no rounds.</Notice>;
 		}
@@ -462,18 +460,6 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// A generated fixture is the whole round set, so it can't be extended by hand.
 	const canAddRound = ! locked && season.cadence !== 'full';
 	const nextStatus = round ? nextRoundStatus( round.status ) : null;
-	// The admin's cue for closing the season, and the only guard on it — the
-	// backend accepts any round once every round that exists is complete, which
-	// round 1 of a tournament that creates them one at a time satisfies. A
-	// configured round count is the real last round; without one (unlimited
-	// Keizer, or a generated fixture) the highest round that exists is the best
-	// available answer.
-	const isLastRound =
-		round !== null &&
-		( roundLimit !== null
-			? round.round_number === roundLimit
-			: round.round_number ===
-			  ordered[ ordered.length - 1 ]?.round_number );
 	// Match the backend's board numbering (max existing board + 1) so the
 	// builder shows the number the new pairing will actually get.
 	const nextBoardNumber =
@@ -916,13 +902,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					busy={ setStatus.isPending }
 					onCancel={ () => {
 						setConfirmAdvance( false );
-						setCloseSeason( false );
 					} }
 					onConfirm={ () =>
-						setStatus.mutate( {
-							status: nextStatus,
-							completeSeason: closeSeason && isLastRound,
-						} )
+						setStatus.mutate( { status: nextStatus } )
 					}
 				>
 					{ nextStatus === 'published' &&
@@ -931,24 +913,6 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						'Finalising locks the pairings so they can’t be changed. Results can still be entered.' }
 					{ nextStatus === 'complete' &&
 						'Completing the round freezes its standings snapshot.' }
-					{ /* Opt-in, not implied: completing the tournament can't be undone. */ }
-					{ nextStatus === 'complete' && isLastRound && (
-						<label className="mt-3 flex items-start gap-2">
-							<input
-								type="checkbox"
-								checked={ closeSeason }
-								onChange={ ( e ) =>
-									setCloseSeason( e.target.checked )
-								}
-								className="mt-0.5"
-							/>
-							<span className="text-sm text-ink-3">
-								Also complete the tournament. This is the last
-								round, and a completed tournament is read-only
-								for good.
-							</span>
-						</label>
-					) }
 					{ setStatus.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( setStatus.error ) }

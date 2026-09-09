@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCS\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use SCS\Entity\Attendance;
 use SCS\Entity\Enum\AttendanceStatus;
@@ -121,6 +122,22 @@ class AttendanceRepository
             'DELETE a FROM ' . SCS_TABLE_PREFIX . 'attendance a JOIN ' . SCS_TABLE_PREFIX . 'rounds r ON r.id = a.round_id WHERE r.season_id = ?',
             [$season_id]
         );
+    }
+
+    // Scoped to the rounds handed in, so a caller can delete exactly the rows it
+    // looked at rather than everything the season happens to hold.
+    /** @param list<int> $ids */
+    public function deleteByRounds(array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        $this->connection->createQueryBuilder()
+            ->delete(SCS_TABLE_PREFIX . 'attendance')
+            ->where('round_id IN (:ids)')
+            ->setParameter('ids', $ids, ArrayParameterType::INTEGER)
+            ->executeStatement();
     }
 
     /**

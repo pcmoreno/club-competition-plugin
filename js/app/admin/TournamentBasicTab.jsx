@@ -51,6 +51,9 @@ export function TournamentBasicTab( { season, locked = false } ) {
 
 	// Fixed once the tournament leaves preparation; pairing *settings* stay editable.
 	const fixedOnStart = season.status !== 'preparation';
+	// A start date that was never set can still be recorded: the rule is against
+	// rewriting a fact, not against filling in a blank.
+	const startDateLocked = fixedOnStart && !! season.start_date;
 
 	const save = useMutation( {
 		mutationFn: ( payload ) =>
@@ -175,15 +178,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 						type="date"
 						value={ startDate }
 						onChange={ ( e ) => setStartDate( e.target.value ) }
-						disabled={ fixedOnStart }
+						disabled={ startDateLocked }
 						className={
 							fieldInput +
-							( fixedOnStart
+							( startDateLocked
 								? ' cursor-not-allowed opacity-60'
 								: '' )
 						}
 					/>
-					{ fixedOnStart && (
+					{ startDateLocked && (
 						<span className="mt-1 block text-xs text-muted">
 							The start date is locked once the tournament has
 							started.

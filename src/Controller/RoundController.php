@@ -23,6 +23,7 @@ use SCS\Request\UpdateRoundRequest;
 use SCS\Request\UpdateRoundStatusRequest;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\RoundService;
+use SCS\Services\SeasonLifecycleService;
 use SCS\Services\SerializerService;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -37,6 +38,7 @@ class RoundController extends RestController
         private readonly PlayerDisplayService $playerDisplay,
         private readonly SerializerService $serializer,
         private readonly RoundService $roundService,
+        private readonly SeasonLifecycleService $lifecycle,
     ) {
         parent::__construct($validator);
     }
@@ -193,7 +195,7 @@ class RoundController extends RestController
                 throw new NotFoundException('Round not found.');
             }
 
-            $this->roundService->assertSeasonOpen($round->season_id);
+            $this->lifecycle->assertOpen($round->season_id);
 
             $input = UpdateRoundRequest::fromRequest($request);
             $this->validate($input);
@@ -217,12 +219,24 @@ class RoundController extends RestController
             }
 
             // The plain transitions below write through the repository; the service guards its own.
-            $this->roundService->assertSeasonOpen($round->season_id);
+            $this->lifecycle->assertOpen($round->season_id);
 
             $input = UpdateRoundStatusRequest::fromRequest($request);
             $this->validate($input);
 
             $newStatus = RoundStatus::from($input->status);
+
+            // Finalised is the only way back out of complete, so reopening is the
+            // only thing that makes a round incomplete. Sent straight to draft or
+            // published it would skip that guard and leave the snapshot behind.
+            if ($round->status === RoundStatus::Complete
+                && $newStatus !== RoundStatus::Complete
+                && $newStatus !== RoundStatus::Finalised
+            ) {
+                throw new ValidationException([
+                    'status' => 'A completed round is reopened to finalised, not sent back to draft or published.',
+                ]);
+            }
 
             // Reopening runs through the service so the "only a completed round"
             // guard applies; it deliberately keeps the existing snapshot.
@@ -237,7 +251,7 @@ class RoundController extends RestController
             // The service owns that status write so it shares a transaction
             // with the scoring that can refuse it.
             if ($newStatus === RoundStatus::Complete) {
-                $this->roundService->completeRound($round, $input->complete_season);
+                $this->roundService->completeRound($round);
             } else {
                 $this->roundRepository->updateStatus($round->id, $newStatus);
             }

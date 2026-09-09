@@ -7,6 +7,7 @@ namespace SCS\Controller;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\AttendanceStatus;
 use SCS\Entity\Enum\PairingSystem;
+use SCS\Entity\Enum\Role;
 use SCS\Entity\Enum\RoundStatus;
 use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
@@ -36,6 +37,7 @@ use SCS\Services\AuthContextService;
 use SCS\Services\PlayerDisplayService;
 use SCS\Services\PlayerTournamentService;
 use SCS\Services\SeasonContactService;
+use SCS\Services\SeasonLifecycleService;
 use SCS\Services\SerializerService;
 use SCS\Services\SettingsValidator;
 use SCS\Services\TransactionManager;
@@ -62,6 +64,7 @@ class SeasonController extends RestController
         private readonly AdminRepository $adminRepository,
         private readonly AuthContextService $authContext,
         private readonly TransactionManager $transactions,
+        private readonly SeasonLifecycleService $lifecycle,
     ) {
         parent::__construct($validator);
     }
@@ -91,10 +94,45 @@ class SeasonController extends RestController
             // server-side so the roster renders without a separate fetch.
             $players = array_values($this->playerDisplay->mapForSeason($season->id));
 
+            $payload = $this->serializer->serialize($season);
+
+            // Whether the tournament can be closed, and why not — for the admin
+            // header, so it doesn't re-derive the lifecycle's rule. This route is
+            // member-readable, and the reason names a round they can't see, so it
+            // is added only for an admin rather than serialized for everyone.
+            if (($this->authContext->currentClaims()['role'] ?? null) === Role::Admin->value) {
+                $blocker = $season->status === SeasonStatus::Active
+                    ? $this->lifecycle->completionBlocker($season)
+                    : null;
+
+                $payload += [
+                    'can_complete'       => $season->status === SeasonStatus::Active && $blocker === null,
+                    'completion_blocker' => $blocker,
+                ];
+            }
+
             return $this->ok([
-                'season'  => $this->serializer->serialize($season),
+                'season'  => $payload,
                 'players' => $players,
             ]);
+        });
+    }
+
+    // Close a tournament for good. Its own route rather than a status write:
+    // PATCH still refuses `completed`, so there remains exactly one way in.
+    public function complete(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            $this->lifecycle->complete($season);
+
+            $updated = $this->seasonRepository->findById($season->id);
+
+            return $this->ok($this->serializer->serialize($updated ?? $season, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -238,9 +276,10 @@ class SeasonController extends RestController
 
             $data = $input->toUpdateData();
 
-            // Closed by completing its last round, so RoundService::closeSeason's rule can't be stepped around.
+            // Closed through its own route, so completeSeason's rule — every round
+            // complete — can't be stepped around with a status write.
             if (($data['status'] ?? null) === SeasonStatus::Completed->value) {
-                throw new ConflictException('A tournament is completed by completing its final round.');
+                throw new ConflictException('A tournament is completed through POST /seasons/{id}/complete.');
             }
 
             if ($season->status === SeasonStatus::Completed) {
@@ -273,9 +312,12 @@ class SeasonController extends RestController
                 $this->requireTeamPlayImplemented((bool)($data['is_team'] ?? false));
             }
 
-            // Same rule for the start date: once it has begun, that's a fact rather than a plan.
+            // Same rule for the start date: once it has begun, that's a fact rather
+            // than a plan. Recording one that was never set is still allowed — the
+            // rule is against rewriting a fact, not against filling in a blank.
             if (isset($data['start_date'])
-                && $data['start_date'] !== $season->start_date?->format('Y-m-d')
+                && $season->start_date !== null
+                && $data['start_date'] !== $season->start_date->format('Y-m-d')
                 && $season->status !== SeasonStatus::Preparation
             ) {
                 throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
@@ -295,7 +337,7 @@ class SeasonController extends RestController
                 }
             }
 
-            $systemChanged = $this->applySettings($input, $season, $data);
+            $switchedTo = $this->applySettings($input, $season, $data);
             // Contacts live in their own table, so they count as a change even
             // when nothing on the season row does — saving only the contacts is
             // a normal edit, not an empty request.
@@ -310,10 +352,10 @@ class SeasonController extends RestController
                 $this->seasonRepository->update($season->id, $data);
             }
 
-            // Standing absences are system-specific in the same way pairing settings
-            // are: a full-schedule system can't act on them and won't let them be
-            // cleared, so a switch would strand them on the enrolment.
-            if ($systemChanged) {
+            // A full-schedule system writes no per-round absence rows and refuses
+            // to have them cleared, so a switch onto one would strand the flags on
+            // the enrolment. Between two per-round systems they carry over.
+            if ($switchedTo !== null && $switchedTo->cadence() === 'full') {
                 $this->seasonPlayerRepository->clearDefaultAbsent($season->id);
             }
 
@@ -468,11 +510,11 @@ class SeasonController extends RestController
      * system scores differently; scoring settings lock after the first completed
      * round; display settings are always editable.
      *
-     * Returns whether the pairing system changed.
+     * Returns the system it switched to, or null when it didn't change.
      *
      * @param array<string,mixed> $data
      */
-    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): bool
+    private function applySettings(UpdateSeasonRequest $input, Season $season, array &$data): ?PairingSystem
     {
         $newSystem     = $input->pairing_system !== null ? PairingSystem::from($input->pairing_system) : $season->pairing_system;
         $systemChanged = $newSystem !== $season->pairing_system;
@@ -516,7 +558,7 @@ class SeasonController extends RestController
             $data['display_settings'] = json_encode($this->settingsValidator->validateDisplay($input->display_settings));
         }
 
-        return $systemChanged;
+        return $systemChanged ? $newSystem : null;
     }
 
     public function enrollPlayer(\WP_REST_Request $request): \WP_REST_Response
@@ -573,7 +615,7 @@ class SeasonController extends RestController
                 $seasonPlayer = $this->seasonPlayerRepository->findById($seasonPlayer->id) ?? $seasonPlayer;
             }
 
-            return $this->created($this->serializer->serialize($seasonPlayer));
+            return $this->created($this->serializer->serialize($seasonPlayer, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -623,7 +665,7 @@ class SeasonController extends RestController
 
             $updated = $this->seasonPlayerRepository->findById($seasonPlayer->id);
 
-            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer));
+            return $this->ok($this->serializer->serialize($updated ?? $seasonPlayer, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -699,7 +741,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -795,7 +837,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -848,7 +890,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
@@ -948,7 +990,7 @@ class SeasonController extends RestController
 
             $players = $this->seasonPlayerRepository->findBySeason($season->id);
 
-            return $this->ok(array_map($this->serializer->serialize(...), $players));
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 
