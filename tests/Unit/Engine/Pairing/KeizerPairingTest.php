@@ -102,7 +102,7 @@ final class KeizerPairingTest extends TestCase
             $roster,
             $history,
             $this->standings($roster),
-            new KeizerPairingSettings(rematchWindow: 0),
+            new KeizerPairingSettings(rematchWindow: 0, playsBetweenPairings: 0),
         );
 
         foreach ($result->pairings as $pairing) {
@@ -126,6 +126,41 @@ final class KeizerPairingTest extends TestCase
         self::assertNotContains('3v4', $met, 'These two met last round and the window has not passed.');
     }
 
+    /**
+     * The rounds window and the games window disagree for someone who misses
+     * rounds: three rounds have passed, but 1 and 2 have played nothing since
+     * they met, so only the games window still separates them.
+     */
+    #[Test]
+    public function it_counts_games_rather_than_rounds_between_rematches(): void
+    {
+        $roster  = $this->roster(6);
+        $history = [
+            $this->game(1, 1, 2, 1), $this->game(2, 3, 4, 1), $this->game(3, 5, 6, 1),
+            // 1 and 2 are absent for the next two rounds.
+            $this->game(4, 3, 5, 2), $this->game(5, 4, 6, 2),
+            $this->game(6, 3, 6, 3), $this->game(7, 4, 5, 3),
+        ];
+
+        $off = $this->pairsMade($this->pair(
+            $roster,
+            $history,
+            $this->standings($roster),
+            new KeizerPairingSettings(rematchWindow: 1, playsBetweenPairings: 0),
+        ));
+
+        self::assertContains('1v2', $off, 'Three rounds satisfy the rounds window, so the ranking gets its way.');
+
+        $on = $this->pairsMade($this->pair(
+            $roster,
+            $history,
+            $this->standings($roster),
+            new KeizerPairingSettings(rematchWindow: 1, playsBetweenPairings: 2),
+        ));
+
+        self::assertNotContains('1v2', $on, 'Neither has played since they met, so the games window still holds them apart.');
+    }
+
     #[Test]
     public function it_repeats_a_pairing_once_the_window_has_passed(): void
     {
@@ -135,7 +170,7 @@ final class KeizerPairingTest extends TestCase
             $this->roster(4),
             [$this->game(1, 1, 2), $this->game(2, 3, 4)],
             $this->standings($this->roster(4)),
-            new KeizerPairingSettings(rematchWindow: 1),
+            new KeizerPairingSettings(rematchWindow: 1, playsBetweenPairings: 0),
         );
 
         $met = $this->pairsMade($result);
@@ -315,11 +350,11 @@ final class KeizerPairingTest extends TestCase
         );
     }
 
-    private function game(int $id, int $white, int $black): Game
+    private function game(int $id, int $white, int $black, int $round = 1): Game
     {
         return new Game(
             id:                     $id,
-            round_id:               1,
+            round_id:               $round,
             board:                  $id,
             white_season_player_id: $white,
             black_season_player_id: $black,

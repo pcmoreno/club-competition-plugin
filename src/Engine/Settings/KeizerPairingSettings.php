@@ -18,6 +18,7 @@ use SCS\Engine\Settings\Setting\MaxRematches;
 use SCS\Engine\Settings\Setting\MaxSameColourRun;
 use SCS\Engine\Settings\Setting\NumberOfRounds;
 use SCS\Engine\Settings\Setting\PairingVariant;
+use SCS\Engine\Settings\Setting\PlaysBetweenPairings;
 use SCS\Engine\Settings\Setting\RematchWindow;
 use SCS\Engine\Settings\Setting\ScoreCorrection;
 use SCS\Engine\Settings\Setting\SkipLimit;
@@ -61,6 +62,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly bool $ignoreMildColourPrefs = IgnoreMildColourPrefs::DEFAULT,
         private readonly bool $strongerPreferenceWins = StrongerPreferenceWins::DEFAULT,
         private readonly int $rematchWindow = RematchWindow::DEFAULT,
+        private readonly int $playsBetweenPairings = PlaysBetweenPairings::DEFAULT,
         private readonly int $maxRematches = MaxRematches::DEFAULT,
         private readonly int $maxColourDifference = MaxColourDifference::DEFAULT,
         private readonly int $maxSameColourRun = MaxSameColourRun::DEFAULT,
@@ -106,6 +108,11 @@ final class KeizerPairingSettings implements TournamentPairingSettings
     public function rematchWindow(): int
     {
         return $this->rematchWindow;
+    }
+
+    public function playsBetweenPairings(): int
+    {
+        return $this->playsBetweenPairings;
     }
 
     public function maxRematches(): int
@@ -196,6 +203,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             IgnoreMildColourPrefs::KEY  => $this->ignoreMildColourPrefs,
             StrongerPreferenceWins::KEY => $this->strongerPreferenceWins,
             RematchWindow::KEY   => $this->rematchWindow,
+            PlaysBetweenPairings::KEY => $this->playsBetweenPairings,
             MaxRematches::KEY    => $this->maxRematches,
             MaxColourDifference::KEY => $this->maxColourDifference,
             MaxSameColourRun::KEY    => $this->maxSameColourRun,
@@ -225,6 +233,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             (new IgnoreMildColourPrefs())->field(),
             (new StrongerPreferenceWins())->field(),
             (new RematchWindow())->field(),
+            (new PlaysBetweenPairings())->field(),
             (new MaxRematches())->field(),
             (new MaxColourDifference())->field(),
             (new MaxSameColourRun())->field(),
@@ -260,6 +269,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             ignoreMildColourPrefs:  (new IgnoreMildColourPrefs())->normalise($values[IgnoreMildColourPrefs::KEY] ?? null),
             strongerPreferenceWins: (new StrongerPreferenceWins())->normalise($values[StrongerPreferenceWins::KEY] ?? null),
             rematchWindow:   (new RematchWindow())->normalise($values[RematchWindow::KEY] ?? null),
+            playsBetweenPairings: (new PlaysBetweenPairings())->normalise($values[PlaysBetweenPairings::KEY] ?? null),
             maxRematches:    (new MaxRematches())->normalise($values[MaxRematches::KEY] ?? null),
             maxColourDifference: (new MaxColourDifference())->normalise($values[MaxColourDifference::KEY] ?? null),
             maxSameColourRun:    (new MaxSameColourRun())->normalise($values[MaxSameColourRun::KEY] ?? null),

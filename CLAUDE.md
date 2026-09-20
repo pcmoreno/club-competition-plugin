@@ -153,12 +153,21 @@ weakest players. Standard and colour-aware algorithms are built; the weighted
 variants are exposed but coerce back to standard.
 
 **Rematches are discouraged, not forbidden.** `Pairing ▸ Values` sets a minimum
-gap (`roundsBetweenSamePairing`, 10) and a season maximum (`maxSamePairings`,
-4), and the engine treats both as penalties rather than filters — a thin field
-still gets a board. The oracle confirms both: its worst-repeated pair meets
-exactly four times, and 97 of 110 rematches respect the ten-round gap while 13
-break it, which is what a preference looks like in the data. The first rematch
-of the season falls in round 12, directly explained by the window.
+gap (`roundsBetweenSamePairing`, 10), the same gap counted in games
+(`playsBetweenSamePairing`, 5) and a season maximum (`maxSamePairings`, 4), and
+the engine treats all three as penalties rather than filters — a thin field
+still gets a board.
+
+The oracle confirms both: its worst-repeated pair meets exactly four times, and
+97 of 110 rematches respect the ten-round gap while 13 break it, which is what a
+preference looks like in the data. The first rematch of the season falls in round
+12, directly explained by the window.
+
+The two gaps are one intent measured two ways, and which binds depends on
+attendance: a weekly player reaches five games in five rounds, so the rounds gap
+holds them; someone who plays half the evenings is still short of five games long
+after ten rounds have passed. Rounds a player missed don't count towards the
+games gap, and a pair is separated by the lesser of their two counts.
 
 Colour has two caps on the same tab: `maxColorDifference` (2) bounds how far a
 player's colours drift from even, and `maxConsecutiveSameColor` (2) their

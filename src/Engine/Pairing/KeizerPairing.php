@@ -186,7 +186,7 @@ final class KeizerPairing implements PerRoundPairing
      *
      * @param  list<SeasonPlayer>                       $order
      * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
-     * @param  array<string,array{count:int,last:int}>          $meetings
+     * @param  array<string,array{count:int,last:int,plays:int}>          $meetings
      * @param  array<int,int>                           $rank
      * @param  array<string,int>                        $categories
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
@@ -259,7 +259,7 @@ final class KeizerPairing implements PerRoundPairing
      * @param list<SeasonPlayer>                       $order
      * @param array<int,true>                          $paired
      * @param array<int,array{last:?bool,balance:int,run:int}> $colours
-     * @param array<string,array{count:int,last:int}>          $meetings
+     * @param array<string,array{count:int,last:int,plays:int}>          $meetings
      * @param array<string,int>                                $categories
      */
     private function findOpponent(array $order, int $index, array $paired, array $colours, array $meetings, array $categories): ?SeasonPlayer
@@ -372,7 +372,7 @@ final class KeizerPairing implements PerRoundPairing
      *
      * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}>       $pairs
      * @param  array<string,int>                                $categories
-     * @param  array<string,array{count:int,last:int}>          $meetings
+     * @param  array<string,array{count:int,last:int,plays:int}>          $meetings
      * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
      */
@@ -485,11 +485,11 @@ final class KeizerPairing implements PerRoundPairing
     /**
      * How badly pairing these two again would breach the rematch settings.
      *
-     * Zero is a clean pairing. Meeting again inside the window costs one;
-     * meeting past the season maximum costs more, because a fourth game between
-     * the same two players is worse than a slightly early third.
+     * Zero is a clean pairing. Meeting again inside either window costs one
+     * each; meeting past the season maximum costs more, because a fourth game
+     * between the same two players is worse than a slightly early third.
      *
-     * @param array<string,array{count:int,last:int}> $meetings
+     * @param array<string,array{count:int,last:int,plays:int}> $meetings
      */
     private function rematchPenalty(SeasonPlayer $a, SeasonPlayer $b, array $meetings): int
     {
@@ -505,6 +505,9 @@ final class KeizerPairing implements PerRoundPairing
         if ($met['last'] < $this->settings->rematchWindow()) {
             $penalty += 1;
         }
+        if ($met['plays'] < $this->settings->playsBetweenPairings()) {
+            $penalty += 1;
+        }
 
         return $penalty;
     }
@@ -517,8 +520,12 @@ final class KeizerPairing implements PerRoundPairing
      * round has games, and a round with none would have nothing to remember
      * anyway.
      *
-     * @param  list<Game>                              $history
-     * @return array<string,array{count:int,last:int}>
+     * `last` counts rounds since the pair met, `plays` the games each has played
+     * since — the lesser of the two, so a round one of them missed doesn't bring
+     * their rematch closer.
+     *
+     * @param  list<Game>                                          $history
+     * @return array<string,array{count:int,last:int,plays:int}>
      */
     private function meetings(array $history): array
     {
@@ -529,16 +536,51 @@ final class KeizerPairing implements PerRoundPairing
         $sequence = array_flip(array_keys($rounds));
         $total    = count($sequence);
 
+        // Which round-positions each player actually played, to count games
+        // rather than rounds between two meetings.
+        $played = [];
+        foreach ($history as $game) {
+            foreach ([$game->white_season_player_id, $game->black_season_player_id] as $id) {
+                $played[$id][] = $sequence[$game->round_id];
+            }
+        }
+
         $meetings = [];
         foreach ($history as $game) {
-            $key   = $this->pairKey($game->white_season_player_id, $game->black_season_player_id);
-            $ago   = $total - $sequence[$game->round_id];
-            $entry = $meetings[$key] ?? ['count' => 0, 'last' => PHP_INT_MAX];
+            $white = $game->white_season_player_id;
+            $black = $game->black_season_player_id;
+            $key   = $this->pairKey($white, $black);
+            $at    = $sequence[$game->round_id];
+            $ago   = $total - $at;
+            $entry = $meetings[$key] ?? ['count' => 0, 'last' => PHP_INT_MAX, 'plays' => PHP_INT_MAX];
 
-            $meetings[$key] = ['count' => $entry['count'] + 1, 'last' => min($entry['last'], $ago)];
+            $since = min(
+                $this->playsSince($played[$white] ?? [], $at),
+                $this->playsSince($played[$black] ?? [], $at)
+            );
+
+            $meetings[$key] = [
+                'count' => $entry['count'] + 1,
+                'last'  => min($entry['last'], $ago),
+                'plays' => min($entry['plays'], $since),
+            ];
         }
 
         return $meetings;
+    }
+
+    // Games a player has played after the given round position.
+    /** @param list<int> $positions */
+    private function playsSince(array $positions, int $at): int
+    {
+        $since = 0;
+        foreach ($positions as $position) {
+            if ($position > $at) {
+                $since++;
+            }
+        }
+
+        return $since;
     }
 
     private function pairKey(int $a, int $b): string
