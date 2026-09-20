@@ -684,6 +684,20 @@ round doesn't hide the one being paired. Standing absences never appear in that
 list; neither do declarations made after the pairings go out, which write nothing
 and only mail the tournament's contacts.
 
+**Sevilla models this the other way round.** A `.sev` export carries an `<Abs>`
+row for every player who did not play, every round — playing + absent equals the
+whole roster exactly, so roughly half the club is written out each week. Ours is
+the inverse: no row means present, and a row is the exception.
+
+The difference matters to anything that imports one. Those rows say "didn't
+play", not "declared an absence", and under Keizer every absence scores
+`Par × OwnV` — so taking them literally would mark half the field personally
+absent in every round and price it. A `pairing_bye` is the only one that maps
+across cleanly, and Sevilla writes none of those while the present count stays
+even. Sevilla's own absence reasons are bare integers with no labels in the
+export (`<Reason>0</Reason>`, `<Reason>1</Reason>`), so the mapping cannot be
+read off the file either.
+
 ### Tournament Contacts
 
 The admins a tournament's notifications go to (`…scs_season_contacts`,
