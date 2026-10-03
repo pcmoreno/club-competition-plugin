@@ -19,6 +19,7 @@ use SCS\Entity\Game;
 use SCS\Entity\Season;
 use SCS\Entity\SeasonPlayer;
 use SCS\Entity\StandingsSnapshot;
+use SCS\Exception\UnpairablePlayersException;
 
 /**
  * Pairs one Keizer round from the standings.
@@ -71,6 +72,7 @@ final class KeizerPairing implements PerRoundPairing
         $categories = $this->categoryOrder($season->categories);
 
         $pairs = $this->pairs($order, $colours, $meetings, $rank, $categories);
+        $this->assertNobodyStrandedByRating($order, $pairs);
         $pairs = $this->repairCategories($pairs, $categories, $meetings, $colours);
 
         // Board 1 is the pair containing the highest ranked player, which is
@@ -266,8 +268,14 @@ final class KeizerPairing implements PerRoundPairing
     {
         $player     = $order[$index];
         $candidates = [];
+        $maxRating = $this->settings->maxRatingDifference();
         foreach ($order as $position => $candidate) {
             if ($position === $index || isset($paired[$candidate->id])) {
+                continue;
+            }
+            // The one bound among the preferences: too far apart on enrolment
+            // rating and the board is not offered at all.
+            if ($maxRating > 0 && abs($player->elo_rating - $candidate->elo_rating) > $maxRating) {
                 continue;
             }
             $candidates[] = [
@@ -581,6 +589,41 @@ final class KeizerPairing implements PerRoundPairing
         }
 
         return $since;
+    }
+
+    /**
+     * The rating bound can leave a player with no legal opponent, which the
+     * preferences never do. Saying so beats handing back a round that quietly
+     * drops them: they would appear on no board and take no bye.
+     *
+     * @param list<SeasonPlayer>                 $order
+     * @param list<array{0:SeasonPlayer,1:SeasonPlayer}> $pairs
+     */
+    private function assertNobodyStrandedByRating(array $order, array $pairs): void
+    {
+        if ($this->settings->maxRatingDifference() === 0) {
+            return;
+        }
+
+        $paired = [];
+        foreach ($pairs as [$white, $black]) {
+            $paired[$white->id] = true;
+            $paired[$black->id] = true;
+        }
+
+        $stranded = array_values(array_filter($order, static fn (SeasonPlayer $p) => !isset($paired[$p->id])));
+        if ($stranded === []) {
+            return;
+        }
+
+        throw new UnpairablePlayersException(
+            sprintf(
+                'No opponent within %d rating points for %s.',
+                $this->settings->maxRatingDifference(),
+                implode(', ', array_map(static fn (SeasonPlayer $p) => '#' . $p->id, $stranded))
+            ),
+            array_map(static fn (SeasonPlayer $p) => $p->id, $stranded)
+        );
     }
 
     private function pairKey(int $a, int $b): string

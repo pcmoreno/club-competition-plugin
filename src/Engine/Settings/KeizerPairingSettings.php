@@ -14,6 +14,7 @@ use SCS\Engine\Settings\Setting\ColorTiebreak;
 use SCS\Engine\Settings\Setting\GameCorrection;
 use SCS\Engine\Settings\Setting\IgnoreMildColourPrefs;
 use SCS\Engine\Settings\Setting\MaxColourDifference;
+use SCS\Engine\Settings\Setting\MaxRatingDifference;
 use SCS\Engine\Settings\Setting\MaxRematches;
 use SCS\Engine\Settings\Setting\MaxSameColourRun;
 use SCS\Engine\Settings\Setting\NumberOfRounds;
@@ -65,6 +66,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
         private readonly int $playsBetweenPairings = PlaysBetweenPairings::DEFAULT,
         private readonly int $maxRematches = MaxRematches::DEFAULT,
         private readonly int $maxColourDifference = MaxColourDifference::DEFAULT,
+        private readonly int $maxRatingDifference = MaxRatingDifference::DEFAULT,
         private readonly int $maxSameColourRun = MaxSameColourRun::DEFAULT,
         private readonly ?int $numberOfRounds = null,
     ) {
@@ -123,6 +125,11 @@ final class KeizerPairingSettings implements TournamentPairingSettings
     public function maxColourDifference(): int
     {
         return $this->maxColourDifference;
+    }
+
+    public function maxRatingDifference(): int
+    {
+        return $this->maxRatingDifference;
     }
 
     public function maxSameColourRun(): int
@@ -206,6 +213,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             PlaysBetweenPairings::KEY => $this->playsBetweenPairings,
             MaxRematches::KEY    => $this->maxRematches,
             MaxColourDifference::KEY => $this->maxColourDifference,
+            MaxRatingDifference::KEY => $this->maxRatingDifference,
             MaxSameColourRun::KEY    => $this->maxSameColourRun,
             NumberOfRounds::KEY  => $this->numberOfRounds,
         ];
@@ -236,6 +244,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             (new PlaysBetweenPairings())->field(),
             (new MaxRematches())->field(),
             (new MaxColourDifference())->field(),
+            (new MaxRatingDifference())->field(),
             (new MaxSameColourRun())->field(),
             (new NumberOfRounds())->field(),
         ];
@@ -272,6 +281,7 @@ final class KeizerPairingSettings implements TournamentPairingSettings
             playsBetweenPairings: (new PlaysBetweenPairings())->normalise($values[PlaysBetweenPairings::KEY] ?? null),
             maxRematches:    (new MaxRematches())->normalise($values[MaxRematches::KEY] ?? null),
             maxColourDifference: (new MaxColourDifference())->normalise($values[MaxColourDifference::KEY] ?? null),
+            maxRatingDifference: (new MaxRatingDifference())->normalise($values[MaxRatingDifference::KEY] ?? null),
             maxSameColourRun:    (new MaxSameColourRun())->normalise($values[MaxSameColourRun::KEY] ?? null),
             numberOfRounds:  (new NumberOfRounds())->normalise($values[NumberOfRounds::KEY] ?? null),
         );

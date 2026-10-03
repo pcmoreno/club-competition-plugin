@@ -18,9 +18,11 @@ use SCS\Entity\Round;
 use SCS\Entity\Season;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
+use SCS\Exception\UnpairablePlayersException;
 use SCS\Exception\ValidationException;
 use SCS\Repository\AttendanceRepository;
 use SCS\Repository\GameRepository;
+use SCS\Repository\PlayerRepository;
 use SCS\Repository\RoundRepository;
 use SCS\Repository\SeasonPlayerRepository;
 use SCS\Repository\SeasonRepository;
@@ -41,6 +43,7 @@ final class RoundService
         private readonly PairingEngineResolver $pairingEngines,
         private readonly SettingsResolver $settings,
         private readonly SeasonLifecycleService $lifecycle,
+        private readonly PlayerRepository $players,
     ) {
     }
 
@@ -204,12 +207,16 @@ final class RoundService
 
         $this->requireStandingsAreCurrent($round);
 
-        $result = $engine->pairNextRound(
-            $season,
-            $this->presentPlayers($round),
-            $this->gamesBefore($season->id, $round),
-            array_values($this->snapshots->findLatestForSeason($season->id)),
-        );
+        try {
+            $result = $engine->pairNextRound(
+                $season,
+                $this->presentPlayers($round),
+                $this->gamesBefore($season->id, $round),
+                array_values($this->snapshots->findLatestForSeason($season->id)),
+            );
+        } catch (UnpairablePlayersException $e) {
+            throw new ConflictException($this->nameTheUnpairable($e, $season->id));
+        }
 
         return $this->transactions->transactional(function () use ($round, $season, $result): array {
             // The bye is an attendance row, not a board, so deleting the
@@ -568,6 +575,27 @@ final class RoundService
         }
 
         return $previous;
+    }
+
+    // The engine knows enrolment ids and nothing else, so it says "#14"; here
+    // the roster is in reach and the admin gets the name they recognise.
+    private function nameTheUnpairable(UnpairablePlayersException $e, int $seasonId): string
+    {
+        $enrolments = [];
+        foreach ($this->seasonPlayers->findBySeason($seasonId) as $sp) {
+            $enrolments[$sp->id] = $sp->player_id;
+        }
+
+        $names = [];
+        foreach ($e->seasonPlayerIds as $id) {
+            $player  = isset($enrolments[$id]) ? $this->players->findById($enrolments[$id]) : null;
+            $names[] = $player !== null ? $player->name : ('#' . $id);
+        }
+
+        return sprintf(
+            '%s has nobody to play within the tournament\'s maximum rating difference. Widen it on the Settings tab, or pair the round by hand.',
+            implode(', ', $names)
+        );
     }
 
     private function requireGame(int $gameId): Game

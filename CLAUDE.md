@@ -203,6 +203,21 @@ Because it ranks rather than filters, a field that genuinely can't be paired
 inside its categories keeps a breaching board instead of losing a game: the
 repair pass accepts only strictly-improving swaps, and then gives up.
 
+**`maxRatingDifference` is the one exception to all of that** — the only pairing
+setting that is a bound rather than a preference. A candidate further away than
+it is removed from consideration in `findOpponent` instead of ranked below the
+others, so a narrow value can leave a player with no legal opponent at all. The
+gap is measured on `season_players.elo_rating`, the rating each player enrolled
+with, not whatever it has become since.
+
+Zero means unlimited and is the default, so a season that never sets it pairs
+exactly as it always did. When it is set and the field strands someone,
+`pairNextRound` throws rather than returning a round that quietly drops them:
+the bye is chosen before pairing, so an unpaired player would otherwise appear
+on no board and take no bye. The engine only knows enrolment ids, so it throws
+`UnpairablePlayersException` carrying them and `RoundService::pairRound` catches
+it and names the players before the admin sees it. The club runs it at 300.
+
 The oracle is unambiguous. Across 444 games: `C-C 148`, `B-B 102`, `A-B 78`,
 `A-A 63`, `B-C 53`, and **`A-C` exactly zero**. That is not a side effect of
 pairing by strength, which was this file's previous claim:

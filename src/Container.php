@@ -115,7 +115,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
-            ->addArgument(new Reference('player_display_service'));
+            ->addArgument(new Reference('player_repository'));
 
         $container->register('transaction_manager', Services\TransactionManager::class)
             ->addArgument(new Reference('db_connection'));
@@ -134,7 +134,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
-            ->addArgument(new Reference('player_display_service'));
+            ->addArgument(new Reference('player_repository'));
 
         $container->register('season_contact_service', Services\SeasonContactService::class)
             ->addArgument(new Reference('season_contact_repository'))
@@ -237,7 +237,8 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('pairing_engine_resolver'))
             ->addArgument(new Reference('settings_resolver'))
-            ->addArgument(new Reference('season_lifecycle_service'));
+            ->addArgument(new Reference('season_lifecycle_service'))
+            ->addArgument(new Reference('player_repository'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
