@@ -237,7 +237,8 @@ class Container
             ->addArgument(new Reference('standings_snapshot_repository'))
             ->addArgument(new Reference('pairing_engine_resolver'))
             ->addArgument(new Reference('settings_resolver'))
-            ->addArgument(new Reference('season_lifecycle_service'));
+            ->addArgument(new Reference('season_lifecycle_service'))
+            ->addArgument(new Reference('player_repository'));
 
         // ── Controllers (public — fetched by RestApi) ─────────────────────────
         $container->register('auth_controller', Controller\AuthController::class)
