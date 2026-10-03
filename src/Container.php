@@ -115,7 +115,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
-            ->addArgument(new Reference('player_repository'));
+            ->addArgument(new Reference('player_display_service'));
 
         $container->register('transaction_manager', Services\TransactionManager::class)
             ->addArgument(new Reference('db_connection'));
@@ -134,7 +134,7 @@ class Container
             ->addArgument(new Reference('game_repository'))
             ->addArgument(new Reference('attendance_repository'))
             ->addArgument(new Reference('standings_snapshot_repository'))
-            ->addArgument(new Reference('player_repository'));
+            ->addArgument(new Reference('player_display_service'));
 
         $container->register('season_contact_service', Services\SeasonContactService::class)
             ->addArgument(new Reference('season_contact_repository'))
