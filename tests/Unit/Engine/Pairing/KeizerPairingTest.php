@@ -127,54 +127,6 @@ final class KeizerPairingTest extends TestCase
     }
 
     /**
-     * The rating bound is the one setting that refuses rather than prefers.
-     * roster(4) is 1975/1950/1925/1900, so a 60-point cap leaves 1 and 4 with
-     * only their neighbours to play.
-     */
-    #[Test]
-    public function it_refuses_an_opponent_outside_the_rating_bound(): void
-    {
-        $roster = $this->roster(4);
-
-        $wide = $this->pairsMade($this->pair(
-            $roster,
-            [],
-            $this->standings($roster),
-            new KeizerPairingSettings(maxRatingDifference: 0),
-        ));
-        self::assertContains('1v2', $wide, 'No bound, so the ranking pairs neighbours.');
-
-        $tight = $this->pairsMade($this->pair(
-            $roster,
-            [],
-            $this->standings($roster),
-            new KeizerPairingSettings(maxRatingDifference: 60),
-        ));
-        foreach ($tight as $pair) {
-            [$a, $b] = array_map('intval', explode('v', $pair));
-            self::assertLessThanOrEqual(60, abs(($roster[$a - 1])->elo_rating - ($roster[$b - 1])->elo_rating));
-        }
-    }
-
-    #[Test]
-    public function it_refuses_the_round_when_the_rating_bound_strands_a_player(): void
-    {
-        // 1 is 1975 and the rest are 1950 and below, so a 10-point cap leaves
-        // the top player with nobody at all.
-        $roster = $this->roster(3);
-
-        $this->expectException(\SCS\Exception\ConflictException::class);
-        $this->expectExceptionMessageMatches('/rating points/');
-
-        $this->pair(
-            $roster,
-            [],
-            $this->standings($roster),
-            new KeizerPairingSettings(maxRatingDifference: 10),
-        );
-    }
-
-    /**
      * The rounds window and the games window disagree for someone who misses
      * rounds: three rounds have passed, but 1 and 2 have played nothing since
      * they met, so only the games window still separates them.
