@@ -102,7 +102,7 @@ final class KeizerPairingTest extends TestCase
             $roster,
             $history,
             $this->standings($roster),
-            new KeizerPairingSettings(rematchWindow: 0),
+            new KeizerPairingSettings(rematchWindow: 0, playsBetweenPairings: 0),
         );
 
         foreach ($result->pairings as $pairing) {
@@ -135,7 +135,7 @@ final class KeizerPairingTest extends TestCase
             $this->roster(4),
             [$this->game(1, 1, 2), $this->game(2, 3, 4)],
             $this->standings($this->roster(4)),
-            new KeizerPairingSettings(rematchWindow: 1),
+            new KeizerPairingSettings(rematchWindow: 1, playsBetweenPairings: 0),
         );
 
         $met = $this->pairsMade($result);

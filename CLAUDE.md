@@ -153,12 +153,21 @@ weakest players. Standard and colour-aware algorithms are built; the weighted
 variants are exposed but coerce back to standard.
 
 **Rematches are discouraged, not forbidden.** `Pairing ▸ Values` sets a minimum
-gap (`roundsBetweenSamePairing`, 10) and a season maximum (`maxSamePairings`,
-4), and the engine treats both as penalties rather than filters — a thin field
-still gets a board. The oracle confirms both: its worst-repeated pair meets
-exactly four times, and 97 of 110 rematches respect the ten-round gap while 13
-break it, which is what a preference looks like in the data. The first rematch
-of the season falls in round 12, directly explained by the window.
+gap (`roundsBetweenSamePairing`, 10), the same gap counted in games
+(`playsBetweenSamePairing`, 5) and a season maximum (`maxSamePairings`, 4), and
+the engine treats all three as penalties rather than filters — a thin field
+still gets a board.
+
+The oracle confirms both: its worst-repeated pair meets exactly four times, and
+97 of 110 rematches respect the ten-round gap while 13 break it, which is what a
+preference looks like in the data. The first rematch of the season falls in round
+12, directly explained by the window.
+
+The two gaps are one intent measured two ways, and which binds depends on
+attendance: a weekly player reaches five games in five rounds, so the rounds gap
+holds them; someone who plays half the evenings is still short of five games long
+after ten rounds have passed. Rounds a player missed don't count towards the
+games gap, and a pair is separated by the lesser of their two counts.
 
 Colour has two caps on the same tab: `maxColorDifference` (2) bounds how far a
 player's colours drift from even, and `maxConsecutiveSameColor` (2) their
@@ -193,6 +202,21 @@ being optional per season.
 Because it ranks rather than filters, a field that genuinely can't be paired
 inside its categories keeps a breaching board instead of losing a game: the
 repair pass accepts only strictly-improving swaps, and then gives up.
+
+**`maxRatingDifference` is the one exception to all of that** — the only pairing
+setting that is a bound rather than a preference. A candidate further away than
+it is removed from consideration in `findOpponent` instead of ranked below the
+others, so a narrow value can leave a player with no legal opponent at all. The
+gap is measured on `season_players.elo_rating`, the rating each player enrolled
+with, not whatever it has become since.
+
+Zero means unlimited and is the default, so a season that never sets it pairs
+exactly as it always did. When it is set and the field strands someone,
+`pairNextRound` throws rather than returning a round that quietly drops them:
+the bye is chosen before pairing, so an unpaired player would otherwise appear
+on no board and take no bye. The engine only knows enrolment ids, so it throws
+`UnpairablePlayersException` carrying them and `RoundService::pairRound` catches
+it and names the players before the admin sees it. The club runs it at 300.
 
 The oracle is unambiguous. Across 444 games: `C-C 148`, `B-B 102`, `A-B 78`,
 `A-A 63`, `B-C 53`, and **`A-C` exactly zero**. That is not a side effect of
@@ -674,6 +698,20 @@ round that isn't complete, rather than the lowest, so an unfinished previous
 round doesn't hide the one being paired. Standing absences never appear in that
 list; neither do declarations made after the pairings go out, which write nothing
 and only mail the tournament's contacts.
+
+**Sevilla models this the other way round.** A `.sev` export carries an `<Abs>`
+row for every player who did not play, every round — playing + absent equals the
+whole roster exactly, so roughly half the club is written out each week. Ours is
+the inverse: no row means present, and a row is the exception.
+
+The difference matters to anything that imports one. Those rows say "didn't
+play", not "declared an absence", and under Keizer every absence scores
+`Par × OwnV` — so taking them literally would mark half the field personally
+absent in every round and price it. A `pairing_bye` is the only one that maps
+across cleanly, and Sevilla writes none of those while the present count stays
+even. Sevilla's own absence reasons are bare integers with no labels in the
+export (`<Reason>0</Reason>`, `<Reason>1</Reason>`), so the mapping cannot be
+read off the file either.
 
 ### Tournament Contacts
 
