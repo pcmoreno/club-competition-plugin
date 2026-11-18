@@ -8,20 +8,29 @@ namespace SCS\Services;
  * Downloads and parses the KNSB monthly "Klassiek" (classical) rating list.
  *
  * The federation publishes a ZIP holding a single semicolon-delimited,
- * latin-1 CSV (`KLASSIEK.csv`) with the header
+ * latin-1 CSV with the header
  *   Relatienummer;Naam;Titel;FED;Rating;Nv;Geboren;S
  * where Relatienummer is the player's KNSB id (our `knsb_id`) and Rating is the
- * classical rating (our `knsb_elo`). Refreshed monthly on the 1st; the same URL
- * always serves the latest file, and the CSV's zip-entry mtime is the list date.
+ * classical rating (our `knsb_elo`). The CSV's zip-entry mtime is the list date.
+ *
+ * Each month's list is a new upload under that month's folder, named either
+ * `KLASSIEK.zip` or `2026-10-KLASSIEK.zip` with the CSV inside named to match,
+ * so no fixed URL stays current. The newest one is found through the site's
+ * public media search, with the last known file as a fallback.
  *
  * This only fetches + parses; persistence is KnsbRatingStore, application to
  * players is the sync endpoint. The frontend never calls KNSB directly.
  */
 class KnsbRatingListFetcher
 {
-    public const URL = 'https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip';
+    private const MEDIA_SEARCH = 'https://schaakbond.nl/wp-json/wp/v2/media?search=KLASSIEK&orderby=date&order=desc&per_page=20&_fields=source_url';
 
-    private const CSV_NAME = 'KLASSIEK.csv';
+    // Only ever download from the federation's own uploads, whatever the search returns.
+    private const UPLOADS = 'https://schaakbond.nl/wp-content/uploads/';
+
+    private const FALLBACK_URL = 'https://schaakbond.nl/wp-content/uploads/2026/10/KLASSIEK.zip';
+
+    private const CSV_SUFFIX = 'klassiek.csv';
 
     /**
      * @return array{list_date: ?string, ratings: array<string, array{rating: int, name: string, birth_year: ?int}>}
@@ -38,7 +47,7 @@ class KnsbRatingListFetcher
     /** @return array{contents: string, list_date: ?string} */
     private function download(): array
     {
-        $response = wp_remote_get(self::URL, [ 'timeout' => 30 ]);
+        $response = wp_remote_get($this->latestListUrl(), [ 'timeout' => 30 ]);
         if (is_wp_error($response)) {
             throw new \RuntimeException('KNSB download failed: ' . $response->get_error_message());
         }
@@ -62,12 +71,21 @@ class KnsbRatingListFetcher
                 throw new \RuntimeException('KNSB archive could not be opened.');
             }
 
-            $contents = $zip->getFromName(self::CSV_NAME);
-            $stat     = $zip->statName(self::CSV_NAME);
+            $contents = false;
+            $stat     = false;
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $entry = $zip->statIndex($i);
+                if ($entry !== false && str_ends_with(strtolower($entry['name']), self::CSV_SUFFIX)) {
+                    $contents = $zip->getFromIndex($i);
+                    $stat     = $entry;
+
+                    break;
+                }
+            }
             $zip->close();
 
             if ($contents === false) {
-                throw new \RuntimeException(sprintf('"%s" not found in the KNSB archive.', self::CSV_NAME));
+                throw new \RuntimeException('No KLASSIEK CSV found in the KNSB archive.');
             }
 
             $listDate = isset($stat['mtime']) ? gmdate('Y-m-d', (int)$stat['mtime']) : null;
@@ -76,6 +94,29 @@ class KnsbRatingListFetcher
         } finally {
             @unlink($tmp);
         }
+    }
+
+    // Newest first, so the first KLASSIEK zip the search returns is this month's.
+    private function latestListUrl(): string
+    {
+        $response = wp_remote_get(self::MEDIA_SEARCH, [ 'timeout' => 15 ]);
+        if (is_wp_error($response) || (int)wp_remote_retrieve_response_code($response) !== 200) {
+            return self::FALLBACK_URL;
+        }
+
+        $media = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($media)) {
+            return self::FALLBACK_URL;
+        }
+
+        foreach ($media as $item) {
+            $url = is_array($item) && is_string($item['source_url'] ?? null) ? $item['source_url'] : '';
+            if (str_starts_with($url, self::UPLOADS) && preg_match('/klassiek\.zip$/i', $url) === 1) {
+                return $url;
+            }
+        }
+
+        return self::FALLBACK_URL;
     }
 
     /**

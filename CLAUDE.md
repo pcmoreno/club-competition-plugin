@@ -1014,7 +1014,12 @@ CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
 ### KNSB Rating Sync
 
-- **Source**: `https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip`
+- **Source**: the newest `KLASSIEK` zip in schaakbond.nl's uploads. Each month is
+  a new upload under a new folder (`uploads/2026/10/2026-10-KLASSIEK.zip`), so
+  `KnsbRatingListFetcher` finds it through the site's public WordPress media
+  search, accepts only a URL under `schaakbond.nl/wp-content/uploads/`, and falls
+  back to the last known file when the search fails. The CSV inside is matched on
+  its `KLASSIEK.csv` suffix, since dated zips name it `2026-10-KLASSIEK.csv`.
 - **Trigger**: manual only — `wp scs fetch-knsb-ratings`, or the "Fetch KNSB
   ratings" dialog in the admin roster. **No cron is registered.**
 - **Storage**: `KnsbRatingStore` writes the parsed list under
