@@ -176,9 +176,10 @@ games gap, and a pair is separated by the lesser of their two counts.
 1. **Two players who have met before** follow `colorRule`, Sevilla's "mutual
    colour preference": Alternating swaps the colours of their last game together,
    Balance to zero keeps their head-to-head within one of even, Balance/Alternate
-   does both, No extra rules skips it. This comes **before the caps**. In the
-   club's 2025-26 season a run or imbalance of four happened only in rematches,
-   never on a first meeting.
+   does both, No extra rules skips it. This comes **before the caps**: it is
+   rule 1 in the manual's note on colour assignment, and in the club's 2025-26
+   season a run or imbalance of four happened only in rematches, never on a
+   first meeting.
 2. Otherwise each player is **owed the colour that evens out their season**, and
    with an even season the opposite of their last game. A run at its cap must
    break whatever the balance says.
@@ -191,9 +192,12 @@ games gap, and a pair is separated by the lesser of their two counts.
 
 Replaying 2025-26 with the club's settings, this matches the colours actually
 played in 91% of games (96% of rematches). The fixture includes hand-made
-pairings, so the rest isn't all disagreement. Sevilla's "recent colour balance"
-step, between imbalance and history, is not built, because the manual doesn't
-define it.
+pairings, so the rest isn't all disagreement.
+
+The manual puts the current colour streak between balance and history (its
+"recent colour balance"), and the higher streak gets black. It needs no step of
+its own. With equal balances, the first difference the history comparison finds
+is where the shorter streak ends, so it always gives the same answer.
 
 The two caps sit on the same tab: `maxColorDifference` (2) bounds how far a
 player's colours drift from even, and `maxConsecutiveSameColor` (2) their longest
