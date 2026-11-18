@@ -737,11 +737,7 @@ final class KeizerPairing implements PerRoundPairing
         // what they get, which alternating spreads evenly down the sheet rather
         // than handing white to every favoured player.
         if ($wantsA === null && $wantsB === null) {
-            $favoured = $this->colourTieWinner($a, $b, $rank);
-            $white    = $this->tieAwardIsWhite($board);
-            $other    = $favoured->id === $a->id ? $b : $a;
-
-            return $white ? [$favoured, $other] : [$other, $favoured];
+            return $this->tieRule($a, $b, $rank, $board);
         }
 
         // Only one of them has a claim, so it goes unopposed.
@@ -777,6 +773,11 @@ final class KeizerPairing implements PerRoundPairing
             $other  = $served->id === $a->id ? $b : $a;
 
             return $wants ? [$served, $other] : [$other, $served];
+        }
+
+        // No priority set: Sevilla moves on to the rule for when nothing decides.
+        if ($this->settings->colorPriority() === ColorPriority::None) {
+            return $this->tieRule($a, $b, $rank, $board);
         }
 
         // Otherwise priority decides who is served, and the one served takes
@@ -829,6 +830,21 @@ final class KeizerPairing implements PerRoundPairing
         };
     }
 
+    /**
+     * The rule for when nothing else decides: the tiebreak picks who is
+     * favoured, and the award says what they get.
+     *
+     * @param  array<int,int>                       $rank
+     * @return array{0:SeasonPlayer,1:SeasonPlayer}
+     */
+    private function tieRule(SeasonPlayer $a, SeasonPlayer $b, array $rank, int $board): array
+    {
+        $favoured = $this->colourTieWinner($a, $b, $rank);
+        $other    = $favoured->id === $a->id ? $b : $a;
+
+        return $this->tieAwardIsWhite($board) ? [$favoured, $other] : [$other, $favoured];
+    }
+
     // Whether the favoured player on this board takes white.
     private function tieAwardIsWhite(int $board): bool
     {
@@ -846,7 +862,6 @@ final class KeizerPairing implements PerRoundPairing
     {
         return match ($this->settings->colorPriority()) {
             ColorPriority::HigherRated => $a->elo_rating >= $b->elo_rating ? $a : $b,
-            ColorPriority::None        => $a,
             default                    => ($rank[$a->id] ?? PHP_INT_MAX) <= ($rank[$b->id] ?? PHP_INT_MAX) ? $a : $b,
         };
     }
