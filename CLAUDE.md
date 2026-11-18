@@ -1014,7 +1014,10 @@ CLI scripts to prove UI-facing behaviour — hand it over to be click-tested.
 
 ### KNSB Rating Sync
 
-- **Source**: `https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip`
+- **Source**: `https://www.schaakbond.nl/files/KLASSIEK.zip`, the fixed link to
+  the current list that KNSB's download page
+  (`schaakbond.nl/rating/downloadlijsten/`) offers for software to fetch. If a
+  fetch starts failing, that page is where the link will have moved.
 - **Trigger**: manual only — `wp scs fetch-knsb-ratings`, or the "Fetch KNSB
   ratings" dialog in the admin roster. **No cron is registered.**
 - **Storage**: `KnsbRatingStore` writes the parsed list under

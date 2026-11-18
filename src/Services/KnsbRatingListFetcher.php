@@ -19,7 +19,7 @@ namespace SCS\Services;
  */
 class KnsbRatingListFetcher
 {
-    public const URL = 'https://schaakbond.nl/wp-content/uploads/2024/12/KLASSIEK.zip';
+    public const URL = 'https://www.schaakbond.nl/files/KLASSIEK.zip';
 
     private const CSV_NAME = 'KLASSIEK.csv';
 
