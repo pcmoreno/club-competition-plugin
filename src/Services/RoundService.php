@@ -593,7 +593,7 @@ final class RoundService
         }
 
         return sprintf(
-            '%s has nobody to play within the tournament\'s maximum rating difference. Widen it on the Settings tab, or pair the round by hand.',
+            '%s could not be paired within the tournament\'s maximum rating difference. Widen it on the Settings tab, or pair the round by hand.',
             implode(', ', $names)
         );
     }

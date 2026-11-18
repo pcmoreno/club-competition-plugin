@@ -156,7 +156,9 @@ variants are exposed but coerce back to standard.
 gap (`roundsBetweenSamePairing`, 10), the same gap counted in games
 (`playsBetweenSamePairing`, 5) and a season maximum (`maxSamePairings`, 4), and
 the engine treats all three as penalties rather than filters — a thin field
-still gets a board.
+still gets a board. Each gap costs one; the season maximum costs three, more
+than both gaps together, so an early rematch is always preferred to one past
+the maximum.
 
 The oracle confirms both: its worst-repeated pair meets exactly four times, and
 97 of 110 rematches respect the ten-round gap while 13 break it, which is what a
@@ -211,10 +213,19 @@ gap is measured on `season_players.elo_rating`, the rating each player enrolled
 with, not whatever it has become since.
 
 Zero means unlimited and is the default, so a season that never sets it pairs
-exactly as it always did. When it is set and the field strands someone,
-`pairNextRound` throws rather than returning a round that quietly drops them:
-the bye is chosen before pairing, so an unpaired player would otherwise appear
-on no board and take no bye. The engine only knows enrolment ids, so it throws
+exactly as it always did. The category repair pass respects it too: a swap that
+would put either board past the bound is never taken, whatever it gains.
+
+Choosing opponents one at a time can strand two players whose only legal
+opponents were taken earlier, in a field that could have been paired.
+`placeStranded` trades them into an existing board when both new boards stay
+within the bound. It looks one board deep, so a field that needs a longer chain
+of swaps is still refused.
+
+When nobody can be traded, `pairNextRound` throws rather than returning a round
+that quietly drops them: the bye is chosen before pairing, and without regard to
+rating, so an unpaired player would otherwise appear on no board and take no
+bye. The engine only knows enrolment ids, so it throws
 `UnpairablePlayersException` carrying them and `RoundService::pairRound` catches
 it and names the players before the admin sees it. The club runs it at 300.
 

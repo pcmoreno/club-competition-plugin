@@ -72,6 +72,7 @@ final class KeizerPairing implements PerRoundPairing
         $categories = $this->categoryOrder($season->categories);
 
         $pairs = $this->pairs($order, $colours, $meetings, $rank, $categories);
+        $pairs = $this->placeStranded($order, $pairs, $meetings, $categories);
         $this->assertNobodyStrandedByRating($order, $pairs);
         $pairs = $this->repairCategories($pairs, $categories, $meetings, $colours);
 
@@ -268,14 +269,13 @@ final class KeizerPairing implements PerRoundPairing
     {
         $player     = $order[$index];
         $candidates = [];
-        $maxRating = $this->settings->maxRatingDifference();
         foreach ($order as $position => $candidate) {
             if ($position === $index || isset($paired[$candidate->id])) {
                 continue;
             }
             // The one bound among the preferences: too far apart on enrolment
             // rating and the board is not offered at all.
-            if ($maxRating > 0 && abs($player->elo_rating - $candidate->elo_rating) > $maxRating) {
+            if (!$this->withinRating($player, $candidate)) {
                 continue;
             }
             $candidates[] = [
@@ -416,6 +416,11 @@ final class KeizerPairing implements PerRoundPairing
                         $swapA = [$keep, $taken];
                         $swapB = [$given, $left];
 
+                        // A category gain never buys a board past the rating bound.
+                        if (!$this->withinRating(...$swapA) || !$this->withinRating(...$swapB)) {
+                            continue;
+                        }
+
                         $gain = $before - ($breach($swapA) + $breach($swapB));
                         if ($gain <= 0) {
                             continue;
@@ -494,8 +499,9 @@ final class KeizerPairing implements PerRoundPairing
      * How badly pairing these two again would breach the rematch settings.
      *
      * Zero is a clean pairing. Meeting again inside either window costs one
-     * each; meeting past the season maximum costs more, because a fourth game
-     * between the same two players is worse than a slightly early third.
+     * each; meeting past the season maximum costs more than both together,
+     * because a fourth game between the same two players is worse than an early
+     * third.
      *
      * @param array<string,array{count:int,last:int,plays:int}> $meetings
      */
@@ -508,7 +514,7 @@ final class KeizerPairing implements PerRoundPairing
 
         $penalty = 0;
         if ($met['count'] >= $this->settings->maxRematches()) {
-            $penalty += 2;
+            $penalty += 3;
         }
         if ($met['last'] < $this->settings->rematchWindow()) {
             $penalty += 1;
@@ -605,25 +611,103 @@ final class KeizerPairing implements PerRoundPairing
             return;
         }
 
-        $paired = [];
-        foreach ($pairs as [$white, $black]) {
-            $paired[$white->id] = true;
-            $paired[$black->id] = true;
-        }
-
-        $stranded = array_values(array_filter($order, static fn (SeasonPlayer $p) => !isset($paired[$p->id])));
+        $stranded = $this->unpaired($order, $pairs);
         if ($stranded === []) {
             return;
         }
 
         throw new UnpairablePlayersException(
             sprintf(
-                'No opponent within %d rating points for %s.',
-                $this->settings->maxRatingDifference(),
-                implode(', ', array_map(static fn (SeasonPlayer $p) => '#' . $p->id, $stranded))
+                'Could not pair %s within %d rating points.',
+                implode(', ', array_map(static fn (SeasonPlayer $p) => '#' . $p->id, $stranded)),
+                $this->settings->maxRatingDifference()
             ),
             array_map(static fn (SeasonPlayer $p) => $p->id, $stranded)
         );
+    }
+
+    /**
+     * Greedy pairing can strand two players whose only legal opponents were
+     * taken earlier. Trade them into an existing board when both new boards stay
+     * within the bound, cheapest on category then rematch first.
+     *
+     * @param  list<SeasonPlayer>                                 $order
+     * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}>         $pairs
+     * @param  array<string,array{count:int,last:int,plays:int}> $meetings
+     * @param  array<string,int>                                  $categories
+     * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
+     */
+    private function placeStranded(array $order, array $pairs, array $meetings, array $categories): array
+    {
+        if ($this->settings->maxRatingDifference() === 0) {
+            return $pairs;
+        }
+
+        $cost = fn (SeasonPlayer $a, SeasonPlayer $b): array => [
+            $this->categoryPenalty($a, $b, $categories),
+            $this->rematchPenalty($a, $b, $meetings),
+        ];
+
+        // Each trade places two players, so this ends.
+        while (count($stranded = $this->unpaired($order, $pairs)) >= 2) {
+            $best = null;
+
+            foreach ($stranded as $s => $x) {
+                foreach ($stranded as $t => $y) {
+                    if ($t <= $s) {
+                        continue;
+                    }
+
+                    foreach ($pairs as $i => [$a, $b]) {
+                        foreach ([[$a, $b], [$b, $a]] as [$p, $q]) {
+                            if (!$this->withinRating($x, $p) || !$this->withinRating($y, $q)) {
+                                continue;
+                            }
+
+                            [$cx, $rx] = $cost($x, $p);
+                            [$cy, $ry] = $cost($y, $q);
+                            $rank      = [$cx + $cy, $rx + $ry];
+
+                            if ($best === null || $rank < $best['rank']) {
+                                $best = ['rank' => $rank, 'i' => $i, 'a' => [$x, $p], 'b' => [$y, $q]];
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($best === null) {
+                break;
+            }
+
+            $pairs[$best['i']] = $best['a'];
+            $pairs[]           = $best['b'];
+        }
+
+        return $pairs;
+    }
+
+    private function withinRating(SeasonPlayer $a, SeasonPlayer $b): bool
+    {
+        $max = $this->settings->maxRatingDifference();
+
+        return $max === 0 || abs($a->elo_rating - $b->elo_rating) <= $max;
+    }
+
+    /**
+     * @param  list<SeasonPlayer>                         $order
+     * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}> $pairs
+     * @return list<SeasonPlayer>
+     */
+    private function unpaired(array $order, array $pairs): array
+    {
+        $paired = [];
+        foreach ($pairs as [$white, $black]) {
+            $paired[$white->id] = true;
+            $paired[$black->id] = true;
+        }
+
+        return array_values(array_filter($order, static fn (SeasonPlayer $p) => !isset($paired[$p->id])));
     }
 
     private function pairKey(int $a, int $b): string
