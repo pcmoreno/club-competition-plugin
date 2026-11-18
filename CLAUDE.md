@@ -171,12 +171,38 @@ holds them; someone who plays half the evenings is still short of five games lon
 after ten rounds have passed. Rounds a player missed don't count towards the
 games gap, and a pair is separated by the lesser of their two counts.
 
-Colour has two caps on the same tab: `maxColorDifference` (2) bounds how far a
-player's colours drift from even, and `maxConsecutiveSameColor` (2) their
-longest run. A player at either cap has a **binding** claim that outranks the
-`colorPriority` rule; below it, `pickColorOnStrongerPreference` decides whether
-being more lopsided wins or the priority does, and `ignoreMildColorPrefs`
-discounts the claim of someone whose colours are already even.
+**Colours follow Sevilla's order** (`assignColours`):
+
+1. **Two players who have met before** follow `colorRule`, Sevilla's "mutual
+   colour preference": Alternating swaps the colours of their last game together,
+   Balance to zero keeps their head-to-head within one of even, Balance/Alternate
+   does both, No extra rules skips it. This comes **before the caps**: it is
+   rule 1 in the manual's note on colour assignment, and in the club's 2025-26
+   season a run or imbalance of four happened only in rematches, never on a
+   first meeting.
+2. Otherwise each player is **owed the colour that evens out their season**, and
+   with an even season the opposite of their last game. A run at its cap must
+   break whatever the balance says.
+3. **When both are owed the same colour** (`sameClaim`): a player at a cap wins;
+   then the stronger preference if `pickColorOnStrongerPreference` is on, the
+   larger imbalance if it is off; then the two histories compared backwards,
+   white going to whoever had black at the latest difference; then
+   `colorPriority`; then the all-criteria-tie rule (`colorTieCriterion` plus
+   its award). `colorPriority` None goes straight to that last rule.
+
+Replaying 2025-26 with the club's settings, this matches the colours actually
+played in 91% of games (96% of rematches). The fixture includes hand-made
+pairings, so the rest isn't all disagreement.
+
+The manual puts the current colour streak between balance and history (its
+"recent colour balance"), and the higher streak gets black. It needs no step of
+its own. With equal balances, the first difference the history comparison finds
+is where the shorter streak ends, so it always gives the same answer.
+
+The two caps sit on the same tab: `maxColorDifference` (2) bounds how far a
+player's colours drift from even, and `maxConsecutiveSameColor` (2) their longest
+run. `ignoreMildColorPrefs` discounts the claim of someone whose colours are
+already even.
 
 Both caps are bounds rather than preferences, which is how Sevilla states them —
 "may not exceed", and setting either below 2 can leave it unable to pair at all.
@@ -186,9 +212,8 @@ exists: when the obvious opponent would push a capped player past their limit,
 `limit` while doing it — that budget is for improving colours nobody minds. The
 search still stops at the end of the candidates that are equally good on
 category and rematch, so it never buys colour with a worse board. A thin field
-can still leave a player over cap: we are more permissive than Sevilla, which
-would rather refuse to pair. Reaching for colour when nobody is at a cap remains
-the colour-aware algorithm's job alone.
+can still leave a player over cap, as can the rematch rule above. Reaching for
+colour when nobody is at a cap remains the colour-aware algorithm's job alone.
 
 **Categories constrain pairing**, as the firmest of the three preferences rather
 than as a filter. Category distance is the first sort key in `findOpponent`,

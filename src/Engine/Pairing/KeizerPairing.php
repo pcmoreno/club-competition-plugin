@@ -66,6 +66,7 @@ final class KeizerPairing implements PerRoundPairing
         }
 
         $colours  = $this->colourHistory($history);
+        $mutual   = $this->mutualColours($history);
         $meetings = $this->meetings($history);
         $rank     = $this->rankIndex($order);
 
@@ -85,7 +86,7 @@ final class KeizerPairing implements PerRoundPairing
         $pairings = [];
         $board    = 1;
         foreach ($pairs as [$a, $b]) {
-            [$white, $black] = $this->assignColours($a, $b, $colours, $rank, $board);
+            [$white, $black] = $this->assignColours($a, $b, $colours, $mutual, $rank, $board);
 
             $pairings[] = ['white' => $white->id, 'black' => $black->id, 'board' => $board++];
         }
@@ -188,7 +189,7 @@ final class KeizerPairing implements PerRoundPairing
      * with the best opponent still free.
      *
      * @param  list<SeasonPlayer>                       $order
-     * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
+     * @param  array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      * @param  array<string,array{count:int,last:int,plays:int}>          $meetings
      * @param  array<int,int>                           $rank
      * @param  array<string,int>                        $categories
@@ -261,7 +262,7 @@ final class KeizerPairing implements PerRoundPairing
      *
      * @param list<SeasonPlayer>                       $order
      * @param array<int,true>                          $paired
-     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     * @param array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      * @param array<string,array{count:int,last:int,plays:int}>          $meetings
      * @param array<string,int>                                $categories
      */
@@ -381,7 +382,7 @@ final class KeizerPairing implements PerRoundPairing
      * @param  list<array{0:SeasonPlayer,1:SeasonPlayer}>       $pairs
      * @param  array<string,int>                                $categories
      * @param  array<string,array{count:int,last:int,plays:int}>          $meetings
-     * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
+     * @param  array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      * @return list<array{0:SeasonPlayer,1:SeasonPlayer}>
      */
     private function repairCategories(array $pairs, array $categories, array $meetings, array $colours): array
@@ -716,21 +717,29 @@ final class KeizerPairing implements PerRoundPairing
     }
 
     /**
-     * White and black for a board.
+     * White and black for a board, in Sevilla's order.
      *
-     * Each player is owed a colour; when both want the same one, the configured
-     * priority decides. With no history at all — the opening round — the higher
-     * ranked player takes white, which is the convention an organiser expects
-     * reading down the sheet.
+     * Two players who have met before follow the mutual colour preference,
+     * which outranks even the caps. Otherwise each player is owed the colour
+     * that evens out their season, and when both are owed the same one the
+     * chain in sameClaim decides, starting with whoever is at a cap.
      *
-     * @param  array<int,array{last:?bool,balance:int,run:int}> $colours
-     * @param  array<int,int>                                   $rank
+     * @param  array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
+     * @param  array<string,list<int>>                                         $mutual
+     * @param  array<int,int>                                                  $rank
      * @return array{0:SeasonPlayer,1:SeasonPlayer}
      */
-    private function assignColours(SeasonPlayer $a, SeasonPlayer $b, array $colours, array $rank, int $board): array
+    private function assignColours(SeasonPlayer $a, SeasonPlayer $b, array $colours, array $mutual, array $rank, int $board): array
     {
         $wantsA = $this->wantsWhite($a, $colours);
         $wantsB = $this->wantsWhite($b, $colours);
+
+        // The rematch rule outranks the caps. In the club's 2025-26 season a run or
+        // imbalance of four happened only in rematches, never on a first meeting.
+        $white = $this->mutualWhite($a, $b, $mutual);
+        if ($white !== null) {
+            return $white->id === $a->id ? [$a, $b] : [$b, $a];
+        }
 
         // Nobody has a claim at all — an opening round, or two players both back
         // from an absence. The tiebreak picks who is favoured and the award says
@@ -754,25 +763,47 @@ final class KeizerPairing implements PerRoundPairing
             return $wantsA ? [$a, $b] : [$b, $a];
         }
 
-        // Both want the same colour. A player who has hit a cap outranks the
-        // configured priority whatever the settings say — that claim is the one
-        // that stops a real complaint. Below a cap, whether the more lopsided
-        // player wins or the priority decides is itself configurable, and a
-        // merely mild claim never displaces a stronger one.
+        return $this->sameClaim($a, $b, $wantsA, $colours, $rank, $board);
+    }
+
+    /**
+     * Both players are owed the same colour, so one of them goes without.
+     *
+     * Sevilla's chain: a player at a cap wins; then the stronger preference if
+     * that option is on, the larger colour imbalance if it is off; then the two
+     * histories compared backwards; then the preferred player; then the rule for
+     * when nothing decides.
+     *
+     * @param  array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
+     * @param  array<int,int>                                                  $rank
+     * @return array{0:SeasonPlayer,1:SeasonPlayer}
+     */
+    private function sameClaim(SeasonPlayer $a, SeasonPlayer $b, bool $wantsWhite, array $colours, array $rank, int $board): array
+    {
+        $serve = static fn (SeasonPlayer $served): array => ($served->id === $a->id) === $wantsWhite ? [$a, $b] : [$b, $a];
+
         $urgencyA = $this->colourUrgency($a, $colours);
         $urgencyB = $this->colourUrgency($b, $colours);
 
-        $capped   = max($urgencyA, $urgencyB) === 3;
-        $decisive = $capped
-            || $this->settings->strongerPreferenceWins()
-            || min($urgencyA, $urgencyB) === 1;
+        if ($urgencyA !== $urgencyB && max($urgencyA, $urgencyB) === 3) {
+            return $serve($urgencyA > $urgencyB ? $a : $b);
+        }
 
-        if ($decisive && $urgencyA !== $urgencyB) {
-            $served = $urgencyA > $urgencyB ? $a : $b;
-            $wants  = $served->id === $a->id ? $wantsA : $wantsB;
-            $other  = $served->id === $a->id ? $b : $a;
+        if ($this->settings->strongerPreferenceWins()) {
+            if ($urgencyA !== $urgencyB) {
+                return $serve($urgencyA > $urgencyB ? $a : $b);
+            }
+        } else {
+            $imbalanceA = abs($colours[$a->id]['balance'] ?? 0);
+            $imbalanceB = abs($colours[$b->id]['balance'] ?? 0);
+            if ($imbalanceA !== $imbalanceB) {
+                return $serve($imbalanceA > $imbalanceB ? $a : $b);
+            }
+        }
 
-            return $wants ? [$served, $other] : [$other, $served];
+        $white = $this->historyWhite($a, $b, $colours);
+        if ($white !== null) {
+            return $white->id === $a->id ? [$a, $b] : [$b, $a];
         }
 
         // No priority set: Sevilla moves on to the rule for when nothing decides.
@@ -780,35 +811,98 @@ final class KeizerPairing implements PerRoundPairing
             return $this->tieRule($a, $b, $rank, $board);
         }
 
-        // Otherwise priority decides who is served, and the one served takes
-        // what they wanted.
-        $preferred = $this->preferredPlayer($a, $b, $rank);
-        $other     = $preferred->id === $a->id ? $b : $a;
+        return $serve($this->preferredPlayer($a, $b, $rank));
+    }
 
-        $wants = $preferred->id === $a->id ? $wantsA : $wantsB;
+    /**
+     * Who takes white under the mutual colour preference, or null when it
+     * doesn't decide: they have never met, or the rule leaves an even pair to
+     * the ordinary rules.
+     *
+     * @param array<string,list<int>> $mutual
+     */
+    private function mutualWhite(SeasonPlayer $a, SeasonPlayer $b, array $mutual): ?SeasonPlayer
+    {
+        $whites = $mutual[$this->pairKey($a->id, $b->id)] ?? [];
+        if ($whites === []) {
+            return null;
+        }
 
-        return $wants ? [$preferred, $other] : [$other, $preferred];
+        $alternate = end($whites) === $a->id ? $b : $a;
+
+        // A's whites minus A's blacks in their games against each other.
+        $balance = 2 * count(array_filter($whites, static fn (int $id) => $id === $a->id)) - count($whites);
+        $behind  = $balance === 0 ? null : ($balance < 0 ? $a : $b);
+
+        return match ($this->settings->colorRule()) {
+            ColorRule::Alternating      => $alternate,
+            ColorRule::BalanceToZero    => $behind,
+            ColorRule::BalanceAlternate => $behind ?? $alternate,
+            ColorRule::NoExtraRules     => null,
+        };
+    }
+
+    /**
+     * Sevilla's history comparison: walk both players' games back from the
+     * latest until their colours differ, and white goes to whoever had black
+     * there. Absent rounds aren't in the history, so they're ignored, as the
+     * club has it. When one player runs out first, the other alternates from
+     * their older game, which is Sevilla's "stop when out of games" switched off.
+     * Null when the histories are the same throughout.
+     *
+     * @param array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
+     */
+    private function historyWhite(SeasonPlayer $a, SeasonPlayer $b, array $colours): ?SeasonPlayer
+    {
+        $seqA = $colours[$a->id]['seq'] ?? [];
+        $seqB = $colours[$b->id]['seq'] ?? [];
+
+        for ($back = 1, $longest = max(count($seqA), count($seqB)); $back <= $longest; $back++) {
+            $colourA = $seqA[count($seqA) - $back] ?? null;
+            $colourB = $seqB[count($seqB) - $back] ?? null;
+
+            if ($colourA === $colourB) {
+                continue;
+            }
+            if ($colourA === null) {
+                return $colourB ? $a : $b;
+            }
+            if ($colourB === null) {
+                return $colourA ? $b : $a;
+            }
+
+            return $colourA ? $b : $a;
+        }
+
+        return null;
     }
 
     /**
      * True if this player is owed white, false if black, null if they have no
      * claim either way.
      *
-     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     * A run at its cap must break, whatever the balance says. Otherwise the
+     * colour that evens out the season, and with an even season the opposite of
+     * their last game.
+     *
+     * @param array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      */
     private function wantsWhite(SeasonPlayer $player, array $colours): ?bool
     {
         $entry = $colours[$player->id] ?? null;
-        if ($entry === null) {
+        if ($entry === null || $entry['last'] === null) {
             return null;
         }
 
-        if ($this->settings->colorRule() === ColorRule::BalanceToZero) {
-            return $entry['balance'] === 0 ? null : $entry['balance'] < 0;
+        if ($entry['run'] >= $this->settings->maxSameColourRun()) {
+            return !$entry['last'];
         }
 
-        // Alternating: whatever they had last time, they want the other.
-        return $entry['last'] === null ? null : !$entry['last'];
+        if ($entry['balance'] !== 0) {
+            return $entry['balance'] < 0;
+        }
+
+        return !$entry['last'];
     }
 
     /**
@@ -867,29 +961,47 @@ final class KeizerPairing implements PerRoundPairing
     }
 
     /**
-     * Each player's last colour and their running balance.
+     * Each player's last colour, running balance, current run and the colours
+     * of every game they played, oldest first.
      *
      * Absences never appear here, which is Sevilla's "ignore absent rounds for
-     * history check": a player who missed three weeks still wants the opposite
-     * of whatever they last actually played.
+     * colour assignment": a player who missed three weeks still wants the
+     * opposite of whatever they last actually played.
      *
-     * @param  list<Game>                                          $history
-     * @return array<int,array{last:?bool,balance:int,run:int}>
+     * @param  list<Game>                                                       $history
+     * @return array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}>
      */
     private function colourHistory(array $history): array
     {
         $colours = [];
         foreach ($history as $game) {
             foreach ([[$game->white_season_player_id, true], [$game->black_season_player_id, false]] as [$id, $isWhite]) {
-                $entry            = $colours[$id] ?? ['last' => null, 'balance' => 0, 'run' => 0];
+                $entry            = $colours[$id] ?? ['last' => null, 'balance' => 0, 'run' => 0, 'seq' => []];
                 $entry['run']     = $entry['last'] === $isWhite ? $entry['run'] + 1 : 1;
                 $entry['last']    = $isWhite;
                 $entry['balance'] = $entry['balance'] + ($isWhite ? 1 : -1);
+                $entry['seq'][]   = $isWhite;
                 $colours[$id]     = $entry;
             }
         }
 
         return $colours;
+    }
+
+    /**
+     * Who had white each time two players met, oldest first, keyed by pair.
+     *
+     * @param  list<Game>              $history
+     * @return array<string,list<int>>
+     */
+    private function mutualColours(array $history): array
+    {
+        $mutual = [];
+        foreach ($history as $game) {
+            $mutual[$this->pairKey($game->white_season_player_id, $game->black_season_player_id)][] = $game->white_season_player_id;
+        }
+
+        return $mutual;
     }
 
     /**
@@ -901,7 +1013,7 @@ final class KeizerPairing implements PerRoundPairing
      * point of it being one predicate: the two disagreeing is how a repair pass
      * undid the opponent search.
      *
-     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     * @param array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      */
     private function colourCapClash(SeasonPlayer $a, SeasonPlayer $b, array $colours): bool
     {
@@ -926,7 +1038,7 @@ final class KeizerPairing implements PerRoundPairing
      * which is the "mild" preference the settings can discount. Zero for no
      * claim at all.
      *
-     * @param array<int,array{last:?bool,balance:int,run:int}> $colours
+     * @param array<int,array{last:?bool,balance:int,run:int,seq:list<bool>}> $colours
      */
     private function colourUrgency(SeasonPlayer $player, array $colours): int
     {
