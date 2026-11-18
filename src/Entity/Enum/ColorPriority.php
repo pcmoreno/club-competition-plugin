@@ -23,7 +23,7 @@ enum ColorPriority: string
         return match ($this) {
             self::HigherRanked => 'The higher ranked player',
             self::HigherRated  => 'The higher rated player',
-            self::None         => 'Neither — take them as they fall',
+            self::None         => 'Neither — as when nothing decides the colours',
         };
     }
 }
