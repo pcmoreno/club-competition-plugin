@@ -255,7 +255,7 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 			) : (
 				<div className="mt-4 grid gap-4 sm:grid-cols-2">
 					<PlayerColumn
-						role="keep"
+						side="keep"
 						player={ keep }
 						tournaments={ keepQuery.data }
 						inherit={ inherited }
@@ -263,7 +263,7 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 						inheritFrom={ remove.name }
 					/>
 					<PlayerColumn
-						role="remove"
+						side="remove"
 						player={ remove }
 						tournaments={ removeQuery.data }
 						overlapIds={ overlap.map( ( t ) => t.season_id ) }
@@ -343,7 +343,7 @@ function inheritedFields( keep, remove ) {
 }
 
 function PlayerColumn( {
-	role,
+	side,
 	player,
 	tournaments,
 	overlapIds = [],
@@ -351,7 +351,7 @@ function PlayerColumn( {
 	inheritMember = null,
 	inheritFrom = null,
 } ) {
-	const keeping = role === 'keep';
+	const keeping = side === 'keep';
 
 	return (
 		<section className="rounded border border-rule bg-surface p-4">

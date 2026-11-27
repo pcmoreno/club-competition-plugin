@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
@@ -81,6 +81,7 @@ function syncedLabel( dt ) {
 }
 
 export function Players() {
+	const fieldId = useId();
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: keys.adminPlayers(),
 		queryFn: () => api.get( 'players' ),
@@ -172,8 +173,12 @@ export function Players() {
 								},
 							] }
 						/>
-						<label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-3">
+						<label
+							htmlFor={ `${ fieldId }-active-only` }
+							className="flex shrink-0 items-center gap-1.5 text-sm text-ink-3"
+						>
 							<input
+								id={ `${ fieldId }-active-only` }
 								type="checkbox"
 								checked={ activeOnly }
 								onChange={ ( e ) =>

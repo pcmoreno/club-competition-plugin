@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId, cloneElement } from '@wordpress/element';
 import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
@@ -24,12 +24,16 @@ function errorMessage( err ) {
 }
 
 function Field( { label, error, children } ) {
+	const id = useId();
 	return (
 		<div>
-			<label className="mb-1 block text-sm font-medium text-ink-2">
+			<label
+				htmlFor={ id }
+				className="mb-1 block text-sm font-medium text-ink-2"
+			>
 				{ label }
 			</label>
-			{ children }
+			{ cloneElement( children, { id } ) }
 			{ error && (
 				<span className="mt-1 block text-sm text-loss">{ error }</span>
 			) }

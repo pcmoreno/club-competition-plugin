@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from '@wordpress/element';
+import { useState, useMemo, useRef, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ConfirmModal } from '../components/ui';
@@ -21,6 +21,7 @@ import { keys } from '../api/keys';
 // carries its own Remove (disabled while it still holds players). Rename isn't
 // offered: players store the group as a plain string, so it'd orphan them.
 export function TournamentCategoriesTab( { season, players, locked = false } ) {
+	const fieldId = useId();
 	const isTeam = season.is_team === true;
 	const term = isTeam ? 'team' : 'category';
 	const plural = isTeam ? 'teams' : 'categories';
@@ -57,7 +58,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		}
 		unassigned.sort( byRating );
 		return { groups, unassigned };
-	}, [ players, list ] );
+	}, [ players, list, isTeam ] );
 
 	// The list is optimistic: it updates immediately and persists in the
 	// background; a failed save rolls back to the server's last-known value.
@@ -364,11 +365,15 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 			{ ! locked && (
 				<div className="max-w-xl">
 					<div className="flex items-end gap-3">
-						<label className="block flex-1">
+						<label
+							htmlFor={ `${ fieldId }-add` }
+							className="block flex-1"
+						>
 							<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 								Add { term }
 							</span>
 							<input
+								id={ `${ fieldId }-add` }
 								type="text"
 								value={ input }
 								onChange={ ( e ) => setInput( e.target.value ) }

@@ -98,6 +98,7 @@ export function ChangePasswordDialog( { onClose } ) {
 							<input
 								type="password"
 								autoComplete="current-password"
+								// eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a dialog on open.
 								autoFocus
 								className={ fieldInput }
 								{ ...register( 'currentPassword', {

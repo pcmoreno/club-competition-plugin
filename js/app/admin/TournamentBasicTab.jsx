@@ -1,4 +1,4 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useId } from '@wordpress/element';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
@@ -20,6 +20,7 @@ import { keys } from '../api/keys';
 // edit form, a missing param reads as "unchanged", so this pass can't clear a
 // date back to empty.
 export function TournamentBasicTab( { season, locked = false } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const [ name, setName ] = useState( season.name ?? '' );
 	const [ pairing, setPairing ] = useState( season.pairing_system );
@@ -115,11 +116,12 @@ export function TournamentBasicTab( { season, locked = false } ) {
 		<form className="space-y-4" onSubmit={ submit }>
 			{ /* One fieldset rather than a disabled per control, so a field added later can't be missed. */ }
 			<fieldset disabled={ locked } className="space-y-4">
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-name` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Name
 					</span>
 					<input
+						id={ `${ fieldId }-name` }
 						type="text"
 						value={ name }
 						onChange={ ( e ) => setName( e.target.value ) }
@@ -128,11 +130,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					/>
 				</label>
 
-				<label className="block">
+				<label
+					htmlFor={ `${ fieldId }-pairing-system` }
+					className="block"
+				>
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Pairing system
 					</span>
 					<select
+						id={ `${ fieldId }-pairing-system` }
 						value={ pairing }
 						onChange={ ( e ) => setPairing( e.target.value ) }
 						disabled={ fixedOnStart }
@@ -170,11 +176,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 				</label>
 
 				<div className="grid grid-cols-2 gap-3">
-					<label className="block">
+					<label
+						htmlFor={ `${ fieldId }-start-date` }
+						className="block"
+					>
 						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 							Start date
 						</span>
 						<input
+							id={ `${ fieldId }-start-date` }
 							type="date"
 							value={ startDate }
 							onChange={ ( e ) => setStartDate( e.target.value ) }
@@ -193,11 +203,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 							</span>
 						) }
 					</label>
-					<label className="block">
+					<label
+						htmlFor={ `${ fieldId }-end-date` }
+						className="block"
+					>
 						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 							End date
 						</span>
 						<input
+							id={ `${ fieldId }-end-date` }
 							type="date"
 							value={ endDate }
 							onChange={ ( e ) => setEndDate( e.target.value ) }
@@ -206,11 +220,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					</label>
 				</div>
 
-				<label className="block">
+				<label
+					htmlFor={ `${ fieldId }-time-control` }
+					className="block"
+				>
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Time control
 					</span>
 					<select
+						id={ `${ fieldId }-time-control` }
 						value={ timeControl }
 						onChange={ ( e ) => setTimeControl( e.target.value ) }
 						disabled={ fixedOnStart }
@@ -234,11 +252,15 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					</span>
 				</label>
 
-				<label className="block">
+				<label
+					htmlFor={ `${ fieldId }-competition-type` }
+					className="block"
+				>
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Competition type
 					</span>
 					<select
+						id={ `${ fieldId }-competition-type` }
 						value={ isTeam ? 'team' : 'individual' }
 						onChange={ ( e ) =>
 							setIsTeam( e.target.value === 'team' )
@@ -271,11 +293,12 @@ export function TournamentBasicTab( { season, locked = false } ) {
 					</span>
 				</label>
 
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-location` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Location
 					</span>
 					<input
+						id={ `${ fieldId }-location` }
 						type="text"
 						value={ location }
 						onChange={ ( e ) => setLocation( e.target.value ) }

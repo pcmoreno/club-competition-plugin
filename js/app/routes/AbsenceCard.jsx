@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { formatDate, ConfirmModal } from '../components/ui';
@@ -40,6 +40,7 @@ function optionLabel( entry ) {
 // Every entry carries the server's `state`, which is what decides where it
 // renders — the client never infers it from the round's status.
 export function AbsenceCard( { declinable } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const [ roundId, setRoundId ] = useState( '' );
 	const [ reason, setReason ] = useState( '' );
@@ -152,11 +153,12 @@ export function AbsenceCard( { declinable } ) {
 
 			{ open.length > 0 && (
 				<form className="mt-4 space-y-3" onSubmit={ submit }>
-					<label className="block">
+					<label htmlFor={ `${ fieldId }-round` } className="block">
 						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 							Round
 						</span>
 						<select
+							id={ `${ fieldId }-round` }
 							value={ roundId }
 							onChange={ ( e ) => {
 								setRoundId( e.target.value );
@@ -177,11 +179,15 @@ export function AbsenceCard( { declinable } ) {
 						</select>
 					</label>
 
-					<label className="block">
+					<label
+						htmlFor={ `${ fieldId }-reason-optional` }
+						className="block"
+					>
 						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 							Reason (optional)
 						</span>
 						<input
+							id={ `${ fieldId }-reason-optional` }
 							type="text"
 							value={ reason }
 							onChange={ ( e ) => setReason( e.target.value ) }

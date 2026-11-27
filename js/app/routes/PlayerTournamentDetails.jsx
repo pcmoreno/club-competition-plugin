@@ -209,7 +209,9 @@ function CategoryBreakdown( { season, player, games } ) {
 	const byCat = {};
 	for ( const g of games ) {
 		const cat = g.opponent?.category;
-		if ( ! cat ) continue;
+		if ( ! cat ) {
+			continue;
+		}
 		( byCat[ cat ] ??= [] ).push( g );
 	}
 	const cats = Object.keys( byCat ).sort();

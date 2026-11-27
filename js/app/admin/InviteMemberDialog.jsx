@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Dialog } from '../components/Dialog';
@@ -28,6 +28,7 @@ const fieldInput =
 // backend routes all three through the same endpoint). The email is prefilled
 // so the admin can also correct a typo.
 export function InviteMemberDialog( { player, onClose } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const isResend = player.member_status === 'invited';
 	const isReinvite = player.member_status === 'revoked';
@@ -88,15 +89,17 @@ export function InviteMemberDialog( { player, onClose } ) {
 			onClose={ onClose }
 			onSubmit={ submit }
 		>
-			<label className="mt-4 block">
+			<label htmlFor={ `${ fieldId }-email` } className="mt-4 block">
 				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 					Email
 				</span>
 				<input
+					id={ `${ fieldId }-email` }
 					type="email"
 					value={ email }
 					onChange={ ( e ) => setEmail( e.target.value ) }
 					required
+					// eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a dialog on open.
 					autoFocus
 					placeholder="name@example.com"
 					className={ fieldInput }

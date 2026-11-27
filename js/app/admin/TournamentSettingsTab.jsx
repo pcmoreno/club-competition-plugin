@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from '@wordpress/element';
+import { useState, useEffect, useRef, useId } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { navigate } from '../router/router';
@@ -290,6 +290,7 @@ function TiebreakConfig( {
 	onChange,
 	disabled,
 } ) {
+	const fieldId = useId();
 	const entries = Object.entries( config || {} ).filter( ( [ metric ] ) =>
 		selected.includes( metric )
 	);
@@ -320,12 +321,14 @@ function TiebreakConfig( {
 							} );
 						return (
 							<label
+								htmlFor={ `${ fieldId }-${ metric }-${ f.key }` }
 								key={ f.key }
 								className="flex items-center justify-between gap-3 text-sm text-ink-3"
 							>
 								<span className="flex-1">{ f.label }</span>
 								{ f.type === 'select' ? (
 									<select
+										id={ `${ fieldId }-${ metric }-${ f.key }` }
 										className={ inputCls + ' w-56 pr-8' }
 										value={ current }
 										disabled={ disabled }
@@ -350,6 +353,7 @@ function TiebreakConfig( {
 									</select>
 								) : (
 									<input
+										id={ `${ fieldId }-${ metric }-${ f.key }` }
 										type="number"
 										step={ f.step ?? 1 }
 										className={
@@ -570,6 +574,7 @@ function PairingRow( { field, values, setValues, disabled } ) {
 }
 
 function ScoringGroup( { group, values, setValues, disabled } ) {
+	const fieldId = useId();
 	if ( group.group === 'game_outcomes' ) {
 		return (
 			<section>
@@ -577,11 +582,13 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 				<div className="flex flex-wrap gap-4">
 					{ group.fields.map( ( f ) => (
 						<label
+							htmlFor={ `${ fieldId }-${ f.key }` }
 							key={ f.key }
 							className="flex items-center gap-2 text-sm text-ink-3"
 						>
 							<span>{ f.label }</span>
 							<input
+								id={ `${ fieldId }-${ f.key }` }
 								type="number"
 								min={ f.min }
 								step={ f.step ?? 0.5 }

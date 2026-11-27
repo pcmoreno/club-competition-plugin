@@ -1,4 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from '@wordpress/element';
+import {
+	useState,
+	useEffect,
+	useMemo,
+	useRef,
+	useId,
+} from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Notice, ConfirmModal } from '../components/ui';
@@ -20,6 +26,7 @@ import { keys } from '../api/keys';
 // a full-schedule system (round-robin) builds every round in one call, while the
 // per-round engines don't exist yet and keep a disabled placeholder.
 export function TournamentPairingsTab( { season, players, locked = false } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const [ selectedRoundId, setSelectedRoundId ] = useState( null );
 	const [ builder, setBuilder ] = useState( { white: null, black: null } );
@@ -116,7 +123,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	);
 
 	const round = roundData?.round ?? null;
-	const games = roundData?.games ?? [];
+	const games = useMemo( () => roundData?.games ?? [], [ roundData ] );
 	// Phases: draft/published build the board (pairings editable, no results);
 	// finalised locks the board and opens result entry; complete freezes the
 	// standings and shows results read-only.
@@ -582,7 +589,10 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 
 			{ round && (
 				<div className="flex flex-wrap items-center gap-3">
-					<label className="flex items-center gap-2">
+					<label
+						htmlFor={ `${ fieldId }-date` }
+						className="flex items-center gap-2"
+					>
 						<span className="text-xs uppercase tracking-wide text-muted">
 							Date
 						</span>
@@ -592,6 +602,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						     January on the way, and emptying a segment makes
 						     the value '' — which clears the stored date. */ }
 						<input
+							id={ `${ fieldId }-date` }
 							type="date"
 							disabled={ locked }
 							value={ dateDraft ?? round.date ?? '' }

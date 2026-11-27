@@ -63,6 +63,7 @@ export function TransferPanel( {
 						const isSel = selected.has( id );
 						const meta = rowMeta( p );
 						return (
+							// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- mouse-only by decision; nobody drives this list from the keyboard.
 							<li
 								key={ id }
 								draggable={ ! locked }

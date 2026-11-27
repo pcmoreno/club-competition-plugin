@@ -127,14 +127,22 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 			setSelEnrolled( new Set() );
 			setSelAvailable( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		} else {
 			setSelAvailable( new Set() );
 			setSelEnrolled( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		}

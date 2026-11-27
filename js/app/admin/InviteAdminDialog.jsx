@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Dialog } from '../components/Dialog';
@@ -28,6 +28,7 @@ function errorMessage( err ) {
 // Only the first admin account can do either — the backend enforces it, and the
 // caller only offers this dialog to that account.
 export function InviteAdminDialog( { admin = null, onClose } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const isResend = admin !== null;
 	const [ name, setName ] = useState( admin?.name ?? '' );
@@ -86,15 +87,17 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 			onSubmit={ submit }
 		>
 			{ ! isResend && (
-				<label className="mt-4 block">
+				<label htmlFor={ `${ fieldId }-name` } className="mt-4 block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Name
 					</span>
 					<input
+						id={ `${ fieldId }-name` }
 						type="text"
 						value={ name }
 						onChange={ ( e ) => setName( e.target.value ) }
 						required
+						// eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a dialog on open.
 						autoFocus
 						placeholder="Jane Doe"
 						className={ fieldInput }
@@ -102,15 +105,17 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 				</label>
 			) }
 
-			<label className="mt-4 block">
+			<label htmlFor={ `${ fieldId }-email` } className="mt-4 block">
 				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 					Email
 				</span>
 				<input
+					id={ `${ fieldId }-email` }
 					type="email"
 					value={ email }
 					onChange={ ( e ) => setEmail( e.target.value ) }
 					required
+					// eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a dialog on open.
 					autoFocus={ isResend }
 					placeholder="name@example.com"
 					className={ fieldInput }
