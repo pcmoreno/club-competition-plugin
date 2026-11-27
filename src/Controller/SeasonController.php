@@ -31,6 +31,7 @@ use SCS\Request\BulkPlayerIdsRequest;
 use SCS\Request\CreateSeasonRequest;
 use SCS\Request\EnrollPlayerRequest;
 use SCS\Request\SetDefaultAbsenceRequest;
+use SCS\Request\SetEnrolmentRatingRequest;
 use SCS\Request\SetTeamBoardsRequest;
 use SCS\Request\UpdateSeasonRequest;
 use SCS\Services\AuthContextService;
@@ -952,6 +953,39 @@ class SeasonController extends RestController
                 ],
                 'declared'   => $declared,
             ]);
+        });
+    }
+
+    // Set the rating a player is enrolled with. Fixed once the tournament starts,
+    // since pairing, seeding and colours read it from the first round on.
+    public function setPlayerRating(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return $this->handle(function () use ($request) {
+            $season = $this->seasonRepository->findById((int)$request->get_param('id'));
+            if ($season === null) {
+                throw new NotFoundException('Season not found.');
+            }
+
+            if ($season->status !== SeasonStatus::Preparation) {
+                throw new ConflictException('The enrolment rating can only be changed while the tournament is in preparation.');
+            }
+
+            $seasonPlayer = $this->seasonPlayerRepository->findBySeasonAndPlayer(
+                $season->id,
+                (int)$request->get_param('player_id')
+            );
+            if ($seasonPlayer === null) {
+                throw new NotFoundException('Player is not enrolled in this season.');
+            }
+
+            $input = SetEnrolmentRatingRequest::fromRequest($request);
+            $this->validate($input);
+
+            $this->seasonPlayerRepository->update($seasonPlayer->id, ['elo_rating' => $input->elo_rating]);
+
+            $players = $this->seasonPlayerRepository->findBySeason($season->id);
+
+            return $this->ok($this->serializer->serializeMany($players, SerializerService::GROUP_ADMIN));
         });
     }
 

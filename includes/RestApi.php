@@ -462,6 +462,14 @@ class RestApi
                 ],
             ]);
 
+            register_rest_route('scs/v1', '/seasons/(?P<id>\d+)/players/(?P<player_id>\d+)/rating', [
+                [
+                    'methods'             => 'PATCH',
+                    'callback'            => [$seasons, 'setPlayerRating'],
+                    'permission_callback' => $isAdmin,
+                ],
+            ]);
+
             // ── Rounds ────────────────────────────────────────────────────────
             register_rest_route('scs/v1', '/seasons/(?P<season_id>\d+)/rounds', [
                 [
