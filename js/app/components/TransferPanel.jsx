@@ -1,9 +1,10 @@
-import { useEffect, useRef } from '@wordpress/element';
+import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { SearchInput } from './ui';
 
 // One column of a two-panel transfer list. Rows are click-to-toggle selectable
 // and draggable; the whole panel is a drop target. Shift-click gives every
-// visible row from the last one clicked to this one that row's state.
+// visible row from the last one clicked to this one that row's state. Pass
+// `rowRating` for Name / Rating headers that sort the panel, by name first.
 export function TransferPanel( {
 	title,
 	side,
@@ -11,6 +12,7 @@ export function TransferPanel( {
 	rowId,
 	rowLabel,
 	rowMeta,
+	rowRating,
 	selected,
 	search,
 	onSearch,
@@ -26,6 +28,34 @@ export function TransferPanel( {
 	action,
 } ) {
 	const anchor = useRef( null );
+	const [ sort, setSort ] = useState( { key: 'name', dir: 'asc' } );
+
+	const sorted = useMemo( () => {
+		if ( ! rowRating ) {
+			return rows;
+		}
+		const byName = ( a, b ) =>
+			String( rowLabel( a ) ?? '' ).localeCompare(
+				String( rowLabel( b ) ?? '' )
+			);
+		const cmp =
+			sort.key === 'rating'
+				? ( a, b ) =>
+						( rowRating( a ) || 0 ) - ( rowRating( b ) || 0 ) ||
+						byName( a, b )
+				: byName;
+		const sign = sort.dir === 'asc' ? 1 : -1;
+		return [ ...rows ].sort( ( a, b ) => sign * cmp( a, b ) );
+	}, [ rows, rowLabel, rowRating, sort ] );
+
+	// A new column starts ascending for names and highest-first for ratings.
+	const sortBy = ( key ) =>
+		setSort( ( prev ) => {
+			if ( prev.key === key ) {
+				return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+			}
+			return { key, dir: key === 'rating' ? 'desc' : 'asc' };
+		} );
 
 	// An emptied selection (moved, or cleared by the other panel) drops the anchor.
 	useEffect( () => {
@@ -35,7 +65,7 @@ export function TransferPanel( {
 	}, [ selected ] );
 
 	const click = ( e, id ) => {
-		const ids = rows.map( rowId );
+		const ids = sorted.map( rowId );
 		const from = ids.indexOf( anchor.current );
 		if ( e.shiftKey && from !== -1 ) {
 			const to = ids.indexOf( id );
@@ -63,6 +93,22 @@ export function TransferPanel( {
 				</div>
 				{ action }
 			</div>
+			{ rowRating && (
+				<div className="flex justify-between px-3.5 pb-1">
+					<SortButton
+						label="Name"
+						col="name"
+						sort={ sort }
+						onSort={ sortBy }
+					/>
+					<SortButton
+						label="Rating"
+						col="rating"
+						sort={ sort }
+						onSort={ sortBy }
+					/>
+				</div>
+			) }
 			<ul
 				onDragOver={
 					locked
@@ -86,7 +132,7 @@ export function TransferPanel( {
 						{ empty }
 					</li>
 				) : (
-					rows.map( ( p ) => {
+					sorted.map( ( p ) => {
 						const id = rowId( p );
 						const isSel = selected.has( id );
 						const meta = rowMeta( p );
@@ -128,5 +174,19 @@ export function TransferPanel( {
 				) }
 			</ul>
 		</section>
+	);
+}
+
+function SortButton( { label, col, sort, onSort } ) {
+	const active = sort.key === col;
+	return (
+		<button
+			type="button"
+			onClick={ () => onSort( col ) }
+			className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted hover:text-ink"
+		>
+			{ label }
+			{ active && <span>{ sort.dir === 'asc' ? '▲' : '▼' }</span> }
+		</button>
 	);
 }

@@ -6,6 +6,11 @@ import { TransferPanel } from '../components/TransferPanel';
 import { errorMessage } from './tournamentShared';
 import { keys } from '../api/keys';
 
+// Each side sorts by the rating it shows: the enrolment rating on the left, the
+// player's own KNSB rating on the right.
+const enrolledRating = ( p ) => p.elo;
+const availableRating = ( p ) => p.knsb_elo;
+
 // ADMIN. Players (enrolment) tab, as a two-panel transfer list: Enrolled on the
 // left, the remaining active club players on the right. Move players by
 // dragging between panels or by multi-selecting and using the centre button
@@ -215,6 +220,7 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 						const cat = p.category ? ` (${ p.category })` : '';
 						return `${ p.elo || '' }${ cat }`.trim();
 					} }
+					rowRating={ enrolledRating }
 					selected={ selEnrolled }
 					search={ enrolledSearch }
 					onSearch={ setEnrolledSearch }
@@ -276,6 +282,7 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 						rowId={ ( p ) => p.id }
 						rowLabel={ ( p ) => p.name }
 						rowMeta={ ( p ) => p.knsb_elo || '' }
+						rowRating={ availableRating }
 						selected={ selAvailable }
 						search={ availableSearch }
 						onSearch={ setAvailableSearch }
