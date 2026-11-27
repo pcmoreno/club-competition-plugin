@@ -70,6 +70,8 @@ export function ChangePasswordDialog( { onClose } ) {
 			title="Change password"
 			size="sm"
 			busy={ isSubmitting }
+			// Clicking away to a password manager mustn't discard the form.
+			dismissOnBackdrop={ false }
 			onClose={ onClose }
 		>
 			{ done ? (
