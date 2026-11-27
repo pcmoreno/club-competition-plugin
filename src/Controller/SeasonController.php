@@ -13,6 +13,7 @@ use SCS\Entity\Enum\SeasonStatus;
 use SCS\Entity\Enum\TimeControl;
 use SCS\Entity\Round;
 use SCS\Entity\Season;
+use SCS\Entity\SeasonPlayer;
 use SCS\Entity\ValueObjects\TeamSheet;
 use SCS\Exception\ConflictException;
 use SCS\Exception\NotFoundException;
@@ -324,6 +325,15 @@ class SeasonController extends RestController
                 throw new ValidationException(['start_date' => 'The start date can only be changed while the tournament is in preparation.']);
             }
 
+            // The list of categories is settled once it starts: pairing and the
+            // standings filter read it from round 1. Placing players stays open.
+            if (isset($data['categories'])
+                && ($input->categories ?? []) !== $season->categories
+                && $season->status !== SeasonStatus::Preparation
+            ) {
+                throw new ValidationException(['categories' => 'The categories can only be changed while the tournament is in preparation.']);
+            }
+
             // Renaming or removing a team after the start would orphan the
             // players holding that name.
             if (isset($data['categories'])) {
@@ -388,9 +398,21 @@ class SeasonController extends RestController
         }
     }
 
+    // Once it starts a player keeps the category they have; only an unassigned
+    // one, such as a late joiner, can still be placed.
+    private function requirePlaceable(Season $season, SeasonPlayer $seasonPlayer, ?string $category): void
+    {
+        if ($season->status !== SeasonStatus::Preparation
+            && $seasonPlayer->category !== null
+            && $category !== $seasonPlayer->category
+        ) {
+            throw new ConflictException('A player\'s category is fixed once the tournament has started; only unassigned players can be placed.');
+        }
+    }
+
     // A team competition's line-ups are settled once it starts: the boards are
     // published and being played, so a change would rewrite games already on the
-    // table. Individual categories stay editable, as they always were.
+    // table. An individual tournament's players can still be moved between categories.
     private function requireTeamsEditable(Season $season): void
     {
         if ($season->is_team && $season->status !== SeasonStatus::Preparation) {
@@ -656,6 +678,8 @@ class SeasonController extends RestController
                 }
             }
 
+            $this->requirePlaceable($season, $seasonPlayer, $category);
+
             // A team season keeps membership in its line-up, where joining takes
             // the bottom board and leaving gives it up.
             if ($season->is_team) {
@@ -815,6 +839,8 @@ class SeasonController extends RestController
                 if (!isset($enrolled[$playerId])) {
                     continue;
                 }
+
+                $this->requirePlaceable($season, $enrolled[$playerId], $category);
 
                 $updates[]              = [ 'id' => $enrolled[$playerId]->id, 'category' => $category ];
                 $assigned[$playerId]    = $category;
