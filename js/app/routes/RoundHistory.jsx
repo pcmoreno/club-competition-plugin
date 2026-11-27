@@ -77,7 +77,7 @@ export function RoundHistory( { seasonId } ) {
 	// paint the previous tournament's games under the new tournament.
 	const selectedId = rounds.some( ( r ) => r.id === picked )
 		? picked
-		: rounds[ rounds.length - 1 ]?.id ?? null;
+		: ( rounds[ rounds.length - 1 ]?.id ?? null );
 
 	const roundQuery = useQuery( {
 		queryKey: keys.round( selectedId ),
@@ -398,7 +398,7 @@ function StandingsAfter( { round, seasonId, meId } ) {
 											{ r.name ?? '—' }
 										</Link>
 									) : (
-										r.name ?? '—'
+										( r.name ?? '—' )
 									) }
 									{ isMe && <YouTag /> }
 								</td>

@@ -89,14 +89,22 @@ export function TournamentAbsencesTab( { season, locked = false } ) {
 			setSelAbsent( new Set() );
 			setSelPresent( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		} else {
 			setSelPresent( new Set() );
 			setSelAbsent( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		}

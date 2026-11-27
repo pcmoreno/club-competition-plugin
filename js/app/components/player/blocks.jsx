@@ -8,13 +8,7 @@ import { useState } from '@wordpress/element';
 import { Link } from '../../router/router';
 import { Notice } from '../ui';
 import { Square } from '../game';
-import {
-	record,
-	performance,
-	streaks,
-	currentStreak,
-	extremes,
-} from './stats';
+import { record, performance, streaks, currentStreak, extremes } from './stats';
 
 export function OpponentLink( { opponent, opponentTo } ) {
 	if ( ! opponent ) {
@@ -81,12 +75,15 @@ function rangeLabel( streak ) {
 }
 
 const TONE = { win: 'text-win', loss: 'text-loss', ink: 'text-ink-2' };
+const STREAK_TONE = { winning: 'win', losing: 'loss' };
 
 function StreakRow( { label, tone, length, detail } ) {
 	return (
 		<div className="flex items-baseline gap-2">
 			<span className="w-20 shrink-0 text-ink-3">{ label }</span>
-			<span className={ `num w-5 font-mono font-medium ${ TONE[ tone ] }` }>
+			<span
+				className={ `num w-5 font-mono font-medium ${ TONE[ tone ] }` }
+			>
 				{ length }
 			</span>
 			{ length > 0 && detail && (
@@ -128,13 +125,7 @@ export function LongestStreaks( { games, current } ) {
 					<div className="mt-1 border-t border-rule-soft pt-1">
 						<StreakRow
 							label="Current"
-							tone={
-								current.type === 'winning'
-									? 'win'
-									: current.type === 'losing'
-									? 'loss'
-									: 'ink'
-							}
+							tone={ STREAK_TONE[ current.type ] ?? 'ink' }
 							length={ current.length }
 							detail={ current.type }
 						/>
@@ -170,7 +161,9 @@ function FigureRow( { label, value } ) {
 	return (
 		<div className="flex items-baseline justify-between gap-4">
 			<span className="text-ink-3">{ label }</span>
-			<span className="num font-mono font-medium text-ink">{ value }</span>
+			<span className="num font-mono font-medium text-ink">
+				{ value }
+			</span>
 		</div>
 	);
 }
@@ -331,26 +324,17 @@ export function Highlights( { games, opponentTo } ) {
 
 // ── Against you (head-to-head with the logged-in member) ─────────────────────
 
+const OPPOSITE_COLOR = { white: 'black', black: 'white' };
+const INVERSE_RESULT = { win: 'loss', loss: 'win', draw: 'draw' };
+
 // The subject's game flipped to the VIEWER's point of view: their colour is the
 // opposite of the subject's, their result the inverse.
 function fromViewer( g ) {
 	return {
 		round_number: g.round_number,
 		date: g.date,
-		color:
-			g.color === 'white'
-				? 'black'
-				: g.color === 'black'
-				? 'white'
-				: null,
-		result:
-			g.result === 'win'
-				? 'loss'
-				: g.result === 'loss'
-				? 'win'
-				: g.result === 'draw'
-				? 'draw'
-				: null,
+		color: OPPOSITE_COLOR[ g.color ] ?? null,
+		result: INVERSE_RESULT[ g.result ] ?? null,
 		is_bye: false,
 	};
 }
@@ -360,7 +344,12 @@ function fromViewer( g ) {
 // (green ahead, red behind, yellow even). Renders only when a member is logged
 // in and has actually played the subject. Derived from the subject's games
 // (opponent === me), so it works unchanged on the global player page too.
-export function AgainstYou( { games, meId, title = 'Against you', className = '' } ) {
+export function AgainstYou( {
+	games,
+	meId,
+	title = 'Against you',
+	className = '',
+} ) {
 	const [ open, setOpen ] = useState( true );
 	if ( meId == null ) {
 		return null;
@@ -374,12 +363,12 @@ export function AgainstYou( { games, meId, title = 'Against you', className = ''
 
 	const { wins, draws, losses, decided } = record( h2h );
 	const net = wins - losses;
-	const tone =
-		net > 0
-			? 'bg-h2h-win border-h2h-win-rim'
-			: net < 0
-			? 'bg-h2h-loss border-h2h-loss-rim'
-			: 'bg-h2h-even border-h2h-even-rim';
+	let tone = 'bg-h2h-even border-h2h-even-rim';
+	if ( net > 0 ) {
+		tone = 'bg-h2h-win border-h2h-win-rim';
+	} else if ( net < 0 ) {
+		tone = 'bg-h2h-loss border-h2h-loss-rim';
+	}
 	const score = `${ wins }–${ draws }–${ losses }`;
 	// Classical score %: a win = 1, a draw = ½ (so 1 win + 1 draw of 2 = 75%).
 	const pct =

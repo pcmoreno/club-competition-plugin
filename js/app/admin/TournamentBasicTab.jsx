@@ -1,4 +1,4 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useId } from '@wordpress/element';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
@@ -20,6 +20,7 @@ import { keys } from '../api/keys';
 // edit form, a missing param reads as "unchanged", so this pass can't clear a
 // date back to empty.
 export function TournamentBasicTab( { season, locked = false } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const [ name, setName ] = useState( season.name ?? '' );
 	const [ pairing, setPairing ] = useState( season.pairing_system );
@@ -115,164 +116,198 @@ export function TournamentBasicTab( { season, locked = false } ) {
 		<form className="space-y-4" onSubmit={ submit }>
 			{ /* One fieldset rather than a disabled per control, so a field added later can't be missed. */ }
 			<fieldset disabled={ locked } className="space-y-4">
-			<label className="block">
-				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-					Name
-				</span>
-				<input
-					type="text"
-					value={ name }
-					onChange={ ( e ) => setName( e.target.value ) }
-					required
-					className={ fieldInput }
-				/>
-			</label>
-
-			<label className="block">
-				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-					Pairing system
-				</span>
-				<select
-					value={ pairing }
-					onChange={ ( e ) => setPairing( e.target.value ) }
-					disabled={ fixedOnStart }
-					className={
-						fieldInput +
-						( fixedOnStart
-							? ' cursor-not-allowed opacity-60'
-							: '' )
-					}
-				>
-					{ PAIRING_OPTIONS.map( ( o ) => (
-						<option
-							key={ o.value }
-							value={ o.value }
-							// Keep the season's current system selectable even if
-							// it's unimplemented, so the select can render it.
-							disabled={
-								o.implemented === false &&
-								o.value !== season.pairing_system
-							}
-						>
-							{ o.label }
-							{ o.implemented === false
-								? ' (not implemented)'
-								: '' }
-						</option>
-					) ) }
-				</select>
-				{ fixedOnStart && (
-					<span className="mt-1 block text-xs text-muted">
-						The pairing system is locked once the tournament has
-						started.
-					</span>
-				) }
-			</label>
-
-			<div className="grid grid-cols-2 gap-3">
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-name` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-						Start date
+						Name
 					</span>
 					<input
-						type="date"
-						value={ startDate }
-						onChange={ ( e ) => setStartDate( e.target.value ) }
-						disabled={ startDateLocked }
+						id={ `${ fieldId }-name` }
+						type="text"
+						value={ name }
+						onChange={ ( e ) => setName( e.target.value ) }
+						required
+						className={ fieldInput }
+					/>
+				</label>
+
+				<label
+					htmlFor={ `${ fieldId }-pairing-system` }
+					className="block"
+				>
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Pairing system
+					</span>
+					<select
+						id={ `${ fieldId }-pairing-system` }
+						value={ pairing }
+						onChange={ ( e ) => setPairing( e.target.value ) }
+						disabled={ fixedOnStart }
 						className={
 							fieldInput +
-							( startDateLocked
+							( fixedOnStart
 								? ' cursor-not-allowed opacity-60'
 								: '' )
 						}
-					/>
-					{ startDateLocked && (
+					>
+						{ PAIRING_OPTIONS.map( ( o ) => (
+							<option
+								key={ o.value }
+								value={ o.value }
+								// Keep the season's current system selectable even if
+								// it's unimplemented, so the select can render it.
+								disabled={
+									o.implemented === false &&
+									o.value !== season.pairing_system
+								}
+							>
+								{ o.label }
+								{ o.implemented === false
+									? ' (not implemented)'
+									: '' }
+							</option>
+						) ) }
+					</select>
+					{ fixedOnStart && (
 						<span className="mt-1 block text-xs text-muted">
-							The start date is locked once the tournament has
+							The pairing system is locked once the tournament has
 							started.
 						</span>
 					) }
 				</label>
-				<label className="block">
+
+				<div className="grid grid-cols-2 gap-3">
+					<label
+						htmlFor={ `${ fieldId }-start-date` }
+						className="block"
+					>
+						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+							Start date
+						</span>
+						<input
+							id={ `${ fieldId }-start-date` }
+							type="date"
+							value={ startDate }
+							onChange={ ( e ) => setStartDate( e.target.value ) }
+							disabled={ startDateLocked }
+							className={
+								fieldInput +
+								( startDateLocked
+									? ' cursor-not-allowed opacity-60'
+									: '' )
+							}
+						/>
+						{ startDateLocked && (
+							<span className="mt-1 block text-xs text-muted">
+								The start date is locked once the tournament has
+								started.
+							</span>
+						) }
+					</label>
+					<label
+						htmlFor={ `${ fieldId }-end-date` }
+						className="block"
+					>
+						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+							End date
+						</span>
+						<input
+							id={ `${ fieldId }-end-date` }
+							type="date"
+							value={ endDate }
+							onChange={ ( e ) => setEndDate( e.target.value ) }
+							className={ fieldInput }
+						/>
+					</label>
+				</div>
+
+				<label
+					htmlFor={ `${ fieldId }-time-control` }
+					className="block"
+				>
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-						End date
+						Time control
+					</span>
+					<select
+						id={ `${ fieldId }-time-control` }
+						value={ timeControl }
+						onChange={ ( e ) => setTimeControl( e.target.value ) }
+						disabled={ fixedOnStart }
+						className={
+							fieldInput +
+							( fixedOnStart
+								? ' cursor-not-allowed opacity-60'
+								: '' )
+						}
+					>
+						{ TIME_CONTROL_OPTIONS.map( ( o ) => (
+							<option key={ o.value } value={ o.value }>
+								{ o.label }
+							</option>
+						) ) }
+					</select>
+					<span className="mt-1 block text-xs text-muted">
+						{ fixedOnStart
+							? 'The time control is locked once the tournament has started — its games already carry it.'
+							: 'Games take the tournament’s time control when they are paired.' }
+					</span>
+				</label>
+
+				<label
+					htmlFor={ `${ fieldId }-competition-type` }
+					className="block"
+				>
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Competition type
+					</span>
+					<select
+						id={ `${ fieldId }-competition-type` }
+						value={ isTeam ? 'team' : 'individual' }
+						onChange={ ( e ) =>
+							setIsTeam( e.target.value === 'team' )
+						}
+						disabled={ fixedOnStart }
+						className={
+							fieldInput +
+							( fixedOnStart
+								? ' cursor-not-allowed opacity-60'
+								: '' )
+						}
+					>
+						<option value="individual">Individual</option>
+						{ /* Keep it selectable on a season that already is one, so
+					     the select can render it. */ }
+						<option
+							value="team"
+							disabled={ season.is_team !== true }
+						>
+							Team
+							{ season.is_team !== true
+								? ' (not implemented)'
+								: '' }
+						</option>
+					</select>
+					<span className="mt-1 block text-xs text-muted">
+						{ fixedOnStart
+							? 'The competition type is locked once the tournament has started.'
+							: 'Team play can be set up but not yet played: no pairing system puts one team against another.' }
+					</span>
+				</label>
+
+				<label htmlFor={ `${ fieldId }-location` } className="block">
+					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+						Location
 					</span>
 					<input
-						type="date"
-						value={ endDate }
-						onChange={ ( e ) => setEndDate( e.target.value ) }
+						id={ `${ fieldId }-location` }
+						type="text"
+						value={ location }
+						onChange={ ( e ) => setLocation( e.target.value ) }
+						placeholder="Optional"
 						className={ fieldInput }
 					/>
 				</label>
-			</div>
 
-			<label className="block">
-				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-					Time control
-				</span>
-				<select
-					value={ timeControl }
-					onChange={ ( e ) => setTimeControl( e.target.value ) }
-					disabled={ fixedOnStart }
-					className={
-						fieldInput +
-						( fixedOnStart ? ' cursor-not-allowed opacity-60' : '' )
-					}
-				>
-					{ TIME_CONTROL_OPTIONS.map( ( o ) => (
-						<option key={ o.value } value={ o.value }>
-							{ o.label }
-						</option>
-					) ) }
-				</select>
-				<span className="mt-1 block text-xs text-muted">
-					{ fixedOnStart
-						? 'The time control is locked once the tournament has started — its games already carry it.'
-						: 'Games take the tournament’s time control when they are paired.' }
-				</span>
-			</label>
-
-			<label className="block">
-				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-					Competition type
-				</span>
-				<select
-					value={ isTeam ? 'team' : 'individual' }
-					onChange={ ( e ) => setIsTeam( e.target.value === 'team' ) }
-					disabled={ fixedOnStart }
-					className={
-						fieldInput +
-						( fixedOnStart ? ' cursor-not-allowed opacity-60' : '' )
-					}
-				>
-					<option value="individual">Individual</option>
-					{ /* Keep it selectable on a season that already is one, so
-					     the select can render it. */ }
-					<option value="team" disabled={ season.is_team !== true }>
-						Team{ season.is_team !== true ? ' (not implemented)' : '' }
-					</option>
-				</select>
-				<span className="mt-1 block text-xs text-muted">
-					{ fixedOnStart
-						? 'The competition type is locked once the tournament has started.'
-						: 'Team play can be set up but not yet played: no pairing system puts one team against another.' }
-				</span>
-			</label>
-
-			<label className="block">
-				<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-					Location
-				</span>
-				<input
-					type="text"
-					value={ location }
-					onChange={ ( e ) => setLocation( e.target.value ) }
-					placeholder="Optional"
-					className={ fieldInput }
-				/>
-			</label>
-
-			<ContactsField value={ contactIds } onChange={ setContacts } />
+				<ContactsField value={ contactIds } onChange={ setContacts } />
 			</fieldset>
 
 			{ save.isError && (

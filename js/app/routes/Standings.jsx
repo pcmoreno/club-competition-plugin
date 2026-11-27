@@ -102,7 +102,9 @@ export function Standings( { seasonId } ) {
 	// seasons have no Keizer score), Category (an undivided single-pool season),
 	// and Byes (a season that recorded none).
 	const hasScore = rows.some( ( r ) => r.keizer_score != null );
-	const hasCat = rows.some( ( r ) => r.category != null && r.category !== '' );
+	const hasCat = rows.some(
+		( r ) => r.category != null && r.category !== ''
+	);
 	const hasByes = rows.some( ( r ) => ( r.byes ?? 0 ) > 0 );
 
 	return (
@@ -245,7 +247,7 @@ export function Standings( { seasonId } ) {
 										)
 											? Number(
 													r.classical_points
-											  ).toFixed( 1 )
+												).toFixed( 1 )
 											: '—' }
 									</td>
 									<td className="num px-4 py-2.5 font-mono text-ink-3">
@@ -285,7 +287,7 @@ function Wrap( { children, rounds, categories, category, onCategory } ) {
 		rounds > 0
 			? `Standings (after ${ rounds } ${
 					rounds === 1 ? 'round' : 'rounds'
-			  })`
+				})`
 			: 'Standings';
 	return (
 		<Page>

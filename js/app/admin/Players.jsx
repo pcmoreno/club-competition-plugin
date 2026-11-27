@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { AdminHeader } from './AdminLayout';
@@ -80,7 +80,38 @@ function syncedLabel( dt ) {
 	} );
 }
 
+// Invited resends, no account invites, anything else is shown as its status.
+function MemberCell( { player, onInvite } ) {
+	if ( player.member_status === 'invited' ) {
+		return (
+			<button
+				type="button"
+				onClick={ () => onInvite( player ) }
+				title="Resend invite"
+				className="group inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+			>
+				invited
+				<MailIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+			</button>
+		);
+	}
+	if ( player.member_status ) {
+		return player.member_status;
+	}
+	return (
+		<button
+			type="button"
+			onClick={ () => onInvite( player ) }
+			className="inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+		>
+			<MailIcon />
+			Invite
+		</button>
+	);
+}
+
 export function Players() {
+	const fieldId = useId();
 	const { data, isLoading, isError } = useQuery( {
 		queryKey: keys.adminPlayers(),
 		queryFn: () => api.get( 'players' ),
@@ -172,8 +203,12 @@ export function Players() {
 								},
 							] }
 						/>
-						<label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-3">
+						<label
+							htmlFor={ `${ fieldId }-active-only` }
+							className="flex shrink-0 items-center gap-1.5 text-sm text-ink-3"
+						>
 							<input
+								id={ `${ fieldId }-active-only` }
 								type="checkbox"
 								checked={ activeOnly }
 								onChange={ ( e ) =>
@@ -205,7 +240,9 @@ export function Players() {
 					onInvite={ setInviteTarget }
 				/>
 			) }
-			{ addOpen && <PlayerDialog onClose={ () => setAddOpen( false ) } /> }
+			{ addOpen && (
+				<PlayerDialog onClose={ () => setAddOpen( false ) } />
+			) }
 			{ editTarget && (
 				<PlayerDialog
 					player={ editTarget }
@@ -335,28 +372,10 @@ function RosterTable( { players, sort, onSort, onSync, onOpen, onInvite } ) {
 									{ p.active ? 'Yes' : 'No' }
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
-									{ p.member_status === 'invited' ? (
-										<button
-											type="button"
-											onClick={ () => onInvite( p ) }
-											title="Resend invite"
-											className="group inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
-										>
-											invited
-											<MailIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
-										</button>
-									) : p.member_status ? (
-										p.member_status
-									) : (
-										<button
-											type="button"
-											onClick={ () => onInvite( p ) }
-											className="inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
-										>
-											<MailIcon />
-											Invite
-										</button>
-									) }
+									<MemberCell
+										player={ p }
+										onInvite={ onInvite }
+									/>
 								</td>
 								<td className="px-4 py-2.5">
 									{ canSync ? (

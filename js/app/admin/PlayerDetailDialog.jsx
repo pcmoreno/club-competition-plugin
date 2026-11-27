@@ -271,11 +271,8 @@ function MemberSection( { player, onInvite, onRevoke } ) {
 		status === null || status === 'invited' || status === 'revoked';
 	const canRevoke = status === 'invited' || status === 'active';
 	const inviteLabel =
-		status === 'invited'
-			? 'Resend invite'
-			: status === 'revoked'
-			? 'Re-invite'
-			: 'Send invite';
+		{ invited: 'Resend invite', revoked: 'Re-invite' }[ status ] ??
+		'Send invite';
 
 	return (
 		<section>
@@ -329,6 +326,7 @@ function MemberSection( { player, onInvite, onRevoke } ) {
 function ToggleActiveConfirm( { player, onClose } ) {
 	const queryClient = useQueryClient();
 	const deactivating = player.active;
+	const action = deactivating ? 'Deactivate' : 'Activate';
 	const toggle = useMutation( {
 		mutationFn: () =>
 			api.patch( `players/${ player.id }`, { active: ! player.active } ),
@@ -341,13 +339,7 @@ function ToggleActiveConfirm( { player, onClose } ) {
 	return (
 		<ConfirmModal
 			title={ deactivating ? 'Deactivate player' : 'Activate player' }
-			confirmLabel={
-				toggle.isPending
-					? 'Saving…'
-					: deactivating
-					? 'Deactivate'
-					: 'Activate'
-			}
+			confirmLabel={ toggle.isPending ? 'Saving…' : action }
 			busy={ toggle.isPending }
 			onCancel={ onClose }
 			onConfirm={ () => toggle.mutate() }

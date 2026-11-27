@@ -1,4 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from '@wordpress/element';
+import {
+	useState,
+	useEffect,
+	useMemo,
+	useRef,
+	useId,
+} from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Notice, ConfirmModal } from '../components/ui';
@@ -13,6 +19,20 @@ import {
 } from './tournamentShared';
 import { keys } from '../api/keys';
 
+// Why Generate is unavailable, as its tooltip; undefined when it can run.
+function generateBlocker( { season, games, blockingRound } ) {
+	if ( ! season.generates_pairings ) {
+		return 'Automatic pairing isn’t available for this system yet — build the board by hand below.';
+	}
+	if ( games.length > 0 ) {
+		return 'This round already has pairings. Remove them to generate again.';
+	}
+	if ( blockingRound !== null ) {
+		return `Complete round ${ blockingRound } first — the board is built from the standings, and those are written when a round is completed. You can still pair this round by hand below.`;
+	}
+	return undefined;
+}
+
 // ADMIN. Pairings tab of the tournament detail page (default tab while active).
 // A manual round + pairings manager: create/select a round, build the board by
 // dragging enrolled players (listed at the bottom) into White/Black slots, enter
@@ -20,6 +40,7 @@ import { keys } from '../api/keys';
 // a full-schedule system (round-robin) builds every round in one call, while the
 // per-round engines don't exist yet and keep a disabled placeholder.
 export function TournamentPairingsTab( { season, players, locked = false } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const [ selectedRoundId, setSelectedRoundId ] = useState( null );
 	const [ builder, setBuilder ] = useState( { white: null, black: null } );
@@ -65,7 +86,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// fetch a round belonging to a tournament no longer on screen.
 	const currentRoundId = ordered.some( ( r ) => r.id === selectedRoundId )
 		? selectedRoundId
-		: ordered[ ordered.length - 1 ]?.id ?? null;
+		: ( ordered[ ordered.length - 1 ]?.id ?? null );
 
 	// The round immediately before the selected one — its frozen snapshot is the
 	// score each player carries *into* this round.
@@ -116,7 +137,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	);
 
 	const round = roundData?.round ?? null;
-	const games = roundData?.games ?? [];
+	const games = useMemo( () => roundData?.games ?? [], [ roundData ] );
 	// Phases: draft/published build the board (pairings editable, no results);
 	// finalised locks the board and opens result entry; complete freezes the
 	// standings and shows results read-only.
@@ -179,12 +200,15 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// rebuild once a round has left draft, so this can't rewrite boards players
 	// have already seen.
 	const generateSchedule = useMutation( {
-		mutationFn: () => api.post( `seasons/${ season.id }/rounds/generate`, {} ),
+		mutationFn: () =>
+			api.post( `seasons/${ season.id }/rounds/generate`, {} ),
 		onSuccess: ( created ) => {
 			setConfirmGenerate( false );
 			setSelectedRoundId( created?.rounds?.[ 0 ]?.id ?? null );
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
-			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( season.id ),
+			} );
 		},
 	} );
 
@@ -201,7 +225,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// stays open whatever the round's status — correcting the evening a round was
 	// played on is a legitimate fix after the fact.
 	const setRoundDate = useMutation( {
-		mutationFn: ( date ) => api.patch( `rounds/${ currentRoundId }`, { date } ),
+		mutationFn: ( date ) =>
+			api.patch( `rounds/${ currentRoundId }`, { date } ),
 		onSuccess: () => {
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
@@ -264,7 +289,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						status:
 							byeType === 'pairing_bye' ? 'present' : 'absent',
 						bye_type: byeType,
-				  }
+					}
 				: { season_player_id: seasonPlayerId, status: 'present' };
 			return api.put( `rounds/${ currentRoundId }/attendance`, {
 				attendance: [ entry ],
@@ -324,7 +349,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	const byeLabel = ( key ) =>
 		key === 'pairing_bye'
 			? 'Pairing bye'
-			: byeTypes.find( ( b ) => b.key === key )?.label ?? key;
+			: ( byeTypes.find( ( b ) => b.key === key )?.label ?? key );
 
 	// Players holding the automatic pairing bye (present but with no opponent).
 	const pairingByes = ( roundData?.attendance ?? [] )
@@ -500,7 +525,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 							disabled={ createRound.isPending }
 							className="ml-1 rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
-							{ createRound.isPending ? 'Adding…' : '+ New round' }
+							{ createRound.isPending
+								? 'Adding…'
+								: '+ New round' }
 						</button>
 					) }
 				</div>
@@ -529,15 +556,11 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 								! season.generates_pairings ||
 								blockingRound !== null
 							}
-							title={
-								! season.generates_pairings
-									? 'Automatic pairing isn’t available for this system yet — build the board by hand below.'
-									: games.length > 0
-										? 'This round already has pairings. Remove them to generate again.'
-										: blockingRound !== null
-											? `Complete round ${ blockingRound } first — the board is built from the standings, and those are written when a round is completed. You can still pair this round by hand below.`
-											: undefined
-							}
+							title={ generateBlocker( {
+								season,
+								games,
+								blockingRound,
+							} ) }
 							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
 							{ generatePairings.isPending
@@ -576,7 +599,10 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 
 			{ round && (
 				<div className="flex flex-wrap items-center gap-3">
-					<label className="flex items-center gap-2">
+					<label
+						htmlFor={ `${ fieldId }-date` }
+						className="flex items-center gap-2"
+					>
 						<span className="text-xs uppercase tracking-wide text-muted">
 							Date
 						</span>
@@ -586,6 +612,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						     January on the way, and emptying a segment makes
 						     the value '' — which clears the stored date. */ }
 						<input
+							id={ `${ fieldId }-date` }
 							type="date"
 							disabled={ locked }
 							value={ dateDraft ?? round.date ?? '' }
@@ -774,6 +801,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						const onBoard = pairedIds.has( p.season_player_id );
 						const bye = byeOf[ p.season_player_id ];
 						const placed = onBoard || !! bye;
+						const unplacedCls = editable
+							? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
+							: 'border-rule bg-surface text-ink-3';
 						return (
 							<li
 								key={ p.season_player_id }
@@ -785,9 +815,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 									'flex items-center justify-between rounded border px-2 py-1.5 text-sm ' +
 									( placed
 										? 'border-rule-soft bg-surface text-muted'
-										: editable
-										? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
-										: 'border-rule bg-surface text-ink-3' )
+										: unplacedCls )
 								}
 							>
 								<span className="truncate">
@@ -934,11 +962,11 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					onCancel={ () => setConfirmGenerate( false ) }
 					onConfirm={ () => generateSchedule.mutate() }
 				>
-					This lays out every round from the { players.length } enrolled
-					players and replaces the rounds already here. Only possible
-					while every round is still a draft — publish one and the
-					schedule is fixed. Enrolling a player afterwards won’t change
-					it.
+					This lays out every round from the { players.length }{ ' ' }
+					enrolled players and replaces the rounds already here. Only
+					possible while every round is still a draft — publish one
+					and the schedule is fixed. Enrolling a player afterwards
+					won’t change it.
 					{ generateSchedule.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( generateSchedule.error ) }
@@ -955,7 +983,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					}
 					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmReopen( false ) }
-					onConfirm={ () => setStatus.mutate( { status: 'finalised' } ) }
+					onConfirm={ () =>
+						setStatus.mutate( { status: 'finalised' } )
+					}
 				>
 					Reopening lets you correct a result. The published standings
 					stay as they are until you complete the round again — which
@@ -1183,6 +1213,9 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 }
 
 function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
+	const fillCls = player
+		? 'border-rule bg-surface text-ink'
+		: 'border-dashed border-rule text-muted';
 	return (
 		<div
 			onDragOver={ ( e ) => {
@@ -1194,11 +1227,7 @@ function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 			className={
 				'flex min-h-8 items-center justify-between rounded border px-2 py-1 text-sm ' +
 				( side === 'white' ? 'text-right ' : '' ) +
-				( isOver
-					? 'border-accent bg-accent-soft'
-					: player
-					? 'border-rule bg-surface text-ink'
-					: 'border-dashed border-rule text-muted' )
+				( isOver ? 'border-accent bg-accent-soft' : fillCls )
 			}
 		>
 			{ player ? (

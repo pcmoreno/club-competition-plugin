@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { Dialog } from '../components/Dialog';
@@ -43,6 +43,7 @@ const fieldInput =
 // null param as "leave unchanged", so a blank keeps what's stored rather than
 // clearing it. On add there is nothing to keep, so a blank is simply unset.
 export function PlayerDialog( { player = null, onClose } ) {
+	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const isEdit = player !== null;
 	const [ name, setName ] = useState( player?.name ?? '' );
@@ -93,25 +94,28 @@ export function PlayerDialog( { player = null, onClose } ) {
 			onSubmit={ submit }
 		>
 			<div className="mt-4 space-y-4">
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-name` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Name
 					</span>
 					<input
+						id={ `${ fieldId }-name` }
 						type="text"
 						value={ name }
 						onChange={ ( e ) => setName( e.target.value ) }
 						required
+						// eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a dialog on open.
 						autoFocus
 						className={ fieldInput }
 					/>
 				</label>
 
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-knsb-id` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						KNSB ID
 					</span>
 					<input
+						id={ `${ fieldId }-knsb-id` }
 						type="text"
 						value={ knsbId }
 						onChange={ ( e ) => setKnsbId( e.target.value ) }
@@ -120,11 +124,12 @@ export function PlayerDialog( { player = null, onClose } ) {
 					/>
 				</label>
 
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-birth-year` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Birth year
 					</span>
 					<input
+						id={ `${ fieldId }-birth-year` }
 						type="number"
 						inputMode="numeric"
 						min="1900"
@@ -137,11 +142,12 @@ export function PlayerDialog( { player = null, onClose } ) {
 					/>
 				</label>
 
-				<label className="block">
+				<label htmlFor={ `${ fieldId }-gender` } className="block">
 					<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
 						Gender
 					</span>
 					<select
+						id={ `${ fieldId }-gender` }
 						value={ gender }
 						onChange={ ( e ) => setGender( e.target.value ) }
 						className={ fieldInput }

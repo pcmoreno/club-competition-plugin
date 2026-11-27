@@ -8,13 +8,6 @@ import { keys } from '../api/keys';
 
 const GENDER_LABELS = { male: 'Male', female: 'Female', other: 'Other' };
 
-function titleCase( value ) {
-	if ( ! value ) {
-		return '—';
-	}
-	return value.charAt( 0 ).toUpperCase() + value.slice( 1 );
-}
-
 // One label/value row in the account details card. Values that are missing
 // render as an em dash rather than an empty gap.
 function Row( { label, children } ) {
@@ -37,9 +30,7 @@ function AccountRows( { data } ) {
 				<Row label="Name">{ data.name }</Row>
 				<Row label="Email">{ data.email }</Row>
 				<Row label="Role">Administrator</Row>
-				<Row label="Admin since">
-					{ formatDate( data.created_at ) }
-				</Row>
+				<Row label="Admin since">{ formatDate( data.created_at ) }</Row>
 			</>
 		);
 	}

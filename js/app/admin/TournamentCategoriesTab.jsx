@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from '@wordpress/element';
+import { useState, useMemo, useRef, useId } from '@wordpress/element';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ConfirmModal } from '../components/ui';
@@ -9,6 +9,34 @@ import {
 	isTeamLocked,
 } from './tournamentShared';
 import { keys } from '../api/keys';
+
+// The line under the heading: frozen teams, a finished record, or what the groups are for.
+function introText( { season, locked, isTeam, plural } ) {
+	if ( isTeamLocked( season ) && season.status !== 'completed' ) {
+		return 'Teams and board order are fixed now that the tournament has started.';
+	}
+	if ( locked ) {
+		return `The ${ plural } this tournament was played in, and who was in each.`;
+	}
+	if ( isTeam ) {
+		return 'Teams split the tournament into sides. Every player should end up in one.';
+	}
+	return 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.';
+}
+
+// Auto Fill's tooltip: what's missing before it can run, else what it does.
+function autoFillTitle( { list, players, isTeam, term, plural } ) {
+	if ( list.length === 0 ) {
+		return `Add a ${ term } first`;
+	}
+	if ( players.length === 0 ) {
+		return 'Enrol players first';
+	}
+	if ( isTeam ) {
+		return 'Balance the teams by rating';
+	}
+	return `Distribute players evenly across ${ plural }`;
+}
 
 // ADMIN. Categories tab, and the Teams tab — one component, because a season is
 // one or the other and both group their players out of the `categories` column.
@@ -21,6 +49,7 @@ import { keys } from '../api/keys';
 // carries its own Remove (disabled while it still holds players). Rename isn't
 // offered: players store the group as a plain string, so it'd orphan them.
 export function TournamentCategoriesTab( { season, players, locked = false } ) {
+	const fieldId = useId();
 	const isTeam = season.is_team === true;
 	const term = isTeam ? 'team' : 'category';
 	const plural = isTeam ? 'teams' : 'categories';
@@ -57,7 +86,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		}
 		unassigned.sort( byRating );
 		return { groups, unassigned };
-	}, [ players, list ] );
+	}, [ players, list, isTeam ] );
 
 	// The list is optimistic: it updates immediately and persists in the
 	// background; a failed save rolls back to the server's last-known value.
@@ -90,7 +119,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 									? { ...p, category }
 									: p
 							),
-					  }
+						}
 					: old
 			);
 			return { prev };
@@ -129,10 +158,13 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 							...old,
 							players: old.players.map( ( p ) =>
 								byId.has( p.player_id )
-									? { ...p, category: byId.get( p.player_id ) }
+									? {
+											...p,
+											category: byId.get( p.player_id ),
+										}
 									: p
 							),
-					  }
+						}
 					: old
 			);
 			return { prev };
@@ -173,10 +205,10 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 											board_number: boardOf.get(
 												p.player_id
 											),
-									  }
+										}
 									: p
 							),
-					  }
+						}
 					: old
 			);
 			return { prev };
@@ -348,90 +380,89 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				{ isTeamLocked( season ) && season.status !== 'completed'
-					? 'Teams and board order are fixed now that the tournament has started.'
-					: locked
-					? `The ${ plural } this tournament was played in, and who was in each.`
-					: isTeam
-					? 'Teams split the tournament into sides. Every player should end up in one.'
-					: 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.' }
+				{ introText( { season, locked, isTeam, plural } ) }
 			</p>
 
 			{ /* Removed rather than disabled: nothing can be added to a finished record. */ }
 			{ ! locked && (
-			<div className="max-w-xl">
-				<div className="flex items-end gap-3">
-					<label className="block flex-1">
-						<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
-							Add { term }
-						</span>
-						<input
-							type="text"
-							value={ input }
-							onChange={ ( e ) => setInput( e.target.value ) }
-							onKeyDown={ ( e ) => {
-								if ( e.key === 'Enter' ) {
-									e.preventDefault();
-									add();
+				<div className="max-w-xl">
+					<div className="flex items-end gap-3">
+						<label
+							htmlFor={ `${ fieldId }-add` }
+							className="block flex-1"
+						>
+							<span className="mb-1 block text-xs uppercase tracking-wide text-muted">
+								Add { term }
+							</span>
+							<input
+								id={ `${ fieldId }-add` }
+								type="text"
+								value={ input }
+								onChange={ ( e ) => setInput( e.target.value ) }
+								onKeyDown={ ( e ) => {
+									if ( e.key === 'Enter' ) {
+										e.preventDefault();
+										add();
+									}
+								} }
+								placeholder={
+									isTeam ? 'e.g. Team A' : 'e.g. Group A'
 								}
-							} }
-							placeholder={ isTeam ? 'e.g. Team A' : 'e.g. Group A' }
-							className={ fieldInput }
-						/>
-					</label>
-					<button
-						type="button"
-						className={ primaryBtn }
-						onClick={ add }
-						disabled={ save.isPending }
-					>
-						Add
-					</button>
-					<button
-						type="button"
-						className="rounded border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-40"
-						onClick={ () => setConfirming( 'autofill' ) }
-						disabled={
-							list.length === 0 ||
-							players.length === 0 ||
-							assignMany.isPending
-						}
-						title={
-							list.length === 0
-								? `Add a ${ term } first`
-								: players.length === 0
-								? 'Enrol players first'
-								: isTeam
-								? 'Balance the teams by rating'
-								: `Distribute players evenly across ${ plural }`
-						}
-					>
-						{ assignMany.isPending ? 'Filling…' : 'Auto Fill' }
-					</button>
-					<button
-						type="button"
-						className="rounded border border-rule px-4 py-2 text-sm font-medium text-loss hover:bg-surface disabled:opacity-40"
-						onClick={ () => setConfirming( 'clear' ) }
-						disabled={ assigned === 0 || assignMany.isPending }
-						title={
-							assigned === 0
-								? 'Nobody is assigned'
-								: `Take every player back out of their ${ term }`
-						}
-					>
-						Clear
-					</button>
+								className={ fieldInput }
+							/>
+						</label>
+						<button
+							type="button"
+							className={ primaryBtn }
+							onClick={ add }
+							disabled={ save.isPending }
+						>
+							Add
+						</button>
+						<button
+							type="button"
+							className="rounded border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-40"
+							onClick={ () => setConfirming( 'autofill' ) }
+							disabled={
+								list.length === 0 ||
+								players.length === 0 ||
+								assignMany.isPending
+							}
+							title={ autoFillTitle( {
+								list,
+								players,
+								isTeam,
+								term,
+								plural,
+							} ) }
+						>
+							{ assignMany.isPending ? 'Filling…' : 'Auto Fill' }
+						</button>
+						<button
+							type="button"
+							className="rounded border border-rule px-4 py-2 text-sm font-medium text-loss hover:bg-surface disabled:opacity-40"
+							onClick={ () => setConfirming( 'clear' ) }
+							disabled={ assigned === 0 || assignMany.isPending }
+							title={
+								assigned === 0
+									? 'Nobody is assigned'
+									: `Take every player back out of their ${ term }`
+							}
+						>
+							Clear
+						</button>
+					</div>
+					{ save.isError && (
+						<p className="mt-2 text-sm text-loss">
+							{ errorMessage( save.error ) }
+						</p>
+					) }
 				</div>
-				{ save.isError && (
-					<p className="mt-2 text-sm text-loss">
-						{ errorMessage( save.error ) }
-					</p>
-				) }
-			</div>
 			) }
 
 			<p className="text-xs text-muted">
-				{ players.length } { players.length === 1 ? 'player' : 'players' }
+				{ players.length }{ ' ' }
+				{ players.length === 1 ? 'player' : 'players' }
 				{ ' · ' }
 				{ list.length } { list.length === 1 ? term : plural }
 			</p>
@@ -481,7 +512,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 									onDrop={ () => onDropTo( c ) }
 									onDragStart={ onDragStart }
 									onDropOnRow={ isTeam ? onDropOnRow : null }
-									onMove={ isTeam && ! locked ? moveBoard : null }
+									onMove={
+										isTeam && ! locked ? moveBoard : null
+									}
 									showBoards={ isTeam }
 									onRemove={ () => removeAt( c ) }
 									locked={ locked }
@@ -502,7 +535,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 						/>
 					</div>
 
-					{ ( assign.isError || assignMany.isError || boards.isError ) && (
+					{ ( assign.isError ||
+						assignMany.isError ||
+						boards.isError ) && (
 						<p className="text-sm text-loss">
 							{ errorMessage(
 								assign.error || assignMany.error || boards.error
@@ -520,8 +555,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					onCancel={ () => setConfirming( null ) }
 					onConfirm={ runClear }
 				>
-					This takes { assigned } { assigned === 1 ? 'player' : 'players' }{ ' ' }
-					back out of their { plural }. The { plural } themselves stay.
+					This takes { assigned }{ ' ' }
+					{ assigned === 1 ? 'player' : 'players' } back out of their{ ' ' }
+					{ plural }. The { plural } themselves stay.
 				</ConfirmModal>
 			) }
 
@@ -567,7 +603,7 @@ function AssignBox( {
 					: ( e ) => {
 							e.preventDefault();
 							onOver();
-					  }
+						}
 			}
 			onDragLeave={ locked ? undefined : onLeave }
 			onDrop={ locked ? undefined : onDrop }
@@ -623,7 +659,7 @@ function AssignBox( {
 									: ( e ) => {
 											e.stopPropagation();
 											onDropOnRow( p );
-									  }
+										}
 							}
 							className={
 								'flex items-center justify-between rounded px-2 py-1.5 text-sm text-ink-3 ' +

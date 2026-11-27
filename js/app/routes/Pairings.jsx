@@ -145,7 +145,9 @@ function RoundTable( { round, data, seasonId } ) {
 							Result
 						</th>
 						<th className="px-4 py-2 font-medium">Black</th>
-						<th className="w-24 px-4 py-2 font-medium print:hidden">Cat</th>
+						<th className="w-24 px-4 py-2 font-medium print:hidden">
+							Cat
+						</th>
 					</tr>
 				</thead>
 				<tbody>

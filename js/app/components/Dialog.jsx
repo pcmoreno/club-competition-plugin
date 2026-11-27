@@ -83,15 +83,19 @@ export function Dialog( {
 	// — React has already focused it by now — so this only fires when the dialog
 	// would otherwise leave focus behind on the trigger.
 	useEffect( () => {
-		const returnTo = document.activeElement;
 		const panel = panelRef.current;
-		if ( panel && ! panel.contains( document.activeElement ) ) {
+		if ( ! panel ) {
+			return;
+		}
+		const doc = panel.ownerDocument;
+		const returnTo = doc.activeElement;
+		if ( ! panel.contains( returnTo ) ) {
 			panel.focus();
 		}
 		return () => {
 			if (
-				returnTo instanceof HTMLElement &&
-				document.contains( returnTo )
+				returnTo instanceof doc.defaultView.HTMLElement &&
+				doc.contains( returnTo )
 			) {
 				returnTo.focus();
 			}
@@ -124,7 +128,7 @@ export function Dialog( {
 			}
 			const first = items[ 0 ];
 			const last = items[ items.length - 1 ];
-			const active = document.activeElement;
+			const active = panel.ownerDocument.activeElement;
 			// Wrapping at the ends is what keeps Tab from walking out into the
 			// page behind, which is still fully focusable.
 			if ( e.shiftKey && ( active === first || active === panel ) ) {
@@ -143,6 +147,7 @@ export function Dialog( {
 
 	return (
 		<DialogDepth.Provider value={ depth + 1 }>
+			{ /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Escape closes it from the keyboard. */ }
 			<div
 				className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4"
 				style={ { zIndex: 50 + depth * 10 } }

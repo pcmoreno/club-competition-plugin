@@ -76,10 +76,13 @@ export function TournamentDetail( { seasonId } ) {
 	// Moves the tournament out of preparation into active. Once started it can
 	// no longer be deleted, so it's guarded by a confirmation.
 	const start = useMutation( {
-		mutationFn: () => api.patch( `seasons/${ seasonId }`, { status: 'active' } ),
+		mutationFn: () =>
+			api.patch( `seasons/${ seasonId }`, { status: 'active' } ),
 		onSuccess: () => {
 			setConfirmingStart( false );
-			queryClient.invalidateQueries( { queryKey: keys.season( seasonId ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( seasonId ),
+			} );
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
@@ -90,7 +93,9 @@ export function TournamentDetail( { seasonId } ) {
 		mutationFn: () => api.post( `seasons/${ seasonId }/complete` ),
 		onSuccess: () => {
 			setConfirmingComplete( false );
-			queryClient.invalidateQueries( { queryKey: keys.season( seasonId ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( seasonId ),
+			} );
 			queryClient.invalidateQueries( { queryKey: keys.seasons() } );
 		},
 	} );
@@ -112,7 +117,8 @@ export function TournamentDetail( { seasonId } ) {
 
 	const { season, players = [] } = data;
 	const tabs = tabsFor( season );
-	const activeTab = tab ?? ( season.status === 'active' ? 'pairings' : 'basic' );
+	const activeTab =
+		tab ?? ( season.status === 'active' ? 'pairings' : 'basic' );
 	const locked = isLocked( season );
 
 	return (
@@ -163,8 +169,9 @@ export function TournamentDetail( { seasonId } ) {
 
 			{ locked && (
 				<p className="rounded border border-rule bg-surface px-3 py-2 text-sm text-ink-3">
-					This tournament is completed, so its record is read-only. The
-					standings columns on the Settings tab can still be changed.
+					This tournament is completed, so its record is read-only.
+					The standings columns on the Settings tab can still be
+					changed.
 				</p>
 			) }
 

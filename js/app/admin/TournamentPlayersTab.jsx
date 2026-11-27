@@ -35,7 +35,9 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 	const enrolled = useMemo( () => {
 		const q = enrolledSearch.trim().toLowerCase();
 		return [ ...players ]
-			.filter( ( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q ) )
+			.filter(
+				( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q )
+			)
 			.sort( ( a, b ) => ( a.name ?? '' ).localeCompare( b.name ?? '' ) );
 	}, [ players, enrolledSearch ] );
 
@@ -47,7 +49,9 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 		return list
 			.filter( ( p ) => p.active )
 			.filter( ( p ) => ! enrolledIds.has( p.id ) )
-			.filter( ( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q ) )
+			.filter(
+				( p ) => ! q || ( p.name ?? '' ).toLowerCase().includes( q )
+			)
 			.sort( ( a, b ) => ( a.name ?? '' ).localeCompare( b.name ?? '' ) );
 	}, [ allPlayers, enrolledIds, availableSearch ] );
 
@@ -123,14 +127,22 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 			setSelEnrolled( new Set() );
 			setSelAvailable( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		} else {
 			setSelAvailable( new Set() );
 			setSelEnrolled( ( prev ) => {
 				const next = new Set( prev );
-				next.has( id ) ? next.delete( id ) : next.add( id );
+				if ( next.has( id ) ) {
+					next.delete( id );
+				} else {
+					next.add( id );
+				}
 				return next;
 			} );
 		}
@@ -168,9 +180,7 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 			<div
 				className={
 					'items-stretch gap-3 ' +
-					( locked
-						? 'max-w-md'
-						: 'grid grid-cols-[1fr_auto_1fr]' )
+					( locked ? 'max-w-md' : 'grid grid-cols-[1fr_auto_1fr]' )
 				}
 			>
 				<TransferPanel
@@ -210,62 +220,62 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 				/>
 
 				{ ! locked && (
-				<div className="flex justify-center">
-					<button
-						type="button"
-						onClick={ () =>
-							addMode
-								? doEnroll( [ ...selAvailable ] )
-								: doRemove( [ ...selEnrolled ] )
-						}
-						disabled={
-						( ! addMode && ! removeMode ) ||
-						busy ||
-						( removeMode && ! canRemove )
-					}
-						className={
-							'sticky top-28 mt-24 self-start whitespace-nowrap rounded px-3 py-2 text-sm font-medium disabled:opacity-40 ' +
-							( removeMode
-								? 'bg-loss text-paper hover:opacity-90'
-								: 'bg-ink text-paper hover:bg-ink-2' )
-						}
-					>
-						{ removeMode ? 'Remove →' : '← Add' }
-					</button>
-				</div>
+					<div className="flex justify-center">
+						<button
+							type="button"
+							onClick={ () =>
+								addMode
+									? doEnroll( [ ...selAvailable ] )
+									: doRemove( [ ...selEnrolled ] )
+							}
+							disabled={
+								( ! addMode && ! removeMode ) ||
+								busy ||
+								( removeMode && ! canRemove )
+							}
+							className={
+								'sticky top-28 mt-24 self-start whitespace-nowrap rounded px-3 py-2 text-sm font-medium disabled:opacity-40 ' +
+								( removeMode
+									? 'bg-loss text-paper hover:opacity-90'
+									: 'bg-ink text-paper hover:bg-ink-2' )
+							}
+						>
+							{ removeMode ? 'Remove →' : '← Add' }
+						</button>
+					</div>
 				) }
 
 				{ ! locked && (
-				<TransferPanel
-					title={ `Active players (${ available.length })` }
-					side="available"
-					rows={ available }
-					rowId={ ( p ) => p.id }
-					rowLabel={ ( p ) => p.name }
-					rowMeta={ ( p ) => p.knsb_elo || '' }
-					selected={ selAvailable }
-					search={ availableSearch }
-					onSearch={ setAvailableSearch }
-					onToggle={ toggle }
-					onDragStart={ onDragStart }
-					isOver={ dropTarget === 'available' }
-					onDragOver={ () => setDropTarget( 'available' ) }
-					onDragLeave={ () => setDropTarget( null ) }
-					onDrop={ () => onDropTo( 'available' ) }
-					empty="No more players to add."
-					action={
-						addAllIds.length > 0 && (
-							<button
-								type="button"
-								onClick={ () => setConfirm( 'add' ) }
-								disabled={ busy }
-								className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
-							>
-								Add all
-							</button>
-						)
-					}
-				/>
+					<TransferPanel
+						title={ `Active players (${ available.length })` }
+						side="available"
+						rows={ available }
+						rowId={ ( p ) => p.id }
+						rowLabel={ ( p ) => p.name }
+						rowMeta={ ( p ) => p.knsb_elo || '' }
+						selected={ selAvailable }
+						search={ availableSearch }
+						onSearch={ setAvailableSearch }
+						onToggle={ toggle }
+						onDragStart={ onDragStart }
+						isOver={ dropTarget === 'available' }
+						onDragOver={ () => setDropTarget( 'available' ) }
+						onDragLeave={ () => setDropTarget( null ) }
+						onDrop={ () => onDropTo( 'available' ) }
+						empty="No more players to add."
+						action={
+							addAllIds.length > 0 && (
+								<button
+									type="button"
+									onClick={ () => setConfirm( 'add' ) }
+									disabled={ busy }
+									className="whitespace-nowrap rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
+								>
+									Add all
+								</button>
+							)
+						}
+					/>
 				) }
 			</div>
 

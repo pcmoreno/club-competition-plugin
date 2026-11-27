@@ -26,6 +26,33 @@ function Row( { label, value } ) {
 	);
 }
 
+// The stored list's date, download time and size, or why there's none to show.
+function StoredList( { status } ) {
+	const s = status.data;
+	if ( status.isLoading ) {
+		return <p className="text-sm text-muted">Checking the stored list…</p>;
+	}
+	if ( status.isError ) {
+		return (
+			<p className="text-sm text-loss">Couldn’t read the current list.</p>
+		);
+	}
+	if ( ! s?.available ) {
+		return (
+			<p className="text-sm text-ink-3">
+				No list has been downloaded yet.
+			</p>
+		);
+	}
+	return (
+		<dl className="space-y-1">
+			<Row label="List date" value={ s.list_date ?? 'unknown' } />
+			<Row label="Downloaded" value={ s.fetched_at ?? 'unknown' } />
+			<Row label="Players" value={ ( s.count ?? 0 ).toLocaleString() } />
+		</dl>
+	);
+}
+
 // ADMIN. Opened from the roster's Actions menu. Shows which KNSB rating list is
 // currently stored on the server (date + when it was downloaded + how many
 // players), and downloads the latest one server-side (the host has no CLI/cron
@@ -46,7 +73,7 @@ export function FetchKnsbDialog( { onClose } ) {
 			queryClient.setQueryData( keys.knsbStatus(), data ),
 	} );
 
-	const s = status.data;
+	const idleLabel = status.data?.available ? 'Fetch again' : 'Fetch now';
 
 	return (
 		<Dialog
@@ -56,34 +83,7 @@ export function FetchKnsbDialog( { onClose } ) {
 			onClose={ onClose }
 		>
 			<div className="mt-4 rounded border border-rule bg-surface p-4">
-				{ status.isLoading ? (
-					<p className="text-sm text-muted">
-						Checking the stored list…
-					</p>
-				) : status.isError ? (
-					<p className="text-sm text-loss">
-						Couldn’t read the current list.
-					</p>
-				) : s?.available ? (
-					<dl className="space-y-1">
-						<Row
-							label="List date"
-							value={ s.list_date ?? 'unknown' }
-						/>
-						<Row
-							label="Downloaded"
-							value={ s.fetched_at ?? 'unknown' }
-						/>
-						<Row
-							label="Players"
-							value={ ( s.count ?? 0 ).toLocaleString() }
-						/>
-					</dl>
-				) : (
-					<p className="text-sm text-ink-3">
-						No list has been downloaded yet.
-					</p>
-				) }
+				<StoredList status={ status } />
 			</div>
 
 			{ fetchList.isError && (
@@ -110,11 +110,7 @@ export function FetchKnsbDialog( { onClose } ) {
 					onClick={ () => fetchList.mutate() }
 					disabled={ fetchList.isPending }
 				>
-					{ fetchList.isPending
-						? 'Fetching…'
-						: s?.available
-						? 'Fetch again'
-						: 'Fetch now' }
+					{ fetchList.isPending ? 'Fetching…' : idleLabel }
 				</button>
 			</div>
 		</Dialog>
