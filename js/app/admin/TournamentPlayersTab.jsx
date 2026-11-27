@@ -11,6 +11,111 @@ import { keys } from '../api/keys';
 const enrolledRating = ( p ) => p.elo;
 const availableRating = ( p ) => p.knsb_elo;
 
+// The enrolment rating, editable in place: click it, type, Enter or click away
+// to save, Escape to cancel. Clicks stop here so they don't toggle the row.
+function RatingCell( { value, editable, onSave } ) {
+	const [ draft, setDraft ] = useState( null );
+	const [ saving, setSaving ] = useState( false );
+	const [ error, setError ] = useState( null );
+	// Set while a save runs or after Escape, so the blur that follows doesn't save.
+	const settling = useRef( false );
+
+	if ( ! editable ) {
+		return value || '—';
+	}
+
+	if ( draft === null ) {
+		return (
+			<button
+				type="button"
+				title="Adjust rating"
+				onClick={ ( e ) => {
+					e.stopPropagation();
+					settling.current = false;
+					setError( null );
+					setDraft( String( value ?? '' ) );
+				} }
+				className="hover:text-ink hover:underline"
+			>
+				{ value || '—' }
+			</button>
+		);
+	}
+
+	const save = async () => {
+		if ( settling.current ) {
+			return;
+		}
+		const rating = Number( draft );
+		if (
+			draft.trim() === '' ||
+			! Number.isInteger( rating ) ||
+			rating < 0
+		) {
+			setError( 'A whole number, zero or more.' );
+			return;
+		}
+		settling.current = true;
+		if ( rating === value ) {
+			setDraft( null );
+			return;
+		}
+		setSaving( true );
+		try {
+			await onSave( rating );
+			setDraft( null );
+		} catch ( err ) {
+			settling.current = false;
+			setError( errorMessage( err ) );
+		} finally {
+			setSaving( false );
+		}
+	};
+
+	return (
+		<input
+			type="number"
+			// No min: a min would make the arrows snap to multiples of 50 from 0.
+			step="50"
+			value={ draft }
+			disabled={ saving }
+			// eslint-disable-next-line jsx-a11y/no-autofocus -- the click that opens the editor asks for it.
+			autoFocus
+			title={ error ?? undefined }
+			aria-invalid={ error ? true : undefined }
+			onClick={ ( e ) => e.stopPropagation() }
+			onChange={ ( e ) => {
+				setError( null );
+				setDraft( e.target.value );
+			} }
+			onKeyDown={ ( e ) => {
+				if ( e.key === 'Enter' ) {
+					e.preventDefault();
+					save();
+				} else if ( e.key === 'ArrowUp' || e.key === 'ArrowDown' ) {
+					e.preventDefault();
+					const delta = e.key === 'ArrowUp' ? 50 : -50;
+					setError( null );
+					setDraft(
+						String(
+							Math.max( 0, ( Number( draft ) || 0 ) + delta )
+						)
+					);
+				} else if ( e.key === 'Escape' ) {
+					e.stopPropagation();
+					settling.current = true;
+					setDraft( null );
+				}
+			} }
+			onBlur={ save }
+			className={
+				'w-20 rounded border bg-paper px-1 py-0 text-right font-mono text-xs text-ink focus:outline-none ' +
+				( error ? 'border-loss' : 'border-accent' )
+			}
+		/>
+	);
+}
+
 // ADMIN. Players (enrolment) tab, as a two-panel transfer list: Enrolled on the
 // left, the remaining active club players on the right. Move players by
 // dragging between panels or by multi-selecting and using the centre button
@@ -96,6 +201,17 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 		onSuccess: () => setSelEnrolled( new Set() ),
 		onSettled: invalidate,
 	} );
+
+	const rate = useMutation( {
+		mutationFn: ( { playerId, rating } ) =>
+			api.patch( `seasons/${ season.id }/players/${ playerId }/rating`, {
+				elo_rating: rating,
+			} ),
+		onSettled: invalidate,
+	} );
+
+	// The enrolment rating seeds pairing from round 1, so it's fixed once started.
+	const canRate = ! locked && season.status === 'preparation';
 
 	const busy = enroll.isPending || remove.isPending;
 
@@ -216,10 +332,21 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 					rows={ enrolled }
 					rowId={ ( p ) => p.player_id }
 					rowLabel={ ( p ) => p.name }
-					rowMeta={ ( p ) => {
-						const cat = p.category ? ` (${ p.category })` : '';
-						return `${ p.elo || '' }${ cat }`.trim();
-					} }
+					rowMeta={ ( p ) => (
+						<>
+							<RatingCell
+								value={ p.elo }
+								editable={ canRate }
+								onSave={ ( rating ) =>
+									rate.mutateAsync( {
+										playerId: p.player_id,
+										rating,
+									} )
+								}
+							/>
+							{ p.category && ` (${ p.category })` }
+						</>
+					) }
 					rowRating={ enrolledRating }
 					selected={ selEnrolled }
 					search={ enrolledSearch }

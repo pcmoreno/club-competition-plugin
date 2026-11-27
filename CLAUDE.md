@@ -235,7 +235,10 @@ setting that is a bound rather than a preference. A candidate further away than
 it is removed from consideration in `findOpponent` instead of ranked below the
 others, so a narrow value can leave a player with no legal opponent at all. The
 gap is measured on `season_players.elo_rating`, the rating each player enrolled
-with, not whatever it has become since.
+with, not whatever it has become since. Enrolment copies the player's KNSB
+rating; an admin can adjust it inline on the Players tab
+(`PATCH /seasons/{id}/players/{player_id}/rating`) while the tournament is in
+preparation, and it is fixed from the start on.
 
 Zero means unlimited and is the default, so a season that never sets it pairs
 exactly as it always did. The category repair pass respects it too: a swap that
