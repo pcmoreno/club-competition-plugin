@@ -148,6 +148,28 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 		}
 	};
 
+	// Shift-click: select or deselect a run of rows in this panel.
+	const selectRange = ( side, ids, select ) => {
+		const apply = ( prev ) => {
+			const next = new Set( prev );
+			for ( const id of ids ) {
+				if ( select ) {
+					next.add( id );
+				} else {
+					next.delete( id );
+				}
+			}
+			return next;
+		};
+		if ( side === 'available' ) {
+			setSelEnrolled( new Set() );
+			setSelAvailable( apply );
+		} else {
+			setSelAvailable( new Set() );
+			setSelEnrolled( apply );
+		}
+	};
+
 	// Dragging a selected row carries the whole selection; an unselected row
 	// carries just itself.
 	const onDragStart = ( side, id ) => {
@@ -197,6 +219,7 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 					search={ enrolledSearch }
 					onSearch={ setEnrolledSearch }
 					onToggle={ toggle }
+					onSelectRange={ selectRange }
 					onDragStart={ onDragStart }
 					isOver={ dropTarget === 'enrolled' }
 					onDragOver={ () => setDropTarget( 'enrolled' ) }
@@ -257,6 +280,7 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 						search={ availableSearch }
 						onSearch={ setAvailableSearch }
 						onToggle={ toggle }
+						onSelectRange={ selectRange }
 						onDragStart={ onDragStart }
 						isOver={ dropTarget === 'available' }
 						onDragOver={ () => setDropTarget( 'available' ) }
