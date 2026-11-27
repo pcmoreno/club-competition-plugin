@@ -347,8 +347,13 @@ is changed with the per-row arrows or by dropping one player onto another.
 **Teams are fixed once the tournament starts** — `requireTeamsEditable` refuses
 the team list, the assignments and the board order from `active` onwards, not
 just from `completed`, because by then boards are published and being played.
-Individual categories keep their old behaviour and stay editable while the
-tournament runs; only `is_team` seasons freeze early.
+The **list** of categories is fixed from `active` onwards for every tournament
+(`SeasonController::update` refuses a changed `categories` outside preparation):
+pairing and the standings filter read it from round 1. On an individual
+tournament a player without a category can still be placed in one while it
+runs, so a late joiner fits in, but a player who has one keeps it
+(`requirePlaceable`, on both assignment routes). Auto Fill and Clear go with the
+list. `is_team` seasons freeze every assignment.
 
 `PATCH /seasons/{id}/boards` takes a team and its players **in playing order**,
 never the numbers themselves: 1..n is assigned server-side, so no request can

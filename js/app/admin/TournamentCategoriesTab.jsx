@@ -10,13 +10,16 @@ import {
 } from './tournamentShared';
 import { keys } from '../api/keys';
 
-// The line under the heading: frozen teams, a finished record, or what the groups are for.
-function introText( { season, locked, isTeam, plural } ) {
+// The line under the heading: frozen teams, a finished record, a fixed list, or what the groups are for.
+function introText( { season, locked, listLocked, isTeam, plural } ) {
 	if ( isTeamLocked( season ) && season.status !== 'completed' ) {
 		return 'Teams and board order are fixed now that the tournament has started.';
 	}
 	if ( locked ) {
 		return `The ${ plural } this tournament was played in, and who was in each.`;
+	}
+	if ( listLocked ) {
+		return 'The categories are fixed now that the tournament has started. Players without one can still be placed.';
 	}
 	if ( isTeam ) {
 		return 'Teams split the tournament into sides. Every player should end up in one.';
@@ -53,6 +56,8 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	const isTeam = season.is_team === true;
 	const term = isTeam ? 'team' : 'category';
 	const plural = isTeam ? 'teams' : 'categories';
+	// The list itself is fixed from the start; placing players may stay open.
+	const listLocked = locked || season.status !== 'preparation';
 	const queryClient = useQueryClient();
 	const [ list, setList ] = useState( season.categories ?? [] );
 	const [ input, setInput ] = useState( '' );
@@ -330,6 +335,10 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 		assign.mutate( { playerId: d.playerId, category: target } );
 	};
 
+	// The menu on an unassigned row: no drag, however far down the box is.
+	const placeIn = ( player, category ) =>
+		assign.mutate( { playerId: player.player_id, category } );
+
 	// Drag and drop isn't obvious on a list, so a board can also be nudged one
 	// place at a time.
 	const moveBoard = ( player, delta ) => {
@@ -380,11 +389,11 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				{ introText( { season, locked, isTeam, plural } ) }
+				{ introText( { season, locked, listLocked, isTeam, plural } ) }
 			</p>
 
-			{ /* Removed rather than disabled: nothing can be added to a finished record. */ }
-			{ ! locked && (
+			{ /* Removed rather than disabled: the list is fixed once the tournament starts. */ }
+			{ ! listLocked && (
 				<div className="max-w-xl">
 					<div className="flex items-end gap-3">
 						<label
@@ -482,8 +491,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 						</h3>
 						{ ! locked && (
 							<p className="text-xs text-muted">
-								Drag a player into a { term }, or back to
-								Unassigned to clear it.
+								{ listLocked
+									? `Drag an unassigned player into a ${ term }.`
+									: `Drag a player into a ${ term }, or back to Unassigned to clear it.` }
 								{ isTeam &&
 									' Change the board order with the arrows, or by dropping one player onto another.' }
 							</p>
@@ -493,7 +503,9 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 					{ players.length === 0 && ! locked && (
 						<p className="text-sm text-muted">
 							No players enrolled yet — add them on the Players
-							tab. You can still add and remove { plural } here.
+							tab.
+							{ ! listLocked &&
+								` You can still add and remove ${ plural } here.` }
 						</p>
 					) }
 
@@ -516,23 +528,33 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 										isTeam && ! locked ? moveBoard : null
 									}
 									showBoards={ isTeam }
-									onRemove={ () => removeAt( c ) }
+									onRemove={
+										listLocked ? null : () => removeAt( c )
+									}
 									locked={ locked }
+									pinned={ listLocked }
 									empty="Drop players here"
 								/>
 							) ) }
 						</div>
-						<AssignBox
-							title="Unassigned"
-							rows={ grouped.unassigned }
-							isOver={ over === '__none' }
-							onOver={ () => setOver( '__none' ) }
-							onLeave={ () => setOver( null ) }
-							onDrop={ () => onDropTo( null ) }
-							onDragStart={ onDragStart }
-							locked={ locked }
-							empty="No unassigned players"
-						/>
+						{ /* Sticky, so it stays beside whichever box you've scrolled to. */ }
+						<div className="sticky top-4">
+							<AssignBox
+								title="Unassigned"
+								rows={ grouped.unassigned }
+								isOver={ over === '__none' }
+								onOver={ () => setOver( '__none' ) }
+								onLeave={ () => setOver( null ) }
+								onDrop={ () => onDropTo( null ) }
+								onDragStart={ onDragStart }
+								placeOptions={ list }
+								onPlace={ placeIn }
+								term={ term }
+								scroll
+								locked={ locked }
+								empty="No unassigned players"
+							/>
+						</div>
 					</div>
 
 					{ ( assign.isError ||
@@ -593,8 +615,17 @@ function AssignBox( {
 	showBoards = false,
 	onRemove,
 	locked = false,
+	// Rows stay put but the box still takes drops: a started tournament's categories.
+	pinned = false,
+	// A "Place in…" menu per row, listing these; for the Unassigned box.
+	placeOptions = [],
+	onPlace = null,
+	term = 'category',
+	// Cap the list to the screen and scroll inside it, for a sticky box.
+	scroll = false,
 	empty,
 } ) {
+	const draggable = ! locked && ! pinned;
 	return (
 		<section
 			onDragOver={
@@ -635,7 +666,14 @@ function AssignBox( {
 					) }
 				</div>
 			</div>
-			<ul className="min-h-20 space-y-1 p-1.5">
+			<ul
+				className={
+					'min-h-20 space-y-1 p-1.5' +
+					( scroll
+						? ' max-h-[calc(100vh-6rem)] overflow-y-auto'
+						: '' )
+				}
+			>
 				{ rows.length === 0 ? (
 					<li className="px-2 py-4 text-center text-xs text-muted">
 						{ empty }
@@ -644,9 +682,9 @@ function AssignBox( {
 					rows.map( ( p, i ) => (
 						<li
 							key={ p.player_id }
-							draggable={ ! locked }
+							draggable={ draggable }
 							onDragStart={
-								locked ? undefined : () => onDragStart( p )
+								draggable ? () => onDragStart( p ) : undefined
 							}
 							onDragOver={
 								locked || ! onDropOnRow
@@ -663,7 +701,9 @@ function AssignBox( {
 							}
 							className={
 								'flex items-center justify-between rounded px-2 py-1.5 text-sm text-ink-3 ' +
-								( locked ? '' : 'cursor-grab hover:bg-paper' )
+								( draggable
+									? 'cursor-grab hover:bg-paper'
+									: '' )
 							}
 						>
 							<span className="flex min-w-0 items-baseline gap-2">
@@ -680,6 +720,27 @@ function AssignBox( {
 										{ p.elo }
 									</span>
 								) }
+								{ onPlace &&
+									! locked &&
+									placeOptions.length > 0 && (
+										<select
+											aria-label={ `Place ${ p.name } in a ${ term }` }
+											value=""
+											onChange={ ( e ) =>
+												onPlace( p, e.target.value )
+											}
+											className="ml-1 rounded border border-rule bg-paper py-0 pl-1 pr-6 text-xs text-ink-3"
+										>
+											<option value="" disabled>
+												Place in…
+											</option>
+											{ placeOptions.map( ( c ) => (
+												<option key={ c } value={ c }>
+													{ c }
+												</option>
+											) ) }
+										</select>
+									) }
 								{ onMove && (
 									<>
 										<MoveButton
