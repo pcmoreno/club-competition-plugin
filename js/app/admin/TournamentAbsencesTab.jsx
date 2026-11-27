@@ -110,6 +110,28 @@ export function TournamentAbsencesTab( { season, locked = false } ) {
 		}
 	};
 
+	// Shift-click: select or deselect a run of rows in this panel.
+	const selectRange = ( side, ids, select ) => {
+		const apply = ( prev ) => {
+			const next = new Set( prev );
+			for ( const id of ids ) {
+				if ( select ) {
+					next.add( id );
+				} else {
+					next.delete( id );
+				}
+			}
+			return next;
+		};
+		if ( side === 'present' ) {
+			setSelAbsent( new Set() );
+			setSelPresent( apply );
+		} else {
+			setSelPresent( new Set() );
+			setSelAbsent( apply );
+		}
+	};
+
 	const onDragStart = ( side, id ) => {
 		const sel = side === 'present' ? selPresent : selAbsent;
 		const ids = sel.has( id ) && sel.size > 0 ? [ ...sel ] : [ id ];
@@ -155,6 +177,7 @@ export function TournamentAbsencesTab( { season, locked = false } ) {
 					search={ presentSearch }
 					onSearch={ setPresentSearch }
 					onToggle={ toggle }
+					onSelectRange={ selectRange }
 					onDragStart={ onDragStart }
 					isOver={ dropTarget === 'present' }
 					onDragOver={ () => setDropTarget( 'present' ) }
@@ -197,6 +220,7 @@ export function TournamentAbsencesTab( { season, locked = false } ) {
 					search={ absentSearch }
 					onSearch={ setAbsentSearch }
 					onToggle={ toggle }
+					onSelectRange={ selectRange }
 					onDragStart={ onDragStart }
 					isOver={ dropTarget === 'absent' }
 					onDragOver={ () => setDropTarget( 'absent' ) }

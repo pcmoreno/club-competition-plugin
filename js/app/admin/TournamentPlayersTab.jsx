@@ -6,6 +6,11 @@ import { TransferPanel } from '../components/TransferPanel';
 import { errorMessage } from './tournamentShared';
 import { keys } from '../api/keys';
 
+// Each side sorts by the rating it shows: the enrolment rating on the left, the
+// player's own KNSB rating on the right.
+const enrolledRating = ( p ) => p.elo;
+const availableRating = ( p ) => p.knsb_elo;
+
 // ADMIN. Players (enrolment) tab, as a two-panel transfer list: Enrolled on the
 // left, the remaining active club players on the right. Move players by
 // dragging between panels or by multi-selecting and using the centre button
@@ -148,6 +153,28 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 		}
 	};
 
+	// Shift-click: select or deselect a run of rows in this panel.
+	const selectRange = ( side, ids, select ) => {
+		const apply = ( prev ) => {
+			const next = new Set( prev );
+			for ( const id of ids ) {
+				if ( select ) {
+					next.add( id );
+				} else {
+					next.delete( id );
+				}
+			}
+			return next;
+		};
+		if ( side === 'available' ) {
+			setSelEnrolled( new Set() );
+			setSelAvailable( apply );
+		} else {
+			setSelAvailable( new Set() );
+			setSelEnrolled( apply );
+		}
+	};
+
 	// Dragging a selected row carries the whole selection; an unselected row
 	// carries just itself.
 	const onDragStart = ( side, id ) => {
@@ -193,10 +220,12 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 						const cat = p.category ? ` (${ p.category })` : '';
 						return `${ p.elo || '' }${ cat }`.trim();
 					} }
+					rowRating={ enrolledRating }
 					selected={ selEnrolled }
 					search={ enrolledSearch }
 					onSearch={ setEnrolledSearch }
 					onToggle={ toggle }
+					onSelectRange={ selectRange }
 					onDragStart={ onDragStart }
 					isOver={ dropTarget === 'enrolled' }
 					onDragOver={ () => setDropTarget( 'enrolled' ) }
@@ -253,10 +282,12 @@ export function TournamentPlayersTab( { season, players, locked = false } ) {
 						rowId={ ( p ) => p.id }
 						rowLabel={ ( p ) => p.name }
 						rowMeta={ ( p ) => p.knsb_elo || '' }
+						rowRating={ availableRating }
 						selected={ selAvailable }
 						search={ availableSearch }
 						onSearch={ setAvailableSearch }
 						onToggle={ toggle }
+						onSelectRange={ selectRange }
 						onDragStart={ onDragStart }
 						isOver={ dropTarget === 'available' }
 						onDragOver={ () => setDropTarget( 'available' ) }

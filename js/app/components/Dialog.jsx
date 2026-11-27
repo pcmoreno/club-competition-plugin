@@ -41,6 +41,8 @@ const FOCUSABLE = [
 // backdrop) so a second attempt can't fire while the first is unresolved. The
 // caller still disables its own buttons.
 //
+// `dismissOnBackdrop={ false }` keeps a click outside from closing it.
+//
 // Pass `onSubmit` to make the panel a form; `headerExtra` for controls that
 // belong beside the title, such as a delete affordance.
 export function Dialog( {
@@ -50,6 +52,7 @@ export function Dialog( {
 	size = 'md',
 	scroll = false,
 	busy = false,
+	dismissOnBackdrop = true,
 	onClose,
 	onSubmit,
 	children,
@@ -155,7 +158,11 @@ export function Dialog( {
 					// Only a click on the backdrop itself dismisses — not one
 					// that bubbled up from the panel, or from a dialog stacked
 					// on top of this one.
-					if ( e.target === e.currentTarget && ! busy ) {
+					if (
+						dismissOnBackdrop &&
+						e.target === e.currentTarget &&
+						! busy
+					) {
 						onClose();
 					}
 				} }
