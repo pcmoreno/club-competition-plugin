@@ -55,7 +55,7 @@ Database
 |-------|-----------|-------|
 | Plugin Runtime | PHP 8.2+ / WordPress 5.0+ | Entry point: `club-competition-plugin.php` |
 | DI Container | Symfony DependencyInjection | Configured in `src/Container.php` |
-| Database | MySQL 5.7+ via Doctrine DBAL | Tables built from `SCS_TABLE_PREFIX` — **not** hardcoded `wp_scs_` |
+| Database | MySQL 8.4+ via Doctrine DBAL | Tables built from `SCS_TABLE_PREFIX` — **not** hardcoded `wp_scs_` |
 | REST API | WordPress REST API | Custom endpoints at `/wp-json/scs/v1/` |
 | Authentication | lcobucci/jwt + Symfony CSRF | JWT in an httpOnly cookie, never localStorage |
 | Validation | Symfony Validator | Input validation on all DTOs |

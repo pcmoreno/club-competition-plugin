@@ -15,7 +15,7 @@ A WordPress plugin for managing chess competition pairings, standings, and resul
 
 - WordPress 5.0+
 - PHP 8.2+
-- MySQL 5.7+
+- MySQL 8.4+
 - Composer (for dependency management)
 
 ## Installation
