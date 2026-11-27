@@ -19,6 +19,40 @@ function errorMessage( err ) {
 const fieldInput =
 	'w-full rounded border border-rule bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none';
 
+// Title and button per member_status; any other status is a first invite.
+const MODES = {
+	invited: { title: 'Resend invite', action: 'Resend invite' },
+	revoked: { title: 'Re-invite member', action: 'Re-invite' },
+};
+const FIRST_INVITE = { title: 'Invite member', action: 'Send invite' };
+
+function InviteDescription( { player } ) {
+	const name = <strong className="text-ink">{ player.name }</strong>;
+	if ( player.member_status === 'invited' ) {
+		return (
+			<>
+				{ name } hasn’t accepted yet. A new email with a fresh link will
+				be sent, and the previous link will stop working.
+			</>
+		);
+	}
+	if ( player.member_status === 'revoked' ) {
+		return (
+			<>
+				{ name }’s member account was revoked. Re-inviting sends a fresh
+				link so they can set a password and sign in again.
+			</>
+		);
+	}
+	return (
+		<>
+			{ name } will receive an email with a link to create a password, and
+			can then sign in and start using the website. This gives them a
+			member account — not admin access.
+		</>
+	);
+}
+
 // Invite a player to become a member, or re-send a pending invite. Posts to
 // POST /players/{id}/invite, which creates a member account (ROLE_MEMBER, not
 // admin) and emails a one-time link to set a password — or, when the player is
@@ -30,8 +64,7 @@ const fieldInput =
 export function InviteMemberDialog( { player, onClose } ) {
 	const fieldId = useId();
 	const queryClient = useQueryClient();
-	const isResend = player.member_status === 'invited';
-	const isReinvite = player.member_status === 'revoked';
+	const mode = MODES[ player.member_status ] ?? FIRST_INVITE;
 	const [ email, setEmail ] = useState( player.email ?? '' );
 
 	const invite = useMutation( {
@@ -55,35 +88,8 @@ export function InviteMemberDialog( { player, onClose } ) {
 
 	return (
 		<Dialog
-			title={
-				isResend
-					? 'Resend invite'
-					: isReinvite
-						? 'Re-invite member'
-						: 'Invite member'
-			}
-			description={
-				isResend ? (
-					<>
-						<strong className="text-ink">{ player.name }</strong>{ ' ' }
-						hasn’t accepted yet. A new email with a fresh link will
-						be sent, and the previous link will stop working.
-					</>
-				) : isReinvite ? (
-					<>
-						<strong className="text-ink">{ player.name }</strong>
-						’s member account was revoked. Re-inviting sends a fresh
-						link so they can set a password and sign in again.
-					</>
-				) : (
-					<>
-						<strong className="text-ink">{ player.name }</strong>{ ' ' }
-						will receive an email with a link to create a password,
-						and can then sign in and start using the website. This
-						gives them a member account — not admin access.
-					</>
-				)
-			}
+			title={ mode.title }
+			description={ <InviteDescription player={ player } /> }
 			size="sm"
 			busy={ invite.isPending }
 			onClose={ onClose }
@@ -126,13 +132,7 @@ export function InviteMemberDialog( { player, onClose } ) {
 					className={ primaryBtn }
 					disabled={ ! canSubmit }
 				>
-					{ invite.isPending
-						? 'Sending…'
-						: isResend
-							? 'Resend invite'
-							: isReinvite
-								? 'Re-invite'
-								: 'Send invite' }
+					{ invite.isPending ? 'Sending…' : mode.action }
 				</button>
 			</div>
 		</Dialog>

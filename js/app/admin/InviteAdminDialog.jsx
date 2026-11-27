@@ -31,6 +31,7 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 	const fieldId = useId();
 	const queryClient = useQueryClient();
 	const isResend = admin !== null;
+	const sendLabel = isResend ? 'Resend invite' : 'Send invite';
 	const [ name, setName ] = useState( admin?.name ?? '' );
 	const [ email, setEmail ] = useState( admin?.email ?? '' );
 
@@ -149,11 +150,7 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 					className={ primaryBtn }
 					disabled={ ! canSubmit }
 				>
-					{ invite.isPending
-						? 'Sending…'
-						: isResend
-							? 'Resend invite'
-							: 'Send invite' }
+					{ invite.isPending ? 'Sending…' : sendLabel }
 				</button>
 			</div>
 		</Dialog>

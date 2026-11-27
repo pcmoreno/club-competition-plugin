@@ -233,6 +233,12 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 		keep.knsb_id !== remove.knsb_id;
 
 	const canMerge = bothLoaded && overlap.length === 0 && ! merge.isPending;
+	let notice = null;
+	if ( loading ) {
+		notice = 'Loading…';
+	} else if ( failed ) {
+		notice = 'Couldn’t load tournaments. Please try again.';
+	}
 
 	return (
 		<>
@@ -242,15 +248,9 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 				and then removed. Check these are the same person.
 			</p>
 
-			{ loading ? (
+			{ notice ? (
 				<div className="mt-4">
-					<Notice>Loading…</Notice>
-				</div>
-			) : failed ? (
-				<div className="mt-4">
-					<Notice>
-						Couldn’t load tournaments. Please try again.
-					</Notice>
+					<Notice>{ notice }</Notice>
 				</div>
 			) : (
 				<div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -445,35 +445,45 @@ function PlayerColumn( {
 // backfill is conditional (the account only moves into an empty keeper slot),
 // so it gets its own row instead of the generic one.
 function MemberRow( { status, inheritStatus = null, inheritFrom = null } ) {
-	const badge = status ? MEMBER_BADGE[ status ] : null;
-	const inheritBadge =
-		! status && inheritStatus ? MEMBER_BADGE[ inheritStatus ] : null;
-	const badgeClass = ( cls ) =>
-		`rounded px-2 py-0.5 text-xs font-medium ${ cls }`;
-
 	return (
 		<div className="flex items-baseline justify-between gap-3">
 			<dt className="text-sm text-muted">Member</dt>
 			<dd className="text-right text-sm">
-				{ badge ? (
-					<span className={ badgeClass( badge.cls ) }>
-						{ badge.label }
-					</span>
-				) : inheritBadge ? (
-					<>
-						<span className={ badgeClass( inheritBadge.cls ) }>
-							{ inheritBadge.label }
-						</span>
-						<span className="ml-1 text-xs text-muted">
-							from { inheritFrom }
-						</span>
-					</>
-				) : (
-					<span className="text-ink">—</span>
-				) }
+				<MemberValue
+					status={ status }
+					inheritStatus={ inheritStatus }
+					inheritFrom={ inheritFrom }
+				/>
 			</dd>
 		</div>
 	);
+}
+
+// The keeper's own badge, else the one it inherits, else a dash.
+function MemberValue( { status, inheritStatus, inheritFrom } ) {
+	const badgeClass = ( cls ) =>
+		`rounded px-2 py-0.5 text-xs font-medium ${ cls }`;
+	const badge = status ? MEMBER_BADGE[ status ] : null;
+	const inheritBadge =
+		! status && inheritStatus ? MEMBER_BADGE[ inheritStatus ] : null;
+	if ( badge ) {
+		return (
+			<span className={ badgeClass( badge.cls ) }>{ badge.label }</span>
+		);
+	}
+	if ( inheritBadge ) {
+		return (
+			<>
+				<span className={ badgeClass( inheritBadge.cls ) }>
+					{ inheritBadge.label }
+				</span>
+				<span className="ml-1 text-xs text-muted">
+					from { inheritFrom }
+				</span>
+			</>
+		);
+	}
+	return <span className="text-ink">—</span>;
 }
 
 function Row( {

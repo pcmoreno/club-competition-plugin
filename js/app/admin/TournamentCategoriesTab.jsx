@@ -10,6 +10,34 @@ import {
 } from './tournamentShared';
 import { keys } from '../api/keys';
 
+// The line under the heading: frozen teams, a finished record, or what the groups are for.
+function introText( { season, locked, isTeam, plural } ) {
+	if ( isTeamLocked( season ) && season.status !== 'completed' ) {
+		return 'Teams and board order are fixed now that the tournament has started.';
+	}
+	if ( locked ) {
+		return `The ${ plural } this tournament was played in, and who was in each.`;
+	}
+	if ( isTeam ) {
+		return 'Teams split the tournament into sides. Every player should end up in one.';
+	}
+	return 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.';
+}
+
+// Auto Fill's tooltip: what's missing before it can run, else what it does.
+function autoFillTitle( { list, players, isTeam, term, plural } ) {
+	if ( list.length === 0 ) {
+		return `Add a ${ term } first`;
+	}
+	if ( players.length === 0 ) {
+		return 'Enrol players first';
+	}
+	if ( isTeam ) {
+		return 'Balance the teams by rating';
+	}
+	return `Distribute players evenly across ${ plural }`;
+}
+
 // ADMIN. Categories tab, and the Teams tab — one component, because a season is
 // one or the other and both group their players out of the `categories` column.
 // A team season's column also holds the line-ups, but that's the server's
@@ -352,13 +380,7 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 	return (
 		<div className="space-y-6">
 			<p className="text-sm text-ink-3">
-				{ isTeamLocked( season ) && season.status !== 'completed'
-					? 'Teams and board order are fixed now that the tournament has started.'
-					: locked
-						? `The ${ plural } this tournament was played in, and who was in each.`
-						: isTeam
-							? 'Teams split the tournament into sides. Every player should end up in one.'
-							: 'Categories split the tournament into pools. Leave the list empty to run it as a single undivided group.' }
+				{ introText( { season, locked, isTeam, plural } ) }
 			</p>
 
 			{ /* Removed rather than disabled: nothing can be added to a finished record. */ }
@@ -406,15 +428,13 @@ export function TournamentCategoriesTab( { season, players, locked = false } ) {
 								players.length === 0 ||
 								assignMany.isPending
 							}
-							title={
-								list.length === 0
-									? `Add a ${ term } first`
-									: players.length === 0
-										? 'Enrol players first'
-										: isTeam
-											? 'Balance the teams by rating'
-											: `Distribute players evenly across ${ plural }`
-							}
+							title={ autoFillTitle( {
+								list,
+								players,
+								isTeam,
+								term,
+								plural,
+							} ) }
 						>
 							{ assignMany.isPending ? 'Filling…' : 'Auto Fill' }
 						</button>

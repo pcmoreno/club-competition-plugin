@@ -19,6 +19,20 @@ import {
 } from './tournamentShared';
 import { keys } from '../api/keys';
 
+// Why Generate is unavailable, as its tooltip; undefined when it can run.
+function generateBlocker( { season, games, blockingRound } ) {
+	if ( ! season.generates_pairings ) {
+		return 'Automatic pairing isn’t available for this system yet — build the board by hand below.';
+	}
+	if ( games.length > 0 ) {
+		return 'This round already has pairings. Remove them to generate again.';
+	}
+	if ( blockingRound !== null ) {
+		return `Complete round ${ blockingRound } first — the board is built from the standings, and those are written when a round is completed. You can still pair this round by hand below.`;
+	}
+	return undefined;
+}
+
 // ADMIN. Pairings tab of the tournament detail page (default tab while active).
 // A manual round + pairings manager: create/select a round, build the board by
 // dragging enrolled players (listed at the bottom) into White/Black slots, enter
@@ -542,15 +556,11 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 								! season.generates_pairings ||
 								blockingRound !== null
 							}
-							title={
-								! season.generates_pairings
-									? 'Automatic pairing isn’t available for this system yet — build the board by hand below.'
-									: games.length > 0
-										? 'This round already has pairings. Remove them to generate again.'
-										: blockingRound !== null
-											? `Complete round ${ blockingRound } first — the board is built from the standings, and those are written when a round is completed. You can still pair this round by hand below.`
-											: undefined
-							}
+							title={ generateBlocker( {
+								season,
+								games,
+								blockingRound,
+							} ) }
 							className="rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
 							{ generatePairings.isPending
@@ -791,6 +801,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						const onBoard = pairedIds.has( p.season_player_id );
 						const bye = byeOf[ p.season_player_id ];
 						const placed = onBoard || !! bye;
+						const unplacedCls = editable
+							? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
+							: 'border-rule bg-surface text-ink-3';
 						return (
 							<li
 								key={ p.season_player_id }
@@ -802,9 +815,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 									'flex items-center justify-between rounded border px-2 py-1.5 text-sm ' +
 									( placed
 										? 'border-rule-soft bg-surface text-muted'
-										: editable
-											? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
-											: 'border-rule bg-surface text-ink-3' )
+										: unplacedCls )
 								}
 							>
 								<span className="truncate">
@@ -1202,6 +1213,9 @@ function BuilderBoard( { board, builder, overSlot, onOver, onDrop, onClear } ) {
 }
 
 function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
+	const fillCls = player
+		? 'border-rule bg-surface text-ink'
+		: 'border-dashed border-rule text-muted';
 	return (
 		<div
 			onDragOver={ ( e ) => {
@@ -1213,11 +1227,7 @@ function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 			className={
 				'flex min-h-8 items-center justify-between rounded border px-2 py-1 text-sm ' +
 				( side === 'white' ? 'text-right ' : '' ) +
-				( isOver
-					? 'border-accent bg-accent-soft'
-					: player
-						? 'border-rule bg-surface text-ink'
-						: 'border-dashed border-rule text-muted' )
+				( isOver ? 'border-accent bg-accent-soft' : fillCls )
 			}
 		>
 			{ player ? (

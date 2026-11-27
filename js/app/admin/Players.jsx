@@ -80,6 +80,36 @@ function syncedLabel( dt ) {
 	} );
 }
 
+// Invited resends, no account invites, anything else is shown as its status.
+function MemberCell( { player, onInvite } ) {
+	if ( player.member_status === 'invited' ) {
+		return (
+			<button
+				type="button"
+				onClick={ () => onInvite( player ) }
+				title="Resend invite"
+				className="group inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+			>
+				invited
+				<MailIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+			</button>
+		);
+	}
+	if ( player.member_status ) {
+		return player.member_status;
+	}
+	return (
+		<button
+			type="button"
+			onClick={ () => onInvite( player ) }
+			className="inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
+		>
+			<MailIcon />
+			Invite
+		</button>
+	);
+}
+
 export function Players() {
 	const fieldId = useId();
 	const { data, isLoading, isError } = useQuery( {
@@ -342,28 +372,10 @@ function RosterTable( { players, sort, onSort, onSync, onOpen, onInvite } ) {
 									{ p.active ? 'Yes' : 'No' }
 								</td>
 								<td className="px-4 py-2.5 text-ink-3">
-									{ p.member_status === 'invited' ? (
-										<button
-											type="button"
-											onClick={ () => onInvite( p ) }
-											title="Resend invite"
-											className="group inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
-										>
-											invited
-											<MailIcon className="opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
-										</button>
-									) : p.member_status ? (
-										p.member_status
-									) : (
-										<button
-											type="button"
-											onClick={ () => onInvite( p ) }
-											className="inline-flex items-center gap-1.5 text-ink-3 hover:text-accent"
-										>
-											<MailIcon />
-											Invite
-										</button>
-									) }
+									<MemberCell
+										player={ p }
+										onInvite={ onInvite }
+									/>
 								</td>
 								<td className="px-4 py-2.5">
 									{ canSync ? (

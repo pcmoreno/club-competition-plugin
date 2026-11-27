@@ -120,6 +120,33 @@ function Report( { report } ) {
 	);
 }
 
+// The stored list's date and download time, or why there's none to sync from.
+function StoredList( { status } ) {
+	const s = status.data;
+	if ( status.isLoading ) {
+		return <p className="text-sm text-muted">Checking the stored list…</p>;
+	}
+	if ( status.isError ) {
+		return (
+			<p className="text-sm text-loss">Couldn’t read the current list.</p>
+		);
+	}
+	if ( ! s?.available ) {
+		return (
+			<p className="text-sm text-ink-3">
+				No list has been downloaded yet — fetch one first with “Fetch
+				KNSB ratings”.
+			</p>
+		);
+	}
+	return (
+		<dl className="space-y-1">
+			<Count label="List date" value={ s.list_date ?? 'unknown' } />
+			<Count label="Downloaded" value={ s.fetched_at ?? 'unknown' } />
+		</dl>
+	);
+}
+
 // ADMIN. Opened from the roster's Actions menu. Applies the stored KNSB list to
 // every player who has a KNSB id (POST /players/knsb-sync) — active or not —
 // and reports what changed. Players without a KNSB id are skipped; one that
@@ -154,31 +181,7 @@ export function SyncKnsbDialog( { onClose } ) {
 			) : (
 				<>
 					<div className="mt-4 rounded border border-rule bg-surface p-4">
-						{ status.isLoading ? (
-							<p className="text-sm text-muted">
-								Checking the stored list…
-							</p>
-						) : status.isError ? (
-							<p className="text-sm text-loss">
-								Couldn’t read the current list.
-							</p>
-						) : s?.available ? (
-							<dl className="space-y-1">
-								<Count
-									label="List date"
-									value={ s.list_date ?? 'unknown' }
-								/>
-								<Count
-									label="Downloaded"
-									value={ s.fetched_at ?? 'unknown' }
-								/>
-							</dl>
-						) : (
-							<p className="text-sm text-ink-3">
-								No list has been downloaded yet — fetch one
-								first with “Fetch KNSB ratings”.
-							</p>
-						) }
+						<StoredList status={ status } />
 					</div>
 
 					{ sync.isError && (
