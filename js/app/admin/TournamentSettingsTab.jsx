@@ -194,7 +194,9 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 
 	const patch = ( index, changes ) =>
 		onChange(
-			list.map( ( row, i ) => ( i === index ? { ...row, ...changes } : row ) )
+			list.map( ( row, i ) =>
+				i === index ? { ...row, ...changes } : row
+			)
 		);
 
 	const removeAt = ( index ) => {
@@ -265,7 +267,10 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 					className={ ghostBtn + ' px-0' }
 					disabled={ disabled }
 					onClick={ () =>
-						onChange( [ ...list, { key: '', label: '', points: 0 } ] )
+						onChange( [
+							...list,
+							{ key: '', label: '', points: 0 },
+						] )
 					}
 				>
 					+ Add bye type
@@ -303,7 +308,8 @@ function TiebreakConfig( {
 						{ labelFor( metric ) }
 					</h4>
 					{ fields.map( ( f ) => {
-						const current = values?.[ metric ]?.[ f.key ] ?? f.default;
+						const current =
+							values?.[ metric ]?.[ f.key ] ?? f.default;
 						const set = ( v ) =>
 							onChange( {
 								...values,
@@ -400,7 +406,7 @@ function NullableNumberField( { id, field, value, onChange, disabled } ) {
 					checked={ isNull }
 					disabled={ disabled }
 					onChange={ ( e ) =>
-						onChange( e.target.checked ? null : field.min ?? 1 )
+						onChange( e.target.checked ? null : ( field.min ?? 1 ) )
 					}
 				/>
 				<label htmlFor={ nullId }>{ field.nullLabel }</label>
@@ -418,7 +424,7 @@ function PairingField( { id, field, values, setValues, disabled } ) {
 	const value =
 		values && field.key in values
 			? values[ field.key ]
-			: field.default ?? null;
+			: ( field.default ?? null );
 	const set = ( v ) => setValues( { ...values, [ field.key ]: v } );
 
 	if ( field.type === 'number' && field.nullable ) {
@@ -478,7 +484,9 @@ function PairingField( { id, field, values, setValues, disabled } ) {
 			className={ inputCls + ' num w-28 text-right' }
 			value={ value ?? '' }
 			disabled={ disabled }
-			onChange={ ( e ) => set( toNumber( e.target.value, field.default ) ) }
+			onChange={ ( e ) =>
+				set( toNumber( e.target.value, field.default ) )
+			}
 		/>
 	);
 }
@@ -578,7 +586,9 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 								min={ f.min }
 								step={ f.step ?? 0.5 }
 								className={ inputCls + ' num w-20' }
-								value={ values.gameOutcomes?.[ f.key ] ?? f.default }
+								value={
+									values.gameOutcomes?.[ f.key ] ?? f.default
+								}
 								disabled={ disabled }
 								onChange={ ( e ) =>
 									setValues( {
@@ -676,7 +686,10 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 	// Anything else is a plain list of knobs — the same shape the pairing tab
 	// renders, so it goes through the same row. A settings class adding one
 	// needs nothing here.
-	if ( Array.isArray( group.fields ) && group.fields.some( ( f ) => f.key ) ) {
+	if (
+		Array.isArray( group.fields ) &&
+		group.fields.some( ( f ) => f.key )
+	) {
 		return (
 			<section>
 				<SectionTitle>{ group.label }</SectionTitle>
@@ -764,7 +777,8 @@ export function TournamentSettingsTab( { season, locked = false } ) {
 	}, [ data ] );
 
 	const save = useMutation( {
-		mutationFn: ( payload ) => api.patch( `seasons/${ season.id }`, payload ),
+		mutationFn: ( payload ) =>
+			api.patch( `seasons/${ season.id }`, payload ),
 		onSuccess: () => {
 			setSaved( true );
 			// Saved state is now the server's, so let the refetch below reseed —
@@ -811,8 +825,8 @@ export function TournamentSettingsTab( { season, locked = false } ) {
 		<div className="flex max-w-2xl flex-col gap-6">
 			{ scoringLocked && ! locked && (
 				<Notice>
-					A round has been completed, so scoring settings are locked for
-					this tournament. Display settings can still be changed.
+					A round has been completed, so scoring settings are locked
+					for this tournament. Display settings can still be changed.
 				</Notice>
 			) }
 
@@ -880,7 +894,9 @@ export function TournamentSettingsTab( { season, locked = false } ) {
 			) }
 
 			{ save.isError && (
-				<p className="text-sm text-loss">{ errorMessage( save.error ) }</p>
+				<p className="text-sm text-loss">
+					{ errorMessage( save.error ) }
+				</p>
 			) }
 
 			<div className="flex items-center gap-3">
@@ -930,9 +946,9 @@ export function TournamentSettingsTab( { season, locked = false } ) {
 				>
 					<p>
 						Permanently delete{ ' ' }
-						<strong className="text-ink">{ season.name }</strong> and
-						all its data (enrolled players, rounds, results)? This
-						can’t be undone.
+						<strong className="text-ink">{ season.name }</strong>{ ' ' }
+						and all its data (enrolled players, rounds, results)?
+						This can’t be undone.
 					</p>
 					{ remove.isError && (
 						<p className="mt-3 text-loss">

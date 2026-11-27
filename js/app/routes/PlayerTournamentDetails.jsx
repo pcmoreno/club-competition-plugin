@@ -174,7 +174,9 @@ function Header( { player, season, isMe } ) {
 				</h1>
 				<p className="mt-1 text-sm text-ink-3">
 					{ season.name }
-					{ player.category ? ` · Category ${ player.category }` : '' }
+					{ player.category
+						? ` · Category ${ player.category }`
+						: '' }
 				</p>
 			</div>
 		</div>

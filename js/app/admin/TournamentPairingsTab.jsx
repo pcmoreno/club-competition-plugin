@@ -65,7 +65,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// fetch a round belonging to a tournament no longer on screen.
 	const currentRoundId = ordered.some( ( r ) => r.id === selectedRoundId )
 		? selectedRoundId
-		: ordered[ ordered.length - 1 ]?.id ?? null;
+		: ( ordered[ ordered.length - 1 ]?.id ?? null );
 
 	// The round immediately before the selected one — its frozen snapshot is the
 	// score each player carries *into* this round.
@@ -179,12 +179,15 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// rebuild once a round has left draft, so this can't rewrite boards players
 	// have already seen.
 	const generateSchedule = useMutation( {
-		mutationFn: () => api.post( `seasons/${ season.id }/rounds/generate`, {} ),
+		mutationFn: () =>
+			api.post( `seasons/${ season.id }/rounds/generate`, {} ),
 		onSuccess: ( created ) => {
 			setConfirmGenerate( false );
 			setSelectedRoundId( created?.rounds?.[ 0 ]?.id ?? null );
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
-			queryClient.invalidateQueries( { queryKey: keys.season( season.id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: keys.season( season.id ),
+			} );
 		},
 	} );
 
@@ -201,7 +204,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	// stays open whatever the round's status — correcting the evening a round was
 	// played on is a legitimate fix after the fact.
 	const setRoundDate = useMutation( {
-		mutationFn: ( date ) => api.patch( `rounds/${ currentRoundId }`, { date } ),
+		mutationFn: ( date ) =>
+			api.patch( `rounds/${ currentRoundId }`, { date } ),
 		onSuccess: () => {
 			invalidateRound();
 			queryClient.invalidateQueries( { queryKey: roundsKey } );
@@ -264,7 +268,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						status:
 							byeType === 'pairing_bye' ? 'present' : 'absent',
 						bye_type: byeType,
-				  }
+					}
 				: { season_player_id: seasonPlayerId, status: 'present' };
 			return api.put( `rounds/${ currentRoundId }/attendance`, {
 				attendance: [ entry ],
@@ -324,7 +328,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 	const byeLabel = ( key ) =>
 		key === 'pairing_bye'
 			? 'Pairing bye'
-			: byeTypes.find( ( b ) => b.key === key )?.label ?? key;
+			: ( byeTypes.find( ( b ) => b.key === key )?.label ?? key );
 
 	// Players holding the automatic pairing bye (present but with no opponent).
 	const pairingByes = ( roundData?.attendance ?? [] )
@@ -500,7 +504,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 							disabled={ createRound.isPending }
 							className="ml-1 rounded border border-rule px-3 py-1.5 text-sm text-ink-3 hover:bg-surface hover:text-ink disabled:opacity-40"
 						>
-							{ createRound.isPending ? 'Adding…' : '+ New round' }
+							{ createRound.isPending
+								? 'Adding…'
+								: '+ New round' }
 						</button>
 					) }
 				</div>
@@ -786,8 +792,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 									( placed
 										? 'border-rule-soft bg-surface text-muted'
 										: editable
-										? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
-										: 'border-rule bg-surface text-ink-3' )
+											? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
+											: 'border-rule bg-surface text-ink-3' )
 								}
 							>
 								<span className="truncate">
@@ -934,11 +940,11 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					onCancel={ () => setConfirmGenerate( false ) }
 					onConfirm={ () => generateSchedule.mutate() }
 				>
-					This lays out every round from the { players.length } enrolled
-					players and replaces the rounds already here. Only possible
-					while every round is still a draft — publish one and the
-					schedule is fixed. Enrolling a player afterwards won’t change
-					it.
+					This lays out every round from the { players.length }{ ' ' }
+					enrolled players and replaces the rounds already here. Only
+					possible while every round is still a draft — publish one
+					and the schedule is fixed. Enrolling a player afterwards
+					won’t change it.
 					{ generateSchedule.isError && (
 						<span className="mt-2 block text-loss">
 							{ errorMessage( generateSchedule.error ) }
@@ -955,7 +961,9 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					}
 					busy={ setStatus.isPending }
 					onCancel={ () => setConfirmReopen( false ) }
-					onConfirm={ () => setStatus.mutate( { status: 'finalised' } ) }
+					onConfirm={ () =>
+						setStatus.mutate( { status: 'finalised' } )
+					}
 				>
 					Reopening lets you correct a result. The published standings
 					stay as they are until you complete the round again — which
@@ -1197,8 +1205,8 @@ function Slot( { side, player, isOver, onOver, onDrop, onClear } ) {
 				( isOver
 					? 'border-accent bg-accent-soft'
 					: player
-					? 'border-rule bg-surface text-ink'
-					: 'border-dashed border-rule text-muted' )
+						? 'border-rule bg-surface text-ink'
+						: 'border-dashed border-rule text-muted' )
 			}
 		>
 			{ player ? (

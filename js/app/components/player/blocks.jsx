@@ -8,13 +8,7 @@ import { useState } from '@wordpress/element';
 import { Link } from '../../router/router';
 import { Notice } from '../ui';
 import { Square } from '../game';
-import {
-	record,
-	performance,
-	streaks,
-	currentStreak,
-	extremes,
-} from './stats';
+import { record, performance, streaks, currentStreak, extremes } from './stats';
 
 export function OpponentLink( { opponent, opponentTo } ) {
 	if ( ! opponent ) {
@@ -86,7 +80,9 @@ function StreakRow( { label, tone, length, detail } ) {
 	return (
 		<div className="flex items-baseline gap-2">
 			<span className="w-20 shrink-0 text-ink-3">{ label }</span>
-			<span className={ `num w-5 font-mono font-medium ${ TONE[ tone ] }` }>
+			<span
+				className={ `num w-5 font-mono font-medium ${ TONE[ tone ] }` }
+			>
 				{ length }
 			</span>
 			{ length > 0 && detail && (
@@ -132,8 +128,8 @@ export function LongestStreaks( { games, current } ) {
 								current.type === 'winning'
 									? 'win'
 									: current.type === 'losing'
-									? 'loss'
-									: 'ink'
+										? 'loss'
+										: 'ink'
 							}
 							length={ current.length }
 							detail={ current.type }
@@ -170,7 +166,9 @@ function FigureRow( { label, value } ) {
 	return (
 		<div className="flex items-baseline justify-between gap-4">
 			<span className="text-ink-3">{ label }</span>
-			<span className="num font-mono font-medium text-ink">{ value }</span>
+			<span className="num font-mono font-medium text-ink">
+				{ value }
+			</span>
 		</div>
 	);
 }
@@ -341,16 +339,16 @@ function fromViewer( g ) {
 			g.color === 'white'
 				? 'black'
 				: g.color === 'black'
-				? 'white'
-				: null,
+					? 'white'
+					: null,
 		result:
 			g.result === 'win'
 				? 'loss'
 				: g.result === 'loss'
-				? 'win'
-				: g.result === 'draw'
-				? 'draw'
-				: null,
+					? 'win'
+					: g.result === 'draw'
+						? 'draw'
+						: null,
 		is_bye: false,
 	};
 }
@@ -360,7 +358,12 @@ function fromViewer( g ) {
 // (green ahead, red behind, yellow even). Renders only when a member is logged
 // in and has actually played the subject. Derived from the subject's games
 // (opponent === me), so it works unchanged on the global player page too.
-export function AgainstYou( { games, meId, title = 'Against you', className = '' } ) {
+export function AgainstYou( {
+	games,
+	meId,
+	title = 'Against you',
+	className = '',
+} ) {
 	const [ open, setOpen ] = useState( true );
 	if ( meId == null ) {
 		return null;
@@ -378,8 +381,8 @@ export function AgainstYou( { games, meId, title = 'Against you', className = ''
 		net > 0
 			? 'bg-h2h-win border-h2h-win-rim'
 			: net < 0
-			? 'bg-h2h-loss border-h2h-loss-rim'
-			: 'bg-h2h-even border-h2h-even-rim';
+				? 'bg-h2h-loss border-h2h-loss-rim'
+				: 'bg-h2h-even border-h2h-even-rim';
 	const score = `${ wins }–${ draws }–${ losses }`;
 	// Classical score %: a win = 1, a draw = ½ (so 1 win + 1 draw of 2 = 75%).
 	const pct =

@@ -141,10 +141,10 @@ export function AbsenceCard( { declinable } ) {
 							{ entry.state === 'notified'
 								? `The admin has been told about ${ optionLabel(
 										entry
-								  ) } — they'll confirm it.`
+									) } — they'll confirm it.`
 								: `${ optionLabel(
 										entry
-								  ) } is already recorded by the admin — talk to them to change it.` }
+									) } is already recorded by the admin — talk to them to change it.` }
 						</li>
 					) ) }
 				</ul>

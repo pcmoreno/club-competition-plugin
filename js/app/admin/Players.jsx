@@ -205,7 +205,9 @@ export function Players() {
 					onInvite={ setInviteTarget }
 				/>
 			) }
-			{ addOpen && <PlayerDialog onClose={ () => setAddOpen( false ) } /> }
+			{ addOpen && (
+				<PlayerDialog onClose={ () => setAddOpen( false ) } />
+			) }
 			{ editTarget && (
 				<PlayerDialog
 					player={ editTarget }

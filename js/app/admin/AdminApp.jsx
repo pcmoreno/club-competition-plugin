@@ -22,8 +22,7 @@ export function AdminApp( { path } ) {
 	// rest are exact matches. The detail page still lights the Tournaments tab.
 	const detail = matchPath( '/admin/tournaments/:id', path );
 	const known =
-		detail !== null ||
-		Object.prototype.hasOwnProperty.call( ROUTES, path );
+		detail !== null || Object.prototype.hasOwnProperty.call( ROUTES, path );
 
 	// Normalize bare /admin and any unknown /admin/* to the default page, so the
 	// URL and the active nav tab always agree (no orphan page with no tab lit).

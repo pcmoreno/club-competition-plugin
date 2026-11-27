@@ -274,8 +274,8 @@ function MemberSection( { player, onInvite, onRevoke } ) {
 		status === 'invited'
 			? 'Resend invite'
 			: status === 'revoked'
-			? 'Re-invite'
-			: 'Send invite';
+				? 'Re-invite'
+				: 'Send invite';
 
 	return (
 		<section>
@@ -345,8 +345,8 @@ function ToggleActiveConfirm( { player, onClose } ) {
 				toggle.isPending
 					? 'Saving…'
 					: deactivating
-					? 'Deactivate'
-					: 'Activate'
+						? 'Deactivate'
+						: 'Activate'
 			}
 			busy={ toggle.isPending }
 			onCancel={ onClose }

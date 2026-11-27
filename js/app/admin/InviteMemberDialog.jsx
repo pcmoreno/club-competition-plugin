@@ -58,8 +58,8 @@ export function InviteMemberDialog( { player, onClose } ) {
 				isResend
 					? 'Resend invite'
 					: isReinvite
-					? 'Re-invite member'
-					: 'Invite member'
+						? 'Re-invite member'
+						: 'Invite member'
 			}
 			description={
 				isResend ? (
@@ -126,10 +126,10 @@ export function InviteMemberDialog( { player, onClose } ) {
 					{ invite.isPending
 						? 'Sending…'
 						: isResend
-						? 'Resend invite'
-						: isReinvite
-						? 'Re-invite'
-						: 'Send invite' }
+							? 'Resend invite'
+							: isReinvite
+								? 'Re-invite'
+								: 'Send invite' }
 				</button>
 			</div>
 		</Dialog>

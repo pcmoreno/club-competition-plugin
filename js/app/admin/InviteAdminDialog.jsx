@@ -68,8 +68,8 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 				isResend ? (
 					<>
 						<strong className="text-ink">{ admin.name }</strong>{ ' ' }
-						hasn’t accepted yet. A new email with a fresh link will be
-						sent, and the previous link will stop working.
+						hasn’t accepted yet. A new email with a fresh link will
+						be sent, and the previous link will stop working.
 					</>
 				) : (
 					<>
@@ -147,8 +147,8 @@ export function InviteAdminDialog( { admin = null, onClose } ) {
 					{ invite.isPending
 						? 'Sending…'
 						: isResend
-						? 'Resend invite'
-						: 'Send invite' }
+							? 'Resend invite'
+							: 'Send invite' }
 				</button>
 			</div>
 		</Dialog>

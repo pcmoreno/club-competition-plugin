@@ -38,9 +38,7 @@ export function ContactsField( { value, onChange } ) {
 	const byId = new Map( admins.map( ( a ) => [ a.id, a ] ) );
 	// Ids the parent holds that no active admin matches (a revoked account, say)
 	// are dropped from the display rather than rendered as a blank row.
-	const selected = value
-		.map( ( id ) => byId.get( id ) )
-		.filter( Boolean );
+	const selected = value.map( ( id ) => byId.get( id ) ).filter( Boolean );
 	const available = admins.filter( ( a ) => ! value.includes( a.id ) );
 
 	const add = ( e ) => {

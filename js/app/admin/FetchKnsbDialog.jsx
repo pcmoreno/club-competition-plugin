@@ -113,8 +113,8 @@ export function FetchKnsbDialog( { onClose } ) {
 					{ fetchList.isPending
 						? 'Fetching…'
 						: s?.available
-						? 'Fetch again'
-						: 'Fetch now' }
+							? 'Fetch again'
+							: 'Fetch now' }
 				</button>
 			</div>
 		</Dialog>

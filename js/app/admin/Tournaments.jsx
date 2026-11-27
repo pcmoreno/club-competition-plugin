@@ -6,12 +6,7 @@ import { AdminHeader } from './AdminLayout';
 import { ImportSeasonDialog } from './ImportSeasonDialog';
 import { CreateTournamentDialog } from './CreateTournamentDialog';
 import { PAIRING_LABELS, STATUS_LABELS } from './tournamentShared';
-import {
-	Notice,
-	formatDate,
-	ActionsMenu,
-	SearchInput,
-} from '../components/ui';
+import { Notice, formatDate, ActionsMenu, SearchInput } from '../components/ui';
 import { keys } from '../api/keys';
 
 // ADMIN. List of tournaments (= seasons), grouped Active / Preparation /

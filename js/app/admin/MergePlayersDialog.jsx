@@ -210,7 +210,7 @@ function ReviewStep( { keep, remove, onBack, onDone } ) {
 	const overlap = bothLoaded
 		? removeQuery.data.filter( ( rt ) =>
 				keepQuery.data.some( ( kt ) => kt.season_id === rt.season_id )
-		  )
+			)
 		: [];
 
 	// Fields the keeper is missing that the removed player fills in — previewed

@@ -37,9 +37,7 @@ function AccountRows( { data } ) {
 				<Row label="Name">{ data.name }</Row>
 				<Row label="Email">{ data.email }</Row>
 				<Row label="Role">Administrator</Row>
-				<Row label="Admin since">
-					{ formatDate( data.created_at ) }
-				</Row>
+				<Row label="Admin since">{ formatDate( data.created_at ) }</Row>
 			</>
 		);
 	}

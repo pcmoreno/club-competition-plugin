@@ -42,7 +42,7 @@ export function TransferPanel( {
 						: ( e ) => {
 								e.preventDefault();
 								onDragOver();
-						  }
+							}
 				}
 				onDragLeave={ locked ? undefined : onDragLeave }
 				onDrop={ locked ? undefined : onDrop }
@@ -81,12 +81,14 @@ export function TransferPanel( {
 									( locked
 										? 'text-ink-3'
 										: 'cursor-pointer ' +
-										  ( isSel
+											( isSel
 												? 'bg-accent-soft text-ink'
 												: 'text-ink-3 hover:bg-paper' ) )
 								}
 							>
-								<span className="truncate">{ rowLabel( p ) }</span>
+								<span className="truncate">
+									{ rowLabel( p ) }
+								</span>
 								{ meta !== '' && (
 									<span className="num ml-2 shrink-0 font-mono text-xs text-muted">
 										{ meta }
