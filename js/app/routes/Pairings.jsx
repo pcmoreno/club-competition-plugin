@@ -121,6 +121,10 @@ export function Pairings( { seasonId } ) {
 function RoundTable( { round, data, seasonId } ) {
 	const { games = [], byes = [] } = data;
 	const dateLabel = formatDate( round.date );
+	// No column for a round where nobody has a category to show.
+	const hasCategory = games.some(
+		( g ) => categoryLabel( g.white, g.black ) !== ''
+	);
 
 	return (
 		<div className="overflow-x-auto rounded border border-rule bg-surface shadow-sm">
@@ -145,9 +149,11 @@ function RoundTable( { round, data, seasonId } ) {
 							Result
 						</th>
 						<th className="px-4 py-2 font-medium">Black</th>
-						<th className="w-24 px-4 py-2 font-medium print:hidden">
-							Cat
-						</th>
+						{ hasCategory && (
+							<th className="w-24 px-4 py-2 font-medium print:hidden">
+								Cat
+							</th>
+						) }
 					</tr>
 				</thead>
 				<tbody>
@@ -173,9 +179,11 @@ function RoundTable( { round, data, seasonId } ) {
 									seasonId={ seasonId }
 								/>
 							</td>
-							<td className="px-4 py-2.5 text-ink-3 print:hidden">
-								{ categoryLabel( g.white, g.black ) }
-							</td>
+							{ hasCategory && (
+								<td className="px-4 py-2.5 text-ink-3 print:hidden">
+									{ categoryLabel( g.white, g.black ) }
+								</td>
+							) }
 						</tr>
 					) ) }
 				</tbody>
