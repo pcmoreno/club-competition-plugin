@@ -826,9 +826,11 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						const onBoard = pairedIds.has( p.season_player_id );
 						const bye = byeOf[ p.season_player_id ];
 						const placed = onBoard || !! bye;
-						const unplacedCls = editable
-							? 'cursor-grab border-rule bg-paper text-ink-3 hover:border-accent'
-							: 'border-rule bg-surface text-ink-3';
+						const stateCls = poolStateCls( {
+							onBoard,
+							bye,
+							editable,
+						} );
 						return (
 							<li
 								key={ p.season_player_id }
@@ -838,9 +840,7 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 								} }
 								className={
 									'flex items-center justify-between rounded border px-2 py-1.5 text-sm ' +
-									( placed
-										? 'border-rule-soft bg-surface text-muted'
-										: unplacedCls )
+									stateCls
 								}
 							>
 								<span className="truncate">
@@ -1126,6 +1126,27 @@ function Board( {
 			) }
 		</div>
 	);
+}
+
+// A pool row's colour says what the player is doing this round: white while still
+// to pair, paper once on a board, and a subtle tint for each kind of bye.
+const BYE_CLS = {
+	club_duty: 'border-status-duty-rim bg-status-duty text-ink-3',
+	personal: 'border-status-absent-rim bg-status-absent text-ink-3',
+	pairing_bye: 'border-status-bye-rim bg-status-bye text-ink-3',
+};
+
+function poolStateCls( { onBoard, bye, editable } ) {
+	if ( bye ) {
+		return BYE_CLS[ bye ] ?? 'border-rule-soft bg-paper text-muted';
+	}
+	if ( onBoard ) {
+		return 'border-rule-soft bg-paper text-muted';
+	}
+	if ( editable ) {
+		return 'cursor-grab border-rule bg-surface text-ink-3 hover:border-accent';
+	}
+	return 'border-rule bg-surface text-ink-3';
 }
 
 // The odd player out: present but with no opponent, so they take the pairing
