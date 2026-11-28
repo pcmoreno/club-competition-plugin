@@ -422,6 +422,24 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 		}
 	};
 
+	// An unpaired player dropped on a bye's open seat plays its holder, who keeps
+	// white; creating the game clears the holder's pairing bye server-side.
+	const dropToBye = ( holder ) => {
+		const d = drag.current;
+		drag.current = null;
+		setOverSlot( null );
+		if ( ! d || d.from !== 'pool' || ! editable ) {
+			return;
+		}
+		if ( d.player.season_player_id === holder.season_player_id ) {
+			return;
+		}
+		createGame.mutate( {
+			white: holder.season_player_id,
+			black: d.player.season_player_id,
+		} );
+	};
+
 	if ( roundsLoading ) {
 		return <Notice>Loading…</Notice>;
 	}
@@ -712,6 +730,13 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 						player={ p }
 						scoreOf={ scoreOf }
 						editable={ editable }
+						isOver={ overSlot === `bye-${ p.season_player_id }` }
+						onOver={ ( over ) =>
+							setOverSlot(
+								over ? `bye-${ p.season_player_id }` : null
+							)
+						}
+						onDrop={ () => dropToBye( p ) }
 						onRemove={ () =>
 							setAttendance.mutate( {
 								seasonPlayerId: p.season_player_id,
@@ -1105,8 +1130,22 @@ function Board( {
 
 // The odd player out: present but with no opponent, so they take the pairing
 // bye. Rendered as a board (without a number) so it reads as part of the round.
-function ByeBoard( { player, scoreOf, editable, onRemove } ) {
+function ByeBoard( {
+	player,
+	scoreOf,
+	editable,
+	isOver,
+	onOver,
+	onDrop,
+	onRemove,
+} ) {
 	const score = formatScore( scoreOf[ player.season_player_id ] ?? 0 );
+	let seatCls = 'border-transparent';
+	if ( isOver ) {
+		seatCls = 'border-accent bg-accent-soft';
+	} else if ( editable ) {
+		seatCls = 'border-dashed border-rule';
+	}
 	return (
 		<div className="flex items-center gap-3 rounded border border-dashed border-rule bg-surface px-3 py-2">
 			<span className="num w-8 shrink-0 text-center font-mono text-xs text-muted">
@@ -1120,7 +1159,23 @@ function ByeBoard( { player, scoreOf, editable, onRemove } ) {
 					</span>
 				</span>
 				<span className="text-xs text-muted">bye</span>
-				<span className="truncate text-left text-sm italic text-muted">
+				{ /* The open seat: an unpaired player dropped here plays the holder. */ }
+				<span
+					onDragOver={
+						editable
+							? ( e ) => {
+									e.preventDefault();
+									onOver( true );
+								}
+							: undefined
+					}
+					onDragLeave={ editable ? () => onOver( false ) : undefined }
+					onDrop={ editable ? onDrop : undefined }
+					className={
+						'truncate rounded border px-2 py-1 text-left text-sm italic text-muted ' +
+						seatCls
+					}
+				>
 					Pairing bye
 				</span>
 			</div>
