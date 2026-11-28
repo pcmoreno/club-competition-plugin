@@ -7,7 +7,6 @@ namespace SCS\Services;
 use SCS\Engine\Settings\StandingsDisplaySettings;
 use SCS\Engine\SettingsResolver;
 use SCS\Entity\Enum\BuchholzMethod;
-use SCS\Entity\Enum\ByeType;
 use SCS\Entity\Enum\PairingSystem;
 use SCS\Entity\Enum\StandingsColumn;
 use SCS\Entity\Enum\StandingsMetric;
@@ -17,6 +16,8 @@ use SCS\Exception\ValidationException;
 // Strict gate on client-supplied settings JSON; returns the normalized array to store.
 final class SettingsValidator
 {
+    private const BYE_KEY_PATTERN = '/^[a-z][a-z0-9_]{0,19}$/';
+
     public function __construct(private readonly SettingsResolver $settingsResolver)
     {
     }
@@ -27,9 +28,10 @@ final class SettingsValidator
      * payload through the standard class would silently drop every Keizer knob.
      *
      * @param array<string,mixed> $input
+     * @param list<string>        $byeKeysInUse keys the season's attendance already holds
      * @return array<string,mixed>
      */
-    public function validateScoring(PairingSystem $system, array $input): array
+    public function validateScoring(PairingSystem $system, array $input, array $byeKeysInUse = []): array
     {
         $settings = $this->settingsResolver->scoringFor($system, $input);
         $errors   = [];
@@ -44,16 +46,20 @@ final class SettingsValidator
             }
         }
 
+        // Attendance stores the key itself (VARCHAR(20)), so it must fit and be unambiguous.
+        $seen = [];
         foreach ($input['byeTypes'] ?? [] as $i => $bye) {
-            $key = is_array($bye) ? ($bye['key'] ?? '') : '';
+            $key = is_array($bye) ? trim((string)($bye['key'] ?? '')) : '';
             if ($key === '') {
                 $errors["byeTypes.$i.key"] = 'Key is required.';
-            } elseif (ByeType::tryFrom((string)$key) === null) {
-                // Attendance stores bye_type as a fixed enum, so a key outside it
-                // would render a box every drop silently fails against. Rejected
-                // here rather than at drop time. Admin-defined bye types would
-                // mean making that column free-form, not relaxing this check.
-                $errors["byeTypes.$i.key"] = 'Unknown bye type.';
+            } elseif (preg_match(self::BYE_KEY_PATTERN, $key) !== 1) {
+                $errors["byeTypes.$i.key"] = 'Use lowercase letters, digits and underscores, starting with a letter, at most 20 characters.';
+            } elseif (isset($seen[$key])) {
+                $errors["byeTypes.$i.key"] = sprintf('The key "%s" is used twice.', $key);
+            }
+            $seen[$key] = true;
+            if (!is_array($bye) || trim((string)($bye['label'] ?? '')) === '') {
+                $errors["byeTypes.$i.label"] = 'Label is required.';
             }
             if (isset($bye['points']) && !is_numeric($bye['points'])) {
                 $errors["byeTypes.$i.points"] = 'Must be a number.';
@@ -68,6 +74,12 @@ final class SettingsValidator
             $missing = array_diff($settings->reservedByeKeys(), $keys);
             if ($missing !== []) {
                 $errors['byeTypes'] = sprintf('Reserved bye type(s) cannot be removed: %s.', implode(', ', $missing));
+            }
+
+            // Removing or renaming a type a round still holds would orphan those rows.
+            $orphaned = array_diff($byeKeysInUse, array_map('trim', array_map('strval', $keys)));
+            if ($orphaned !== []) {
+                $errors['byeTypes'] = sprintf('Bye type(s) already recorded in a round cannot be removed or renamed: %s.', implode(', ', $orphaned));
             }
         }
 

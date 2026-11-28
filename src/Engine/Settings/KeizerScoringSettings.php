@@ -55,7 +55,8 @@ final class KeizerScoringSettings implements TournamentScoringSettings
     public const DEFAULT_BYE_TYPES = [
         ['key' => 'pairing_bye', 'label' => 'Pairing bye',       'points' => 0.6667, 'reserved' => true],
         ['key' => 'club_duty',   'label' => 'Club duty',         'points' => 0.6667],
-        ['key' => 'personal',    'label' => 'Personal (absent)', 'points' => 0.3333],
+        ['key' => 'personal',    'label' => 'Personal (absent)', 'points' => 0.3333, 'reserved' => true],
+        ['key' => 'no_show',     'label' => 'Absent without notice', 'points' => 0.0],
     ];
 
     public const DEFAULT_GAME_OUTCOMES = ['win' => 1.0, 'draw' => 0.5, 'loss' => 0.0];

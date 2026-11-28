@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SCS\Request;
 
 use SCS\Entity\Enum\AttendanceStatus;
-use SCS\Entity\Enum\ByeType;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class SaveAttendanceRequest
@@ -23,8 +22,10 @@ class SaveAttendanceRequest
                     new Assert\NotBlank(message: 'status is required.'),
                     new Assert\Choice(callback: [self::class, 'statusChoices'], message: 'status is not valid.'),
                 ],
+                // Checked against the tournament's configured bye types by RoundService, which can see the season.
                 'bye_type' => new Assert\Optional([
-                    new Assert\Choice(callback: [self::class, 'byeTypeChoices'], message: 'bye_type is not valid.'),
+                    new Assert\Type(type: 'string', message: 'bye_type must be a string.'),
+                    new Assert\Length(max: 20, maxMessage: 'bye_type is at most 20 characters.'),
                 ]),
             ],
             allowMissingFields: false,
@@ -37,12 +38,6 @@ class SaveAttendanceRequest
     public static function statusChoices(): array
     {
         return array_column(AttendanceStatus::cases(), 'value');
-    }
-
-    /** @return list<string> */
-    public static function byeTypeChoices(): array
-    {
-        return array_column(ByeType::cases(), 'value');
     }
 
     public static function fromRequest(\WP_REST_Request $request): self

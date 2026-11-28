@@ -103,9 +103,9 @@ class RoundController extends RestController
                     'season_player_id' => $a->season_player_id,
                     'name'             => $display[$a->season_player_id]['name'] ?? null,
                     'category'         => $display[$a->season_player_id]['category'] ?? null,
-                    'bye_type'         => $a->bye_type?->value,
+                    'bye_type'         => $a->bye_type,
                 ],
-                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::PairingBye)
+                array_filter($attendance, fn ($a) => $a->bye_type === ByeType::PairingBye->value)
             ));
 
             return $this->ok([
@@ -276,7 +276,7 @@ class RoundController extends RestController
                 $parsed[] = [
                     'season_player_id' => (int)$entry['season_player_id'],
                     'status'           => AttendanceStatus::from($entry['status']),
-                    'bye_type'         => isset($entry['bye_type']) ? ByeType::from($entry['bye_type']) : null,
+                    'bye_type'         => isset($entry['bye_type']) ? (string)$entry['bye_type'] : null,
                 ];
             }
 

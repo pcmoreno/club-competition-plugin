@@ -152,7 +152,7 @@ final class SeasonFixture
                 round_id:         $number,
                 season_player_id: $this->playerIds[$name],
                 status:           AttendanceStatus::Present,
-                bye_type:         ByeType::PairingBye,
+                bye_type:         ByeType::PairingBye->value,
             );
         }
 

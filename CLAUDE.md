@@ -383,6 +383,24 @@ class, not the frontend. Scoring freezes after the first completed round;
 display never locks; pairing settings are wiped when the pairing system changes
 (they're system-specific).
 
+**Bye types are the tournament's own.** `byeTypes` in the scoring settings is
+the list of reasons a player can sit out a round — Sevilla's absence reasons —
+each `{key, label, points}`, and `attendance.bye_type` stores the key as text.
+`RoundService::saveAttendance` accepts only a key that tournament defines, and
+records the pairing bye as present and every other key as absent, which is what
+pairing reads. A new tournament starts with club duty, personal and no-show
+(`no_show`, 0) besides the pairing bye.
+
+Two keys are **reserved** (`ByeType`): `pairing_bye`, which the engine gives the
+odd player out, and `personal` — Sevilla's "absence with message" — which member
+self-report and standing absence write. They can be relabelled and re-priced but
+not removed or renamed, and `ByeTypes::normalise` restores one a stored list
+lacks, at 0. `SettingsValidator` refuses a key that isn't lowercase `snake_case`
+of at most 20 characters (the column's width), a duplicate, a blank label, and
+the removal or renaming of any key a round of that tournament already records.
+A key that is somehow still orphaned scores 0 and keeps a box on the Pairings
+tab, so its players can be dragged out.
+
 **`SettingsResolver::pairing()` returns null for Swiss**, which has no pairing
 settings class — the endpoint sends `fields: null` and the tab renders nothing.
 Manual, Keizer and both round-robins resolve. The mapping
@@ -791,7 +809,7 @@ hardcode `wp_scs_`.
   `default_absent` and `board_number`)
 - `…scs_rounds` — competition rounds
 - `…scs_games` — individual pairings/results (carries its own `time_control`)
-- `…scs_attendance` — per-round presence and bye type
+- `…scs_attendance` — per-round presence and bye type (a key from the tournament's configured bye types)
 - `…scs_standings_snapshots` — immutable per-round standings, written on round-complete.
   Its `byes` column counts **pairing byes only**, deliberately: counting every
   bye type would make it `total rounds − games played` and carry no information
