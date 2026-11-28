@@ -194,7 +194,7 @@ class PlayerHomeService
         // Not paired: a bye is worth showing, anything else (not yet paired, or
         // marked absent) is not a pairing and belongs on no card.
         $attendance = $this->attendance->findByRoundAndSeasonPlayer($round->id, $enrolment->id);
-        if ($attendance?->bye_type === ByeType::PairingBye) {
+        if ($attendance?->bye_type === ByeType::PairingBye->value) {
             return $base + ['is_bye' => true, 'board' => null, 'color' => null, 'opponent' => null];
         }
 

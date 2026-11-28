@@ -198,7 +198,7 @@ class RoundAbsenceService
         }
 
         if ($mode === self::MODE_SELF) {
-            $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal);
+            $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal->value);
         }
 
         $notified = $this->notify($mode, 'declared', $playerId, $round, $season, $enrolment, $reason, $game);
@@ -324,7 +324,7 @@ class RoundAbsenceService
     private function isOwnDeclaration(Attendance $attendance): bool
     {
         return $attendance->status === AttendanceStatus::Absent
-            && $attendance->bye_type === ByeType::Personal;
+            && $attendance->bye_type === ByeType::Personal->value;
     }
 
     /** @throws TooManyRequestsException when this member is mailing too fast. */

@@ -562,6 +562,14 @@ class SeasonController extends RestController
                 if ($scoringLocked) {
                     throw new ValidationException(['pairing_system' => 'This pairing system scores differently and cannot be selected after the first completed round.']);
                 }
+                // The wipe falls back to the new system's bye types, which must still cover every recorded one.
+                $orphaned = array_diff(
+                    $this->attendanceRepository->findByeTypesBySeason($season->id),
+                    $this->settingsResolver->scoringFor($newSystem, [])->byeKeys()
+                );
+                if ($orphaned !== []) {
+                    throw new ValidationException(['pairing_system' => sprintf('Rounds already record bye type(s) the new system does not define: %s.', implode(', ', $orphaned))]);
+                }
                 $data['scoring_settings'] = null;
             }
         } elseif ($input->pairing_settings !== null) {
@@ -574,7 +582,11 @@ class SeasonController extends RestController
             }
             // Whether this system has scoring settings at all is the validator's
             // call now — it resolves the class that will parse the blob.
-            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring($newSystem, $input->scoring_settings));
+            $data['scoring_settings'] = json_encode($this->settingsValidator->validateScoring(
+                $newSystem,
+                $input->scoring_settings,
+                $this->attendanceRepository->findByeTypesBySeason($season->id)
+            ));
         }
 
         if ($input->display_settings !== null) {
@@ -962,7 +974,7 @@ class SeasonController extends RestController
                     $declared[] = [
                         'season_player_id' => $row->season_player_id,
                         'name'             => $display[$row->season_player_id]['name'] ?? null,
-                        'bye_type'         => $row->bye_type?->value,
+                        'bye_type'         => $row->bye_type,
                     ];
                 }
             }

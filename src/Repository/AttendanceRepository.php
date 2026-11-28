@@ -68,13 +68,13 @@ class AttendanceRepository
         return $byRound;
     }
 
-    public function save(int $round_id, int $season_player_id, AttendanceStatus $status, ?ByeType $bye_type): void
+    public function save(int $round_id, int $season_player_id, AttendanceStatus $status, ?string $bye_type): void
     {
         $existing = $this->findByRoundAndSeasonPlayer($round_id, $season_player_id);
 
         $data = [
             'status'   => $status->value,
-            'bye_type' => $bye_type?->value,
+            'bye_type' => $bye_type,
         ];
 
         if ($existing) {
@@ -113,6 +113,23 @@ class AttendanceRepository
         ]);
     }
 
+    // Every bye key a season's rounds hold, so settings can refuse to drop one in use.
+    /** @return list<string> */
+    public function findByeTypesBySeason(int $season_id): array
+    {
+        $keys = $this->connection->createQueryBuilder()
+            ->select('DISTINCT a.bye_type')
+            ->from(SCS_TABLE_PREFIX . 'attendance', 'a')
+            ->innerJoin('a', SCS_TABLE_PREFIX . 'rounds', 'r', 'r.id = a.round_id')
+            ->where('r.season_id = :season')
+            ->andWhere('a.bye_type IS NOT NULL')
+            ->setParameter('season', $season_id)
+            ->executeQuery()
+            ->fetchFirstColumn();
+
+        return array_map('strval', $keys);
+    }
+
     public function deleteBySeason(int $season_id): void
     {
         // Attendance references a round, not the season directly. Multi-table
@@ -141,7 +158,7 @@ class AttendanceRepository
     }
 
     /**
-     * @param list<array{season_player_id: int, status: AttendanceStatus, bye_type: ?ByeType}> $entries
+     * @param list<array{season_player_id: int, status: AttendanceStatus, bye_type: ?string}> $entries
      */
     public function saveMany(int $round_id, array $entries): void
     {
@@ -159,7 +176,7 @@ class AttendanceRepository
             round_id:         (int)$row['round_id'],
             season_player_id: (int)$row['season_player_id'],
             status:           AttendanceStatus::from($row['status']),
-            bye_type:         $row['bye_type'] !== null ? ByeType::from($row['bye_type']) : null,
+            bye_type:         $row['bye_type'] !== null ? (string)$row['bye_type'] : null,
         );
     }
 }

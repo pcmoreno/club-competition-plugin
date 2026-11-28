@@ -150,7 +150,7 @@ class SerializerService
             'round_id'         => $a->round_id,
             'season_player_id' => $a->season_player_id,
             'status'           => $a->status->value,
-            'bye_type'         => $a->bye_type?->value,
+            'bye_type'         => $a->bye_type,
         ];
     }
 

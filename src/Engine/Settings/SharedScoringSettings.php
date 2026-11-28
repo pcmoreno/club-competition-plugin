@@ -41,6 +41,15 @@ trait SharedScoringSettings
     }
 
     /** @return list<string> */
+    public function byeKeys(): array
+    {
+        return array_values(array_map(
+            static fn (array $bye): string => (string)($bye['key'] ?? ''),
+            array_filter($this->byeTypes, 'is_array')
+        ));
+    }
+
+    /** @return list<string> */
     public function reservedByeKeys(): array
     {
         return (new ByeTypes(self::DEFAULT_BYE_TYPES))->reservedKeys();

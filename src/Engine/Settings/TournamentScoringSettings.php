@@ -23,6 +23,13 @@ interface TournamentScoringSettings extends SettingsInterface
     public function byePoints(string $key): float;
 
     /**
+     * Every bye key this tournament is configured with: the ones attendance may hold.
+     *
+     * @return list<string>
+     */
+    public function byeKeys(): array;
+
+    /**
      * Bye types the engine assigns itself, which a client payload may never drop.
      *
      * @return list<string>

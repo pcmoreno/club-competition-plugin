@@ -128,13 +128,25 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 		queryKey: keys.seasonSettings( season.id ),
 		queryFn: () => api.get( `seasons/${ season.id }/settings` ),
 	} );
-	const byeTypes = useMemo(
-		() =>
-			( settingsData?.scoring?.values?.byeTypes ?? [] ).filter(
-				( b ) => ! b.reserved
+	// One box per configured bye type except the pairing bye, which the round
+	// shows as its own board. A key recorded this round that the settings no
+	// longer define still gets a box, so its players can be dragged back out.
+	const byeTypes = useMemo( () => {
+		const configured = (
+			settingsData?.scoring?.values?.byeTypes ?? []
+		).filter( ( b ) => b.key !== 'pairing_bye' );
+		const known = new Set( configured.map( ( b ) => b.key ) );
+		const orphans = [
+			...new Set(
+				( roundData?.attendance ?? [] )
+					.map( ( a ) => a.bye_type )
+					.filter(
+						( k ) => k && k !== 'pairing_bye' && ! known.has( k )
+					)
 			),
-		[ settingsData ]
-	);
+		].map( ( key ) => ( { key, label: key, points: 0 } ) );
+		return [ ...configured, ...orphans ];
+	}, [ settingsData, roundData ] );
 
 	const round = roundData?.round ?? null;
 	const games = useMemo( () => roundData?.games ?? [], [ roundData ] );
@@ -376,9 +388,10 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 		const d = drag.current;
 		drag.current = null;
 		setOverSlot( null );
-		// Only a pool player forms a new pairing; a board player is unpaired by
-		// dropping it back onto the enrolled list.
-		if ( ! d || d.from !== 'pool' || ! editable ) {
+		// Only an unpaired player forms a new pairing; a board player is unpaired
+		// by dropping it back onto the enrolled list.
+		// From the list or straight out of a bye box; the game clears that bye server-side.
+		if ( ! d || ( d.from !== 'pool' && d.from !== 'bye' ) || ! editable ) {
 			return;
 		}
 		const p = d.player;
@@ -411,7 +424,8 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 					? [ displaced ]
 					: []
 			);
-		if ( opponentsLeft.length === 0 ) {
+		// Not for someone taken out of a bye box: that would swap their absence for a pairing bye.
+		if ( opponentsLeft.length === 0 && d.from === 'pool' ) {
 			setAttendance.mutate( {
 				seasonPlayerId: p.season_player_id,
 				byeType: 'pairing_bye',
@@ -422,13 +436,28 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 		}
 	};
 
+	// A player who didn't turn up is dragged off their board into a bye box: the
+	// board goes, their bye is recorded, and the opponent is back to be re-paired.
+	const benchFromBoard = async ( gameId, player, byeType ) => {
+		try {
+			await deleteGame.mutateAsync( gameId );
+			await setAttendance.mutateAsync( {
+				seasonPlayerId: player.season_player_id,
+				byeType,
+			} );
+		} catch {
+			// Each mutation surfaces its own error under the board or the byes.
+		}
+	};
+
 	// An unpaired player dropped on a bye's open seat plays its holder, who keeps
 	// white; creating the game clears the holder's pairing bye server-side.
 	const dropToBye = ( holder ) => {
 		const d = drag.current;
 		drag.current = null;
 		setOverSlot( null );
-		if ( ! d || d.from !== 'pool' || ! editable ) {
+		// From the list or straight out of a bye box; the game clears that bye server-side.
+		if ( ! d || ( d.from !== 'pool' && d.from !== 'bye' ) || ! editable ) {
 			return;
 		}
 		if ( d.player.season_player_id === holder.season_player_id ) {
@@ -880,8 +909,10 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 							Byes
 						</h4>
 						<p className="mb-3 text-xs text-muted">
-							Drag a player into a bye to sit them out this round;
-							drag them back to the list to clear it. The odd
+							Drag a player into a bye to sit them out this round
+							— from the list, or off their board if they didn’t
+							turn up, which frees their opponent to be re-paired.
+							Drag them back to the list to clear it. The odd
 							player out is given the pairing bye automatically.
 						</p>
 						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -911,11 +942,15 @@ export function TournamentPairingsTab( { season, players, locked = false } ) {
 										const d = drag.current;
 										drag.current = null;
 										setByeOver( null );
-										if (
-											! editable ||
-											! d ||
-											d.from === 'board'
-										) {
+										if ( ! editable || ! d ) {
+											return;
+										}
+										if ( d.from === 'board' ) {
+											benchFromBoard(
+												d.gameId,
+												d.player,
+												b.key
+											);
 											return;
 										}
 										setAttendance.mutate( {

@@ -182,7 +182,7 @@ class SeasonImportService
             }
 
             foreach ($r['byes'] ?? [] as $byeName) {
-                $this->attendance->save($round->id, $resolveEnrolment($byeName), AttendanceStatus::Present, ByeType::PairingBye);
+                $this->attendance->save($round->id, $resolveEnrolment($byeName), AttendanceStatus::Present, ByeType::PairingBye->value);
                 $counts['byes']++;
             }
 

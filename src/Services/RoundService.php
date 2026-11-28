@@ -70,7 +70,7 @@ final class RoundService
             // The only trigger: flagging an enrolment later doesn't backfill rounds that already exist.
             foreach ($this->seasonPlayers->findBySeason($season->id) as $enrolment) {
                 if ($enrolment->default_absent) {
-                    $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal);
+                    $this->attendance->save($round->id, $enrolment->id, AttendanceStatus::Absent, ByeType::Personal->value);
                 }
             }
 
@@ -159,7 +159,7 @@ final class RoundService
                         $round->id,
                         $bye['season_player_id'],
                         AttendanceStatus::Present,
-                        ByeType::from($bye['bye_type']),
+                        (string)$bye['bye_type'],
                     );
                 }
 
@@ -245,7 +245,7 @@ final class RoundService
                     $round->id,
                     $bye['season_player_id'],
                     AttendanceStatus::Present,
-                    ByeType::from($bye['bye_type']),
+                    (string)$bye['bye_type'],
                 );
             }
 
@@ -513,7 +513,7 @@ final class RoundService
      * Save a round's attendance. Same status guard as results, and the same
      * reason: attendance feeds byes, which feed the frozen standings.
      *
-     * @param list<array{season_player_id:int,status:AttendanceStatus,bye_type:?ByeType}> $entries
+     * @param list<array{season_player_id:int,status:AttendanceStatus,bye_type:?string}> $entries
      */
     public function saveAttendance(int $roundId, array $entries): void
     {
@@ -525,6 +525,34 @@ final class RoundService
         foreach ($entries as $entry) {
             if (!in_array($entry['season_player_id'], $roster, true)) {
                 throw new ValidationException(['attendance' => 'Every player must be enrolled in this season.']);
+            }
+        }
+
+        // A bye must be one this tournament defines. The pairing bye is present
+        // (unpaired), every other bye an absence, which is what pairing reads.
+        $season  = $this->seasons->findById($round->season_id);
+        $allowed = $season !== null ? $this->settings->scoring($season)->byeKeys() : [];
+        foreach ($entries as $entry) {
+            $bye = $entry['bye_type'];
+            if ($bye === null) {
+                continue;
+            }
+            if (!in_array($bye, $allowed, true)) {
+                throw new ValidationException(['attendance' => sprintf(
+                    'Bye type "%s" is not configured for season %d (configured: %s).',
+                    $bye,
+                    $round->season_id,
+                    implode(', ', $allowed)
+                )]);
+            }
+            $expected = $bye === ByeType::PairingBye->value ? AttendanceStatus::Present : AttendanceStatus::Absent;
+            if ($entry['status'] !== $expected) {
+                throw new ValidationException(['attendance' => sprintf(
+                    'Bye type "%s" must be recorded as %s, got %s.',
+                    $bye,
+                    $expected->value,
+                    $entry['status']->value
+                )]);
             }
         }
 

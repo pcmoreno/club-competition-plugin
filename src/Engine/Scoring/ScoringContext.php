@@ -53,7 +53,7 @@ final class ScoringContext
         $byesByPlayer = [];
         foreach ($attendance as $row) {
             if ($row->bye_type !== null) {
-                $byesByPlayer[$row->season_player_id][] = $row->bye_type->value;
+                $byesByPlayer[$row->season_player_id][] = $row->bye_type;
             }
         }
 

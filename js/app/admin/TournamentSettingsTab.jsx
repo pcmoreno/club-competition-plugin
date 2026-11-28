@@ -177,8 +177,8 @@ function OrderedMultiSelect( { options, value, onChange, disabled } ) {
 // remounting the input and losing focus after one character.
 let byeRowSeq = 0;
 
-// Editable {key, label, points} rows. Reserved keys (the engine-assigned
-// pairing bye) can be re-priced but never removed.
+// Editable {key, label, points} rows. Reserved keys (pairing bye and personal,
+// which the app writes itself) can be relabelled and re-priced but never removed.
 function ByeTypeList( { field, rows, onChange, disabled } ) {
 	const reserved = field.reservedKeys || [];
 	const list = Array.isArray( rows ) ? rows : [];
@@ -234,7 +234,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 						<input
 							type="number"
 							min={ field.min }
-							step="0.5"
+							step="0.1"
 							className={ inputCls + ' num w-20' }
 							value={ row.points ?? 0 }
 							disabled={ disabled }
@@ -251,7 +251,7 @@ function ByeTypeList( { field, rows, onChange, disabled } ) {
 							disabled={ disabled || isReserved }
 							title={
 								isReserved
-									? 'The pairing bye is assigned by the engine and can’t be removed.'
+									? 'Used by the app itself, so it can’t be removed or renamed.'
 									: 'Remove'
 							}
 							onClick={ () => removeAt( i ) }
@@ -620,7 +620,7 @@ function ScoringGroup( { group, values, setValues, disabled } ) {
 	if ( group.group === 'bye_types' ) {
 		return (
 			<section>
-				<SectionTitle hint="A player’s bye scores the points of its type. The pairing bye is assigned by the engine.">
+				<SectionTitle hint="A player’s bye scores the points of its type. The key is what a round stores: lowercase letters, digits and underscores, at most 20 characters. Pairing bye and Personal are used by the app itself.">
 					Bye types
 				</SectionTitle>
 				<ByeTypeList
