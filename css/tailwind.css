@@ -87,6 +87,15 @@
   --h2h-even-bg:     oklch(96.5% 0.045 95);
   --h2h-even-border: oklch(78% 0.10 95);
 
+  /* Pairings tab pool: what an enrolled player is doing this round. Subtle tints;
+     green = club duty, red = personal absence, yellow = pairing bye. */
+  --status-duty-bg:       oklch(96% 0.03 145);
+  --status-duty-border:   oklch(85% 0.05 145);
+  --status-absent-bg:     oklch(96% 0.025 25);
+  --status-absent-border: oklch(86% 0.05 25);
+  --status-bye-bg:        oklch(97% 0.045 95);
+  --status-bye-border:    oklch(87% 0.08 95);
+
   --white-sq:  #f1e9d2;
   --black-sq:  #2a241b;
   --board-rim: #1a1612;

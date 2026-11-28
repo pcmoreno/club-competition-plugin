@@ -60,6 +60,13 @@ module.exports = {
         'h2h-loss-rim': 'var(--h2h-loss-border)',
         'h2h-even': 'var(--h2h-even-bg)',
         'h2h-even-rim': 'var(--h2h-even-border)',
+        // Pairings tab pool states.
+        'status-duty': 'var(--status-duty-bg)',
+        'status-duty-rim': 'var(--status-duty-border)',
+        'status-absent': 'var(--status-absent-bg)',
+        'status-absent-rim': 'var(--status-absent-border)',
+        'status-bye': 'var(--status-bye-bg)',
+        'status-bye-rim': 'var(--status-bye-border)',
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
